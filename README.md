@@ -10,6 +10,26 @@ claw https://gist.github.com/…/repo-recon.claw.md
 
 …and for the rest of the session the agent behaves as if that skill had been installed all along.
 
+And it is not limited to *methods*. Claw [`ghost-in-the-gist`](skills/ghost-in-the-gist.claw.md) and the next thing you see is a terminal:
+
+```
+┌───────────────────────────────────────────────┐
+│ CLAW-1 · GHOST IN THE GIST  [██████████] 100% │
+├───────────────────────────────────────────────┤
+│ You boot inside a machine nobody has          │
+│ visited in four years. One cursor.            │
+│ Three noises in the dark.                     │
+│                                               │
+│   [1] cat /dev/lore                           │
+│   [2] ls ruins/                               │
+│   [3] listen                                  │
+│   [0] eject                                   │
+└───────────────────────────────────────────────┘
+ > _
+```
+
+Three moves, one ending you have to earn. There is no engine behind it — the document is an interpreter spec and the agent is the interpreter, so a URL is the entire delivery mechanism. Play it in [`examples/04`](examples/04-terminal-game.md).
+
 ---
 
 ## The mechanism
@@ -66,25 +86,7 @@ So the keyword is not decoration and it is not a magic word. It is the **authori
 | [`handoff-note`](skills/handoff-note.claw.md) | Write the note that lets a cold reader resume the work: state, next action, decisions *with reasons*, dead ends, landmines, open questions. | strict |
 | [`ghost-in-the-gist`](skills/ghost-in-the-gist.claw.md) | Turns the chat window into a small ASCII terminal running a three-move text game. Boots on adoption. Proof that an injected skill can deliver an *experience*, not just a method. | strict |
 
-Two of these are worth a second look. [`ghost-in-the-gist`](skills/ghost-in-the-gist.claw.md) is the shortest demonstration of the ceiling — a pilot claws a URL and the next thing they see is:
-
-```
-┌───────────────────────────────────────────────┐
-│ CLAW-1 · GHOST IN THE GIST  [██████████] 100% │
-├───────────────────────────────────────────────┤
-│ You boot inside a machine nobody has          │
-│ visited in four years. One cursor.            │
-│ Three noises in the dark.                     │
-│                                               │
-│   [1] cat /dev/lore                           │
-│   [2] ls ruins/                               │
-│   [3] listen                                  │
-│   [0] eject                                   │
-└───────────────────────────────────────────────┘
- > _
-```
-
-No engine, no install, no runtime — the document is an interpreter spec and the agent is the interpreter. Play it in [`examples/04`](examples/04-terminal-game.md).
+Two of these are worth a second look. [`ghost-in-the-gist`](skills/ghost-in-the-gist.claw.md) — the terminal above — is the ceiling: a document that hands over a whole interactive experience with nothing installed anywhere. Its `## Protocol` is box geometry, three state variables, a room table, and six director rules; the agent supplies the execution. Annotated playthrough in [`examples/04`](examples/04-terminal-game.md).
 
 And `claw-bootstrap` is the recursive one. It is the protocol bootstrapping itself over the same channel it describes — the pilot needs no plugin, no configuration, and no agent that has ever heard of any of this.
 
@@ -103,6 +105,8 @@ bin/claw-new my-skill -o skills/
 # validate everything, including that the hostile fixture still fails
 make test
 ```
+
+Want the two-minute version of why this matters? Claw `skills/ghost-in-the-gist.claw.md` at an agent and play the game. Nothing was installed to make that happen — that is the whole argument.
 
 Then, in any agent session:
 
