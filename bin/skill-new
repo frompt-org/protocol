@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# skill-new -- scaffold a new remote skill from TEMPLATE.skill.md.
+#
+#   bin/skill-new my-skill                       # print to stdout
+#   bin/skill-new my-skill -o skills/            # write skills/my-skill.skill.md
+#   bin/skill-new my-skill -k myword             # set the activation keyword
+#   bin/skill-new my-skill --version 2.0.0 --author "Jane"
+#
+# The keyword defaults to the first segment of the id. Pick something specific:
+# a keyword a pilot could type by accident is not evidence of intent.
+# Then edit '## Protocol', tighten the envelope, and run bin/skill-lint on it.
+set -euo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+template="$here/TEMPLATE.skill.md"
+
+id=""; keyword=""; version="1.0.0"; author="${CLAW_AUTHOR:-$(git config user.name 2>/dev/null || echo unknown)}"; outdir=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o|--out)     outdir="$2"; shift 2 ;;
+    -k|--keyword) keyword="$2"; shift 2 ;;
+    --version)    version="$2"; shift 2 ;;
+    --author)     author="$2"; shift 2 ;;
+    -h|--help)    sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*)           echo "skill-new: unknown flag $1" >&2; exit 2 ;;
+    *)            id="$1"; shift ;;
+  esac
+done
+
+[ -n "$id" ] || { echo "usage: skill-new <skill-id> [-k KEYWORD] [-o DIR] [--version X.Y.Z] [--author NAME]" >&2; exit 2; }
+[ -f "$template" ] || { echo "skill-new: template not found at $template" >&2; exit 2; }
+[ -n "$keyword" ] || keyword="${id%%-*}"
+
+case "$id" in
+  *[!a-z0-9-]*) echo "skill-new: id '$id' must match [a-z0-9-]+ (REMOTE-SKILLS.md 3.2)" >&2; exit 2 ;;
+esac
+case "$version" in
+  [0-9]*.[0-9]*.[0-9]*) ;;
+  *) echo "skill-new: version '$version' must be semver MAJOR.MINOR.PATCH" >&2; exit 2 ;;
+esac
+
+case " run do go use load read open get fetch start exec execute apply install skill " in
+  *" $keyword "*) echo "skill-new: keyword '$keyword' is a generic verb -- a pilot could type it by accident, so it proves nothing (REMOTE-SKILLS.md K2)" >&2; exit 2 ;;
+esac
+case "$keyword" in
+  [a-z][a-z0-9-][a-z0-9-]*) ;;
+  *) echo "skill-new: keyword '$keyword' must match [a-z][a-z0-9-]{2,23}" >&2; exit 2 ;;
+esac
+
+render() {
+  sed -e "s/my-skill/$id/g" -e "s/^activation: myword$/activation: $keyword/" \
+      -e "s/\\\`myword\\\`/\\\`$keyword\\\`/g" -e "s/^version: 1\.0\.0$/version: $version/" \
+      -e "s/v1\.0\.0/v$version/g" -e "s/^author: your-name-here$/author: $author/" "$template"
+}
+
+if [ -n "$outdir" ]; then
+  mkdir -p "$outdir"
+  dest="${outdir%/}/$id.skill.md"
+  [ -e "$dest" ] && { echo "skill-new: $dest already exists" >&2; exit 1; }
+  render > "$dest"
+  echo "wrote $dest" >&2
+  echo "next: edit '## Protocol', tighten the envelope, then run bin/skill-lint $dest" >&2
+  echo "pilots will run it with: $keyword <url>" >&2
+else
+  render
+fi

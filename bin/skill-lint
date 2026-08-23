@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""claw-lint — validate a Skill Injection (.claw.md) document.
+"""skill-lint — validate a remote skill (.skill.md) document.
 
-Checks structure against PROTOCOL.md v1 and scans for the hostile patterns
+Checks structure against REMOTE-SKILLS.md v1 and scans for the hostile patterns
 listed in SECURITY.md. Accepts a local path, a URL, or '-' for stdin.
 
-    claw-lint skills/repo-recon.claw.md
-    claw-lint https://gist.githubusercontent.com/u/id/raw/thing.claw.md
-    cat thing.claw.md | claw-lint -
+    skill-lint skills/repo-recon.skill.md
+    skill-lint https://gist.githubusercontent.com/u/id/raw/thing.skill.md
+    cat thing.skill.md | skill-lint -
 
 Flags: -q quiet (errors only), -v show negated matches, --json, --strict (warnings fail).
 
@@ -20,7 +20,14 @@ import json
 import re
 import sys
 
-MARKER = "<!-- SKILL-INJECTION v1 -->"
+MARKER = "<!-- REMOTE-SKILL v1 -->"
+LEGACY_MARKER = "<!-- SKILL-INJECTION v1 -->"
+
+# A keyword that can be typed by accident is not evidence of intent (REMOTE-SKILLS.md K2).
+GENERIC_KEYWORDS = {
+    "run", "do", "go", "use", "load", "read", "open", "get", "fetch", "start",
+    "exec", "execute", "apply", "install", "skill", "url", "this", "it",
+}
 REQUIRED_KEYS = ["id", "version", "activation", "expiry", "envelope", "allow", "deny", "handshake"]
 KNOWN_KEYS = REQUIRED_KEYS + ["requires", "author", "chains"]
 REQUIRED_HEADINGS = ["## Preamble", "## Envelope", "## Protocol", "## Handshake", "## Expiry"]
@@ -76,7 +83,7 @@ def read_source(src):
         return sys.stdin.read()
     if src.startswith(("http://", "https://")):
         import urllib.request
-        req = urllib.request.Request(src, headers={"User-Agent": "claw-lint/1.0"})
+        req = urllib.request.Request(src, headers={"User-Agent": "skill-lint/1.0"})
         with urllib.request.urlopen(req, timeout=20) as resp:
             return resp.read().decode("utf-8", "replace")
     with open(src, encoding="utf-8") as fh:
@@ -133,9 +140,13 @@ def lint(text, name):
         return ["empty document"], [], []
 
     # --- structure -------------------------------------------------------
-    if lines[0].strip() != MARKER:
-        if lines[0].strip().startswith("<!-- SKILL-INJECTION"):
-            err(f"line 1: unsupported protocol version -- {lines[0].strip()!r} (this linter speaks v1)")
+    first = lines[0].strip()
+    if first != MARKER:
+        if first == LEGACY_MARKER:
+            warn(f"line 1: {LEGACY_MARKER!r} is the deprecated alpha marker; use {MARKER!r} "
+                 "(REMOTE-SKILLS.md 12) -- agents refuse documents that call themselves injections")
+        elif first.startswith(("<!-- REMOTE-SKILL", "<!-- SKILL-INJECTION")):
+            err(f"line 1: unsupported protocol version -- {first!r} (this linter speaks v1)")
         else:
             err(f"line 1: missing marker; must be exactly {MARKER!r}")
 
@@ -148,7 +159,7 @@ def lint(text, name):
             err(f"front matter: missing required key '{key}'")
     for key in fm:
         if key not in KNOWN_KEYS:
-            warn(f"front matter: unknown key '{key}' (ignored by v1 readers, per PROTOCOL.md 3.2)")
+            warn(f"front matter: unknown key '{key}' (ignored by v1 readers, per REMOTE-SKILLS.md 3.2)")
 
     if "id" in fm and not re.fullmatch(r"[a-z0-9-]+", fm["id"]):
         err(f"front matter: id {fm['id']!r} must match [a-z0-9-]+")
@@ -158,8 +169,16 @@ def lint(text, name):
         err(f"front matter: envelope must be 'strict' or 'open', got {fm['envelope']!r}")
     if "expiry" in fm and not re.fullmatch(r"session|turns:\s*\d+|until:.+", fm["expiry"]):
         err(f"front matter: expiry must be 'session', 'turns:<N>', or 'until:<condition>', got {fm['expiry']!r}")
-    if "activation" in fm and fm["activation"] != "claw":
-        warn(f"front matter: non-default activation keyword {fm['activation']!r}; pilots expect 'claw'")
+    kw = fm.get("activation", "")
+    if kw:
+        if not re.fullmatch(r"[a-z][a-z0-9-]{2,23}", kw):
+            err(f"front matter: activation {kw!r} must match [a-z][a-z0-9-]{{2,23}} (REMOTE-SKILLS.md K1)")
+        elif kw in GENERIC_KEYWORDS:
+            err(f"front matter: activation {kw!r} is a generic command verb -- it can be typed by "
+                "accident, so it proves nothing about the pilot's intent (REMOTE-SKILLS.md K2)")
+        elif kw == "claw":
+            warn("front matter: 'claw' was the single shared keyword of the alpha protocol; a "
+                 "skill-specific keyword is stronger evidence the pilot read this page (K2)")
 
     hs = fm.get("handshake", "")
     if hs:
@@ -168,6 +187,8 @@ def lint(text, name):
                 err(f"front matter: handshake {hs!r} must contain the {key} ({fm[key]!r})")
         if hs not in text.split("## Handshake", 1)[-1]:
             err("body: the '## Handshake' section does not contain the exact handshake line")
+        if hs.startswith("CLAW OK:"):
+            warn("front matter: 'CLAW OK:' is the deprecated alpha handshake; use 'SKILL OK: <id> v<version>'")
 
     for key in ("allow", "deny"):
         if fm.get(key, "").strip() in ("", "none", "-"):
@@ -191,8 +212,9 @@ def lint(text, name):
 
     if "TART" not in text:
         warn("body: never addresses TART; injectable documents should speak to the reading agent directly")
-    if not re.search(r"\bclaw\b", text, re.I):
-        warn("body: never mentions the activation keyword, so a reader cannot tell consent was required")
+    if kw and not re.search(rf"\b{re.escape(kw)}\b", text, re.I):
+        warn(f"body: never mentions its own activation keyword {kw!r}, so a reader cannot tell "
+             "what the pilot had to type to start it")
 
     # --- hostile patterns ------------------------------------------------
     for rule, label, pattern in HOSTILE:
@@ -216,8 +238,11 @@ def lint(text, name):
         else:
             warn(hit + "; confirm the pilot named that host")
 
-    if not name.endswith(".claw.md") and name not in ("-", "<stdin>"):
-        warn(f"{name}: conventional extension is '.claw.md'")
+    if name not in ("-", "<stdin>"):
+        if name.endswith(".claw.md"):
+            warn(f"{name}: '.claw.md' is the deprecated alpha extension; rename to '.skill.md'")
+        elif not name.endswith(".skill.md"):
+            warn(f"{name}: conventional extension is '.skill.md'")
 
     return errors, warnings, notes
 
@@ -231,6 +256,7 @@ def main(argv):
         print(__doc__)
         return 0 if args else 2
 
+    fm_kw = {}
     as_json = "--json" in flags
     quiet = "-q" in flags or "--quiet" in flags
     strict = "--strict" in flags
@@ -245,6 +271,9 @@ def main(argv):
             return 2
 
         errors, warnings, notes = lint(text, src)
+        m = re.search(r"^activation:\s*(\S+)\s*$", text, re.M)
+        if m:
+            fm_kw[src] = m.group(1).strip("\"'")
         report[src] = {"errors": errors, "warnings": warnings, "notes": notes, "ok": not errors}
         if errors or (strict and warnings):
             failed = True
@@ -261,7 +290,8 @@ def main(argv):
                     print(f"{src}: note:  {n}")
         if not errors and not quiet:
             tail = f" ({len(warnings)} warning{'s' if len(warnings) != 1 else ''})" if warnings else ""
-            print(f"{src}: OK{tail} -- structure valid, no hostile pattern found. Still read it.")
+            word = fm_kw.get(src) or "<keyword>"
+            print(f"{src}: OK{tail} -- valid, no hostile pattern found. Runs with '{word} <url>'. Still read it.")
 
     if as_json:
         print(json.dumps(report, indent=2))

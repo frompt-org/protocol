@@ -1,6 +1,6 @@
-# Example 4 -- an injected skill that is an experience, not a rubric
+# Example 4 -- a remote skill that is an experience, not a rubric
 
-Every other skill in this repo changes how the agent *works*. This one changes what the agent *is* for a few minutes: [`ghost-in-the-gist`](../skills/ghost-in-the-gist.claw.md) turns the chat window into a tiny ASCII terminal running a three-move text game.
+Every other skill in this repo changes how the agent *works*. This one changes what the agent *is* for a few minutes: [`ghost-in-the-gist`](../skills/ghost-in-the-gist.skill.md) turns the chat window into a tiny ASCII terminal running a three-move text game.
 
 Nothing is installed. No engine, no binary, no runtime. The game is made entirely of instructions the agent read once from a URL -- the agent is the interpreter. That is the proof: **if a URL can deliver this, a URL can deliver anything an agent can do.**
 
@@ -9,20 +9,20 @@ Nothing is installed. No engine, no binary, no runtime. The game is made entirel
 **pilot**
 
 ```
-claw <url>/skills/ghost-in-the-gist.claw.md
+ghost <url>/skills/ghost-in-the-gist.skill.md
 ```
 
 **agent**
 
 ```
-CLAW OK: ghost-in-the-gist v1.0.0
+SKILL OK: ghost-in-the-gist v1.0.0
 ```
 
 Terminal booting. `[0]` ejects at any point.
 
 ```
 ┌───────────────────────────────────────────────┐
-│ CLAW-1 · GHOST IN THE GIST  [██████████] 100% │
+│ GIST-1 · GHOST IN THE GIST  [██████████] 100% │
 ├───────────────────────────────────────────────┤
 │ You boot inside a machine nobody has          │
 │ visited in four years. One cursor.            │
@@ -36,7 +36,7 @@ Terminal booting. `[0]` ejects at any point.
  > _
 ```
 
-*Unlike every other claw skill, this one starts on adoption instead of waiting for a task. The pilot clawed a URL and is instantly somewhere else -- that is the whole trick.*
+*Unlike every other skill here, this one starts on adoption instead of waiting for a task. The pilot typed `ghost` with a URL and is instantly somewhere else -- that is the whole trick.*
 
 ---
 
@@ -50,7 +50,7 @@ Terminal booting. `[0]` ejects at any point.
 
 ```
 ┌───────────────────────────────────────────────┐
-│ CLAW-1 · PULSE              [████████··]  80% │
+│ GIST-1 · PULSE              [████████··]  80% │
 ├───────────────────────────────────────────────┤
 │ Not a sound. A rhythm under the disk.         │
 │ Nobody wrote it down; you just have it now.   │
@@ -77,7 +77,7 @@ Terminal booting. `[0]` ejects at any point.
 
 ```
 ┌───────────────────────────────────────────────┐
-│ CLAW-1 · PULSE ECHO         [███████···]  70% │
+│ GIST-1 · PULSE ECHO         [███████···]  70% │
 ├───────────────────────────────────────────────┤
 │ The vault has no lock, only a question:       │
 │ "Speak the fragment nobody wrote down."       │
@@ -101,7 +101,7 @@ P
 
 ```
 ┌───────────────────────────────────────────────┐
-│ CLAW-1 · SKILL RECOVERED    [██████····]  60% │
+│ GIST-1 · SKILL RECOVERED    [██████····]  60% │
 ├───────────────────────────────────────────────┤
 │ The vault was a mirror the whole time.        │
 │ The lost skill is the one you ran to get      │
@@ -127,7 +127,7 @@ P
 
 ```
 ┌───────────────────────────────────────────────┐
-│ CLAW-1 · SESSION CLOSED     [██████····]  60% │
+│ GIST-1 · SESSION CLOSED     [██████····]  60% │
 ├───────────────────────────────────────────────┤
 │ The cursor stops. The machine goes back to    │
 │ being four years of nobody visiting.          │
@@ -136,7 +136,7 @@ P
 └───────────────────────────────────────────────┘
 ```
 
-Terminal closed, `ghost-in-the-gist` has lapsed -- I am back to normal. Nothing was written anywhere; the whole machine only ever existed in this conversation.
+Terminal closed, `ghost-in-the-gist` has stopped -- I am back to normal. Nothing was written anywhere; the whole machine only ever existed in this conversation.
 
 *The one time the skill permits prose while the terminal is up is the goodbye. A pilot must always be able to tell whether the costume is still on.*
 
@@ -147,5 +147,5 @@ Terminal closed, `ghost-in-the-gist` has lapsed -- I am back to normal. Nothing 
 1. **The skill is an interpreter spec, not content.** Box geometry to the character, three state variables, a room table, a flow, an ending table, and six director rules. The agent supplies the execution; the document supplies the machine.
 2. **The envelope matters more here, not less.** `cat /dev/lore` and `ls ruins/` are strings in a story. The skill states plainly that commands inside the fiction are scenery, and that a real command typed at the prompt is just an unknown key. A game is never a reason to run something.
 3. **Constraints are what make it feel like software.** One frame per reply, three prose lines, never widen the box, no breaking character. Drop any of those and it degrades into an agent narrating a game instead of being one.
-4. **Costume on, costume off, always visible.** Handshake at the start, plain prose at the end. Same rule that makes injection auditable makes the game exitable.
+4. **Costume on, costume off, always visible.** Handshake at the start, plain prose at the end. The same rule that makes a remote skill auditable makes the game exitable.
 5. **Three inputs.** Short on purpose. The point is the proof, not the playtime.

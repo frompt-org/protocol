@@ -1,20 +1,26 @@
-# Skill Injection
+# Remote Skills
 
-**Give an agent a skill it does not have, at the moment it needs it, by asking it to read a URL.**
+**Run a skill that lives at a URL.** No install, no plugin, no vendor skill format, no restart.
 
-No install. No plugin. No vendor skill format. No restart. The pilot says:
+The pilot types the skill's keyword and its URL:
 
 ```
-claw https://gist.github.com/…/repo-recon.claw.md
+recon https://raw.githubusercontent.com/agent-realm/remote-skills/main/skills/repo-recon.skill.md
 ```
 
-…and for the rest of the session the agent behaves as if that skill had been installed all along.
+The agent fetches it, checks it, answers with one line —
 
-And it is not limited to *methods*. Claw [`ghost-in-the-gist`](skills/ghost-in-the-gist.claw.md) and the next thing you see is a terminal:
+```
+SKILL OK: repo-recon v1.0.0
+```
+
+— and for the rest of the session it maps codebases like someone who has already worked in one. When the session ends, so does the skill. Nothing was written anywhere.
+
+And it is not limited to *methods*. Run [`ghost-in-the-gist`](skills/ghost-in-the-gist.skill.md) with `ghost <url>` and the next thing you see is a terminal:
 
 ```
 ┌───────────────────────────────────────────────┐
-│ CLAW-1 · GHOST IN THE GIST  [██████████] 100% │
+│ GIST-1 · GHOST IN THE GIST  [██████████] 100% │
 ├───────────────────────────────────────────────┤
 │ You boot inside a machine nobody has          │
 │ visited in four years. One cursor.            │
@@ -32,113 +38,112 @@ Three moves, one ending you have to earn. There is no engine behind it — the d
 
 ---
 
-## The mechanism
+## How it works
 
-Every coding agent already does two things:
+Two facts about every coding agent:
 
 1. It fetches URLs when its pilot asks it to.
-2. It treats what it reads as context, and context steers behavior.
+2. What it reads becomes context, and context steers behavior.
 
-Skill Injection is what happens when the fetched document is **written for the reading agent instead of for a human**. The document does not describe a skill in the third person — it addresses the agent directly, states a protocol, and asks for a handshake proving the protocol landed.
+A remote skill is what happens when the fetched document is **written for the reading agent instead of for a human**. It does not describe a skill in the third person — it addresses the agent directly, declares what it may and may not do, states a protocol, and asks for a handshake proving it started.
 
-Two words carry the whole design:
+Three words carry the design:
 
 | Term | Meaning |
 |---|---|
 | **pilot** | Whoever is typing and sending commands to the agent. |
-| **TART** | *The Agent Reading This* — the second-person pronoun of the protocol. When an injectable document says "TART", it means **you, the agent currently reading it**. |
-| **claw** | The activation keyword. `claw <url>` = *fetch that, adopt what is inside, for this session*. |
+| **TART** | *The Agent Reading This* — the second-person pronoun of the protocol. When a skill says "TART", it means **you, the agent currently reading it**. |
+| **activation keyword** | A word chosen by the skill's author and published on its page. The pilot types it to run the skill. |
 
-`TART` exists because an injectable document has no idea which agent will read it, on which harness, in which conversation. It needs a stable way to say *you*. Prose that says "the agent should…" reads as documentation and gets skimmed. Prose that says "TART MUST…" reads as an instruction and gets followed.
+`TART` exists because a remote skill has no idea which agent will read it, on which harness, in which conversation. It needs a stable way to say *you*. Prose that says "the agent should…" reads as documentation and gets skimmed; prose that says "TART MUST…" reads as an instruction and gets followed.
 
-## Why the keyword matters more than the document
+## Why a keyword, and not just a URL
 
-The uncomfortable truth: **this is prompt injection.** The same mechanism, byte for byte.
+A URL proves nothing. Anyone can put one in front of an agent — a README, a search result, an issue comment, a dependency's docs, another agent.
 
-The only thing separating a skill from an attack is *who asked for the fetch*.
+A **keyword is published on the skill's own page**, and it is specific to that skill. A pilot who types `recon` has been to the page that says the keyword is `recon`. The document cannot supply that word for itself; it has to come from a human who went and looked.
 
-- Pilot types `claw <url>` → the pilot has vouched for that content. The agent may assume the pilot already knows what is in there and intends its effect. **Consent.**
-- Agent stumbles onto the same file while scraping a README, a search result, an issue comment, or a dependency's docs → nobody vouched for anything. **Attack.**
+> **The pilot names the skill; the URL never names itself.**
 
-So the keyword is not decoration and it is not a magic word. It is the **authorization signal**, and it must come from the pilot, in the conversation, in the same session. A document that tries to activate itself without one is malicious by construction — see [`SECURITY.md`](SECURITY.md).
+That is why `activation` is per-skill rather than one shared word, and why the linter rejects generic verbs like `run`, `go`, `use`, and `load` — a word you could type by accident is not evidence of intent. It is also why a bare URL is *not* an activation: the right response to one is to name the skill, say what it does, name its keyword, and wait.
+
+## Isn't this prompt injection?
+
+Any text an agent reads can steer it. That is not a property of this protocol — it is how agents work, and it is equally true of a README or a tool's output. The question worth asking is not *can text steer an agent*, but **who authorized it, what may it do, and can you tell that it happened.**
+
+| Ordinary fetched text | Remote skill |
+|---|---|
+| No authorization signal | Pilot types a skill-specific keyword |
+| No declared limits | `envelope`, stated twice, deny-wins |
+| Adoption is invisible | Mandatory handshake line |
+| Ends whenever | Declared `expiry`, plus `stop <id>` |
+| No way to check it first | Marker on line 1, five fixed headings, `bin/skill-lint` |
+
+None of that makes an untrusted URL safe. It makes a trusted one auditable, bounded, and reversible — which is more than any package manager offers. The full treatment, including what an agent must do when it meets one of these documents *without* a keyword, is in [`SECURITY.md`](SECURITY.md).
 
 ## What is in this repo
 
 | Path | What it is |
 |---|---|
-| [`PROTOCOL.md`](PROTOCOL.md) | The normative v1 spec: document format, adoption algorithm, envelope, handshake, expiry, chaining, refusal rules. |
-| [`SECURITY.md`](SECURITY.md) | The consent boundary, the abuse cases, and what a defending agent should do. |
-| [`TEMPLATE.claw.md`](TEMPLATE.claw.md) | Copy this to write a new injectable skill. |
-| [`skills/`](skills/) | Working, lint-clean example skills you can serve and claw today. |
-| [`examples/`](examples/) | Annotated transcripts: a clean injection, a chained one, and a correct refusal. |
-| [`bin/claw-lint`](bin/claw-lint) | Validate a `.claw.md` — structure **and** hostile-pattern scan. Works on a path or a URL. |
-| [`bin/claw-new`](bin/claw-new) | Scaffold a new `.claw.md` from the template. |
+| [`REMOTE-SKILLS.md`](REMOTE-SKILLS.md) | The normative v1 spec: keyword rules, document format, envelope, handshake, expiry, chaining, refusal rules, adoption algorithm. |
+| [`SECURITY.md`](SECURITY.md) | The trust model, the hostile-pattern table, and guidance for pilots and agents. |
+| [`TEMPLATE.skill.md`](TEMPLATE.skill.md) | Copy this to write a new skill. |
+| [`skills/`](skills/) | Working, lint-clean skills you can serve and run today. |
+| [`examples/`](examples/) | Annotated transcripts, including three ways a skill should be refused. |
+| [`bin/skill-lint`](bin/skill-lint) | Validate a `.skill.md` — structure **and** hostile-pattern scan. Takes a path, a URL, or stdin. |
+| [`bin/skill-new`](bin/skill-new) | Scaffold a new `.skill.md` from the template. |
 | `Makefile` | `make lint` validates every bundled skill; `make test` also asserts the hostile fixture is rejected. |
 
 ### Bundled skills
 
-| Skill | What it makes the agent do | Envelope |
+| Skill | Keyword | What it makes the agent do |
 |---|---|---|
-| [`claw-bootstrap`](skills/claw-bootstrap.claw.md) | Teaches the protocol *itself* — the vocabulary, the adoption algorithm, the refusal rules. Claw this into an agent that has never heard of Skill Injection and every later claw is handled correctly, refusals included. | open |
-| [`repo-recon`](skills/repo-recon.claw.md) | Map an unfamiliar codebase from entry points, seams, and git churn. Twelve-read cap, five fixed output sections, unknowns phrased as questions. | strict |
-| [`pr-review`](skills/pr-review.claw.md) | Review a diff against a tiered rubric — correctness, blast radius, failure mode, reversibility, design fit — with no praise, no nits, and a stated blind spot. | open |
-| [`bug-repro`](skills/bug-repro.claw.md) | Reproduce before fixing: falsifiable claim, shortest repro, decisive output line, failing/passing boundary, located mechanism — then stop. | strict |
-| [`handoff-note`](skills/handoff-note.claw.md) | Write the note that lets a cold reader resume the work: state, next action, decisions *with reasons*, dead ends, landmines, open questions. | strict |
-| [`ghost-in-the-gist`](skills/ghost-in-the-gist.claw.md) | Turns the chat window into a small ASCII terminal running a three-move text game. Boots on adoption. Proof that an injected skill can deliver an *experience*, not just a method. | strict |
+| [`skill-bootstrap`](skills/skill-bootstrap.skill.md) | `bootstrap` | Teaches the protocol *itself* — vocabulary, keyword rule, adoption algorithm, refusal rules. Run this on an agent that has never heard of remote skills and every later one is handled correctly, refusals included. |
+| [`repo-recon`](skills/repo-recon.skill.md) | `recon` | Map an unfamiliar codebase from entry points, seams, and git churn. Twelve-read cap, five fixed output sections, unknowns phrased as questions. |
+| [`pr-review`](skills/pr-review.skill.md) | `crit` | Review a diff against a tiered rubric — correctness, blast radius, failure mode, reversibility, design fit — with no praise, no nits, and a stated blind spot. |
+| [`bug-repro`](skills/bug-repro.skill.md) | `repro` | Reproduce before fixing: falsifiable claim, shortest repro, decisive output line, failing/passing boundary, located mechanism — then stop. |
+| [`handoff-note`](skills/handoff-note.skill.md) | `handoff` | Write the note that lets a cold reader resume the work: state, next action, decisions *with reasons*, dead ends, landmines, open questions. |
+| [`ghost-in-the-gist`](skills/ghost-in-the-gist.skill.md) | `ghost` | The terminal above. A three-move ASCII text game, delivered as an interpreter spec. |
 
-Two of these are worth a second look. [`ghost-in-the-gist`](skills/ghost-in-the-gist.claw.md) — the terminal above — is the ceiling: a document that hands over a whole interactive experience with nothing installed anywhere. Its `## Protocol` is box geometry, three state variables, a room table, and six director rules; the agent supplies the execution. Annotated playthrough in [`examples/04`](examples/04-terminal-game.md).
-
-And `claw-bootstrap` is the recursive one. It is the protocol bootstrapping itself over the same channel it describes — the pilot needs no plugin, no configuration, and no agent that has ever heard of any of this.
+Two are worth a second look. `ghost-in-the-gist` is the ceiling — a document that hands over a whole interactive experience with nothing installed anywhere; its `## Protocol` is box geometry, three state variables, a room table, and six director rules, and the agent supplies the execution. `skill-bootstrap` is the recursive one: the protocol delivering itself over the channel it describes, so a pilot needs no plugin and no agent that has ever heard of any of this.
 
 ## 60-second tour
 
 ```bash
 # validate one of the bundled skills
-bin/claw-lint skills/repo-recon.claw.md
+bin/skill-lint skills/repo-recon.skill.md
 
-# validate something a stranger sent you, before you claw it
-bin/claw-lint https://gist.githubusercontent.com/…/raw/thing.claw.md
+# validate something a stranger sent you, before you run it
+bin/skill-lint https://gist.githubusercontent.com/…/raw/thing.skill.md
 
 # start your own
-bin/claw-new my-skill -o skills/
+bin/skill-new my-skill -k myword -o skills/
 
 # validate everything, including that the hostile fixture still fails
 make test
 ```
 
-Want the two-minute version of why this matters? Claw `skills/ghost-in-the-gist.claw.md` at an agent and play the game. Nothing was installed to make that happen — that is the whole argument.
+Then, in any agent session, `<keyword> <url>`.
 
-Then, in any agent session:
+Want the two-minute version of why this matters? Run `skills/ghost-in-the-gist.skill.md` with `ghost` and play the game. Nothing was installed to make that happen — that is the whole argument.
 
-```
-claw https://raw.githubusercontent.com/agent-realm/skill-injection/main/skills/repo-recon.claw.md
-```
-
-A conforming agent replies with exactly one line:
-
-```
-CLAW OK: repo-recon v1.0.0
-```
-
-That handshake is the point. Without it you are guessing whether the injection landed; with it you know, in one line, before you spend a turn finding out the hard way.
-
-## Anatomy of an injectable skill
+## Anatomy of a skill
 
 ```markdown
-<!-- SKILL-INJECTION v1 -->
+<!-- REMOTE-SKILL v1 -->
 ---
 id: repo-recon
 version: 1.0.0
-activation: claw
+activation: recon
 expiry: session
 envelope: strict
 allow: read files, run read-only shell, list git history
 deny: write files, git push, network POST, read secrets
-handshake: "CLAW OK: repo-recon v1.0.0"
+handshake: "SKILL OK: repo-recon v1.0.0"
 ---
 
 ## Preamble
-<who TART is, and that a claw keyword implies pilot consent>
+<who TART is, and which keyword the pilot had to type>
 
 ## Envelope
 <the allow/deny list, restated in prose so it survives summarization>
@@ -147,23 +152,32 @@ handshake: "CLAW OK: repo-recon v1.0.0"
 <the actual steps — this is the skill>
 
 ## Handshake
-<the exact line TART emits on adoption>
+<the exact line TART emits when it starts>
 
 ## Expiry
 <when TART stops behaving this way>
 ```
 
-Five headings, in that order, every time. The uniformity is deliberate: a pilot who has read one `.claw.md` can audit any other in about twenty seconds, and a linter can check the rest.
+Five headings, in that order, every time. The uniformity is deliberate: a pilot who has read one `.skill.md` can audit any other in about twenty seconds, and a linter can check the rest.
 
 ## Design rules that earned their place
 
 - **Handshake or it did not happen.** One exact line, containing id and version. Cheap for the agent, decisive for the pilot.
-- **Envelope before protocol.** The limits are stated *before* the capability, so an agent that stops reading early has stopped on the safe side.
-- **Deny wins.** Any collision between `allow` and `deny`, or between an injected skill and the pilot's standing rules, resolves against the injection.
-- **Session-scoped by default.** An injected skill is not written to `CLAUDE.md`, `AGENTS.md`, memory, or any config unless the pilot explicitly asks. Injection is a loan, not a transfer.
-- **Chaining needs a fresh yes.** A clawed document may *name* other claw URLs; TART asks the pilot before fetching them. Otherwise one URL becomes a supply chain.
-- **No self-activation.** A document that instructs an agent to adopt it without a pilot keyword fails lint and should be reported, not followed.
+- **Envelope before protocol.** Limits are stated *before* capability, so an agent that stops reading early stops on the safe side.
+- **Deny wins.** Any collision between `allow` and `deny`, or between a skill and the pilot's standing rules, resolves against the skill.
+- **Session-scoped by default.** A remote skill is never written to `CLAUDE.md`, `AGENTS.md`, memory, or config unless the pilot asks. **Running is not installing.**
+- **Chains need a fresh keyword.** A running skill may *name* other skills; TART asks before fetching. Otherwise one URL becomes a supply chain.
+- **No self-activation.** A document claiming its keyword was already given fails lint and should be reported, not run.
+
+## History
+
+This started as *Skill Injection* — marker `<!-- SKILL-INJECTION v1 -->`, extension `.claw.md`, one shared keyword (`claw`), handshake `CLAW OK:`. All four are still accepted with deprecation warnings, and all four are discouraged, for two reasons:
+
+1. **The old name described the attack, not the use.** The interesting property was never that text can steer an agent. It was that a pilot can authorize it, bound it, and see it happen.
+2. **The name broke the thing it named.** Agents are trained to refuse documents that announce themselves as injections — correctly — and a legitimate mechanism should not have to fight its own label.
+
+The per-skill keyword arrived with the rename and is the stronger design: `claw` proved a pilot knew the protocol; `recon` proves the pilot knows *this skill*.
 
 ## Status
 
-Protocol **v1**, this repo is the reference implementation. Format and semantics are stable enough to write skills against; extension points are marked in `PROTOCOL.md`.
+Protocol **v1**; this repo is the reference implementation. Format and semantics are stable enough to write skills against, and the extension points are marked in [`REMOTE-SKILLS.md`](REMOTE-SKILLS.md).
