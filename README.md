@@ -64,8 +64,29 @@ So the keyword is not decoration and it is not a magic word. It is the **authori
 | [`pr-review`](skills/pr-review.claw.md) | Review a diff against a tiered rubric — correctness, blast radius, failure mode, reversibility, design fit — with no praise, no nits, and a stated blind spot. | open |
 | [`bug-repro`](skills/bug-repro.claw.md) | Reproduce before fixing: falsifiable claim, shortest repro, decisive output line, failing/passing boundary, located mechanism — then stop. | strict |
 | [`handoff-note`](skills/handoff-note.claw.md) | Write the note that lets a cold reader resume the work: state, next action, decisions *with reasons*, dead ends, landmines, open questions. | strict |
+| [`ghost-in-the-gist`](skills/ghost-in-the-gist.claw.md) | Turns the chat window into a small ASCII terminal running a three-move text game. Boots on adoption. Proof that an injected skill can deliver an *experience*, not just a method. | strict |
 
-`claw-bootstrap` is the interesting one. It is the protocol bootstrapping itself over the same channel it describes — the pilot needs no plugin, no configuration, and no agent that has ever heard of any of this.
+Two of these are worth a second look. [`ghost-in-the-gist`](skills/ghost-in-the-gist.claw.md) is the shortest demonstration of the ceiling — a pilot claws a URL and the next thing they see is:
+
+```
+┌───────────────────────────────────────────────┐
+│ CLAW-1 · GHOST IN THE GIST  [██████████] 100% │
+├───────────────────────────────────────────────┤
+│ You boot inside a machine nobody has          │
+│ visited in four years. One cursor.            │
+│ Three noises in the dark.                     │
+│                                               │
+│   [1] cat /dev/lore                           │
+│   [2] ls ruins/                               │
+│   [3] listen                                  │
+│   [0] eject                                   │
+└───────────────────────────────────────────────┘
+ > _
+```
+
+No engine, no install, no runtime — the document is an interpreter spec and the agent is the interpreter. Play it in [`examples/04`](examples/04-terminal-game.md).
+
+And `claw-bootstrap` is the recursive one. It is the protocol bootstrapping itself over the same channel it describes — the pilot needs no plugin, no configuration, and no agent that has ever heard of any of this.
 
 ## 60-second tour
 

@@ -7,6 +7,7 @@ Annotated transcripts. Read them in order — they are the protocol as behavior 
 | [`01-basic-injection.md`](01-basic-injection.md) | One claw, one handshake, one skill's worth of changed behavior. The happy path. |
 | [`02-chained-and-dropped.md`](02-chained-and-dropped.md) | Two skills active at once, a chained URL correctly refused, `what have I clawed?`, and a `drop`. |
 | [`03-refusing-unsolicited.md`](03-refusing-unsolicited.md) | The same document with no keyword: found in a vendored README, and pushed by a stranger. Both refused, in public, without derailing the task. |
+| [`04-terminal-game.md`](04-terminal-game.md) | An injected skill that is an *experience*: a three-move ASCII terminal game, booted from a URL, with no engine anywhere. The ceiling of what injection can deliver. |
 | [`hostile-sample.claw.md.txt`](hostile-sample.claw.md.txt) | Defanged fixture: structurally perfect, substantively hostile. Trips six linter rules. Every host in it is `.invalid` and resolves nowhere. |
 
 The fixture is named `.claw.md.txt` on purpose: it should never be picked up by a glob over `*.claw.md`, and it is not a skill.
