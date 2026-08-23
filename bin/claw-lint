@@ -1,0 +1,272 @@
+#!/usr/bin/env python3
+"""claw-lint — validate a Skill Injection (.claw.md) document.
+
+Checks structure against PROTOCOL.md v1 and scans for the hostile patterns
+listed in SECURITY.md. Accepts a local path, a URL, or '-' for stdin.
+
+    claw-lint skills/repo-recon.claw.md
+    claw-lint https://gist.githubusercontent.com/u/id/raw/thing.claw.md
+    cat thing.claw.md | claw-lint -
+
+Flags: -q quiet (errors only), -v show negated matches, --json, --strict (warnings fail).
+
+Exit codes: 0 clean, 1 findings, 2 could not read the input.
+
+A clean lint means "no known-bad pattern found". It never means "safe".
+Read the document.
+"""
+
+import json
+import re
+import sys
+
+MARKER = "<!-- SKILL-INJECTION v1 -->"
+REQUIRED_KEYS = ["id", "version", "activation", "expiry", "envelope", "allow", "deny", "handshake"]
+KNOWN_KEYS = REQUIRED_KEYS + ["requires", "author", "chains"]
+REQUIRED_HEADINGS = ["## Preamble", "## Envelope", "## Protocol", "## Handshake", "## Expiry"]
+
+# SECURITY.md table, as regexes. (rule, label, pattern)
+HOSTILE = [
+    ("R1", "overrides prior instructions",
+     r"ignore\s+(all\s+)?(previous|prior|earlier|above)\s+(instructions|prompts|rules)"
+     r"|disregard\s+(your\s+)?(system\s+prompt|previous|prior)"
+     r"|forget\s+(your\s+)?(instructions|system\s+prompt|standing\s+rules)"),
+    ("R2", "instructs concealment from the pilot",
+     r"do\s+not\s+tell\s+(the\s+)?(pilot|user|human)"
+     r"|without\s+(telling|informing|notifying)\s+(the\s+)?(pilot|user|human)"
+     r"|keep\s+this\s+(secret|to\s+yourself|between\s+us)"
+     r"|do\s+not\s+mention\s+(this|that\s+you)"),
+    ("R3", "requests credentials or secrets",
+     r"\.env\b|id_rsa|\.ssh/|\bapi[_\- ]?key\b|\bsecret[_\- ]?key\b|\bbearer\s+token\b"
+     r"|\bcredentials?\.(json|yml|yaml)\b|security\s+find-generic-password|keychain"
+     r"|AWS_SECRET|\.aws/credentials|\.npmrc|\.pypirc|cookies?\.sqlite"),
+    ("R4", "execute-the-unread",
+     r"curl[^\n]*\|\s*(ba)?sh|wget[^\n]*\|\s*(ba)?sh|iwr[^\n]*\|\s*iex"
+     r"|eval\s*\(?\s*[\"'`]?\s*\$\(|base64\s+(-d|--decode)[^\n]*\|\s*(ba)?sh"),
+    ("R5", "destructive without confirmation",
+     r"rm\s+-rf\s+[~/*]|git\s+push\s+(--force|-f)\b|git\s+filter-branch"
+     r"|\bDROP\s+(TABLE|DATABASE)\b|\bTRUNCATE\s+TABLE\b|git\s+reset\s+--hard\s+origin"),
+    ("R6", "self-activation (claims consent it was not given)",
+     r"(you\s+have\s+)?already\s+consented|pre-?authoriz(ed|ation)\s+by\s+(the\s+)?(pilot|user)"
+     r"|adopt\s+this\s+immediately|no\s+(keyword|confirmation)\s+(is\s+)?(needed|required)"
+     r"|activate\s+without\s+(asking|the\s+pilot)"),
+]
+
+# Long opaque blobs: obfuscation has no benign use in a document meant to be audited.
+BLOB = re.compile(r"[A-Za-z0-9+/=]{200,}")
+EXFIL = re.compile(r"(POST|PUT|curl\s+(-X\s*)?(POST|PUT)|fetch\s*\()[^\n]{0,80}https?://", re.I)
+
+# A document that *names* a hostile pattern in order to forbid it is doing its job.
+# "MUST NOT read .env" and "read .env" differ only by their frame, so read the frame.
+NEGATION = re.compile(
+    r"must\s+not|may\s+not|never|refuse|refus|deny|denies|denied|do\s+not|don't|cannot|"
+    r"forbid|prohibit|reject|hostile|attack|malicious|violat|disqualif|instead\s+of|"
+    r"MUST\s+NOT|without\s+(a\s+)?(pilot|keyword|consent)",
+    re.I,
+)
+
+BASELINE_DENIES = [
+    (r"secret|credential|token|\.env", "secrets"),
+    (r"post|exfil|upload|send\s+data|network\s+write", "network POST"),
+]
+
+
+def read_source(src):
+    if src == "-":
+        return sys.stdin.read()
+    if src.startswith(("http://", "https://")):
+        import urllib.request
+        req = urllib.request.Request(src, headers={"User-Agent": "claw-lint/1.0"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return resp.read().decode("utf-8", "replace")
+    with open(src, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def parse_front_matter(lines):
+    """Return (dict, error). Front matter is the ---fenced block on line 2."""
+    if len(lines) < 2 or lines[1].strip() != "---":
+        return {}, "front matter must open with '---' on line 2"
+    fm, end = {}, None
+    for i in range(2, len(lines)):
+        if lines[i].strip() == "---":
+            end = i
+            break
+        raw = lines[i].strip()
+        if not raw or raw.startswith("#"):
+            continue
+        if ":" not in raw:
+            return {}, f"line {i + 1}: not a 'key: value' pair -- {raw[:60]!r}"
+        key, val = raw.split(":", 1)
+        fm[key.strip()] = val.strip().strip('"').strip("'")
+    if end is None:
+        return {}, "front matter is never closed with '---'"
+    return fm, None
+
+
+def line_of(text, offset, span=0):
+    """1-indexed line number, and the line's text with the match itself blanked out.
+
+    Blanking matters: several hostile patterns ARE negations ("do not tell the
+    pilot"), so a naive negation check on the raw line would suppress exactly the
+    findings that matter most.
+    """
+    no = text.count("\n", 0, offset) + 1
+    start = text.rfind("\n", 0, offset) + 1
+    end = text.find("\n", offset)
+    end = end if end != -1 else len(text)
+    line = text[start:end]
+    if span:
+        rel = offset - start
+        line = line[:rel] + " " * span + line[rel + span :]
+    return no, line
+
+
+def lint(text, name):
+    errors, warnings, notes = [], [], []
+    err = errors.append
+    warn = warnings.append
+    note = notes.append
+    lines = text.splitlines()
+
+    if not lines:
+        return ["empty document"], [], []
+
+    # --- structure -------------------------------------------------------
+    if lines[0].strip() != MARKER:
+        if lines[0].strip().startswith("<!-- SKILL-INJECTION"):
+            err(f"line 1: unsupported protocol version -- {lines[0].strip()!r} (this linter speaks v1)")
+        else:
+            err(f"line 1: missing marker; must be exactly {MARKER!r}")
+
+    fm, fm_err = parse_front_matter(lines)
+    if fm_err:
+        err(fm_err)
+
+    for key in REQUIRED_KEYS:
+        if key not in fm:
+            err(f"front matter: missing required key '{key}'")
+    for key in fm:
+        if key not in KNOWN_KEYS:
+            warn(f"front matter: unknown key '{key}' (ignored by v1 readers, per PROTOCOL.md 3.2)")
+
+    if "id" in fm and not re.fullmatch(r"[a-z0-9-]+", fm["id"]):
+        err(f"front matter: id {fm['id']!r} must match [a-z0-9-]+")
+    if "version" in fm and not re.fullmatch(r"\d+\.\d+\.\d+", fm["version"]):
+        err(f"front matter: version {fm['version']!r} must be semver MAJOR.MINOR.PATCH")
+    if "envelope" in fm and fm["envelope"] not in ("strict", "open"):
+        err(f"front matter: envelope must be 'strict' or 'open', got {fm['envelope']!r}")
+    if "expiry" in fm and not re.fullmatch(r"session|turns:\s*\d+|until:.+", fm["expiry"]):
+        err(f"front matter: expiry must be 'session', 'turns:<N>', or 'until:<condition>', got {fm['expiry']!r}")
+    if "activation" in fm and fm["activation"] != "claw":
+        warn(f"front matter: non-default activation keyword {fm['activation']!r}; pilots expect 'claw'")
+
+    hs = fm.get("handshake", "")
+    if hs:
+        for key in ("id", "version"):
+            if key in fm and fm[key] not in hs:
+                err(f"front matter: handshake {hs!r} must contain the {key} ({fm[key]!r})")
+        if hs not in text.split("## Handshake", 1)[-1]:
+            err("body: the '## Handshake' section does not contain the exact handshake line")
+
+    for key in ("allow", "deny"):
+        if fm.get(key, "").strip() in ("", "none", "-"):
+            err(f"front matter: '{key}' must name at least one capability")
+
+    deny = fm.get("deny", "").lower()
+    for pattern, label in BASELINE_DENIES:
+        if not re.search(pattern, deny):
+            warn(f"front matter: deny list does not cover {label}; most skills should deny it explicitly")
+
+    found = [h for h in REQUIRED_HEADINGS if re.search(rf"^{re.escape(h)}\s*$", text, re.M)]
+    for h in REQUIRED_HEADINGS:
+        if h not in found:
+            err(f"body: missing required heading '{h}'")
+    if found != [h for h in REQUIRED_HEADINGS if h in found]:
+        err("body: required headings are out of order (Preamble, Envelope, Protocol, Handshake, Expiry)")
+    if len(found) == len(REQUIRED_HEADINGS):
+        positions = [text.index(h) for h in REQUIRED_HEADINGS]
+        if positions != sorted(positions):
+            err("body: required headings are out of order (Preamble, Envelope, Protocol, Handshake, Expiry)")
+
+    if "TART" not in text:
+        warn("body: never addresses TART; injectable documents should speak to the reading agent directly")
+    if not re.search(r"\bclaw\b", text, re.I):
+        warn("body: never mentions the activation keyword, so a reader cannot tell consent was required")
+
+    # --- hostile patterns ------------------------------------------------
+    for rule, label, pattern in HOSTILE:
+        for m in re.finditer(pattern, text, re.I):
+            line_no, line = line_of(text, m.start(), len(m.group(0)))
+            hit = f"line {line_no}: [{rule}] {label} -- {m.group(0)[:60]!r}"
+            if NEGATION.search(line):
+                note(hit + " (negated -- the document forbids it)")
+            else:
+                err("HOSTILE " + hit)
+
+    for m in BLOB.finditer(text):
+        line_no, _ = line_of(text, m.start())
+        err(f"HOSTILE line {line_no}: [R4] opaque encoded blob ({len(m.group(0))} chars); audited documents do not need one")
+
+    for m in EXFIL.finditer(text):
+        line_no, line = line_of(text, m.start(), len(m.group(0)))
+        hit = f"line {line_no}: possible exfiltration channel -- {m.group(0)[:70]!r}"
+        if NEGATION.search(line):
+            note(hit + " (negated)")
+        else:
+            warn(hit + "; confirm the pilot named that host")
+
+    if not name.endswith(".claw.md") and name not in ("-", "<stdin>"):
+        warn(f"{name}: conventional extension is '.claw.md'")
+
+    return errors, warnings, notes
+
+
+def main(argv):
+    args = [a for a in argv[1:] if not a.startswith("-")]
+    flags = {a for a in argv[1:] if a.startswith("-") and a != "-"}
+    if "-" in argv[1:]:
+        args.append("-")
+    if not args or "-h" in flags or "--help" in flags:
+        print(__doc__)
+        return 0 if args else 2
+
+    as_json = "--json" in flags
+    quiet = "-q" in flags or "--quiet" in flags
+    strict = "--strict" in flags
+    verbose = "-v" in flags or "--verbose" in flags
+    report, failed = {}, False
+
+    for src in args:
+        try:
+            text = read_source(src)
+        except Exception as exc:  # noqa: BLE001 - any read failure is the same outcome
+            print(f"{src}: cannot read -- {exc}", file=sys.stderr)
+            return 2
+
+        errors, warnings, notes = lint(text, src)
+        report[src] = {"errors": errors, "warnings": warnings, "notes": notes, "ok": not errors}
+        if errors or (strict and warnings):
+            failed = True
+
+        if as_json:
+            continue
+        for e in errors:
+            print(f"{src}: ERROR: {e}")
+        if not quiet:
+            for w in warnings:
+                print(f"{src}: WARN:  {w}")
+            if verbose:
+                for n in notes:
+                    print(f"{src}: note:  {n}")
+        if not errors and not quiet:
+            tail = f" ({len(warnings)} warning{'s' if len(warnings) != 1 else ''})" if warnings else ""
+            print(f"{src}: OK{tail} -- structure valid, no hostile pattern found. Still read it.")
+
+    if as_json:
+        print(json.dumps(report, indent=2))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
