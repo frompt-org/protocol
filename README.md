@@ -1,6 +1,20 @@
 # Foreign Prompts
 
-**A foreign prompt is a document at a URL that tells an agent how to work. The pilot types the phrase the document publishes, and the agent adopts it for the session.**
+**A foreign prompt is a prompt acquired from a non-local source — usually a URL — to be checked, adopted, and run by an agent that did not write it.**
+
+Say the quiet part first: **this is prompt injection.** Same mechanism, byte for byte — text written by a stranger enters an agent's context and steers what it does. Nothing here pretends otherwise.
+
+The difference is that this injection was *asked for*. Prompt injection was never frightening because text can steer an agent; that is simply how agents work, and it is equally true of a README, a search result, or a tool's output. It is frightening because **nobody authorized it, nothing bounded it, and no one could see it happen.** Fix those three and the same mechanism becomes a delivery system:
+
+| | Prompt injection | Foreign prompt |
+|---|---|---|
+| Who asked for it | nobody | the pilot, by a phrase only that prompt publishes |
+| What it may do | anything the agent can | a declared envelope, deny-wins, never widening permissions |
+| Can you tell it happened | no | a mandatory handshake line |
+| When it ends | when the context does | a declared expiry, or `disown <id>` |
+| Can you check it first | no | marker, fixed sections, and `bin/fp-lint` before you adopt |
+
+So: **the legitimate way to inject a prompt.** Not a safe way to run a stranger's instructions — there is no such thing — but an *auditable, bounded, revocable* way, which is the most any install mechanism has ever offered.
 
 ```
 recon https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon.prompt.md
@@ -17,7 +31,7 @@ No install, no plugin, no config, no restart. When the session ends, so does the
 
 Every agent already fetches URLs on request, and what it reads steers it. A foreign prompt is what happens when the fetched document is **written for the reading agent instead of for a human**: it addresses the agent directly, declares what it may and may not do, states its flow, and asks for a handshake proving it started.
 
-- **Foreign** = origin, never location. Like a *foreign key*, which lives in your table. It runs **here**, in this context.
+- **Foreign** = origin, never location. Like a *foreign key*, which lives in your table. It is acquired from elsewhere and runs **here**, in this context.
 - **Prompt**, not *skill* — a skill is installed, dormant, progressively disclosed. This arrives on demand and is gone at the end.
 - **Adoption** = holding it as active instructions for a declared span. The way a committee adopts a resolution, not the way a family adopts a child.
 
@@ -37,11 +51,11 @@ A URL with **no** phrase is not an adoption. The agent previews it instead — n
 - **Capability without installation.** Any agent, any harness, no admin, no restart. The document is the delivery mechanism.
 - **A prompt can be anything an agent can do** — a method, a rubric, a state machine, a whole interactive UI. See the game below.
 - **It is portable and disposable.** Written to `TART` — *The Agent Reading This* — so it works on whichever agent reads it, and lapses when the conversation does.
-- **It makes an old, invisible practice explicit.** Instructions from elsewhere already reach agents constantly. This one declares its limits, announces itself, and can be revoked.
+- **It makes an old, invisible practice explicit.** Instructions from elsewhere already reach agents constantly — from pages, tool output, other agents. Those arrive unannounced and unbounded. This one declares its limits, announces itself, and can be revoked.
 
-## The danger — and what we do about it
+## Failure modes, and what stops each one
 
-**Be clear about this: a foreign prompt is a stranger's instructions entering your agent's context. That is prompt injection's exact mechanism.** What differs is not the bytes. It is authorization, limits, and visibility.
+The table at the top is the shape of the argument. This is the detail — every way an injected prompt goes wrong, and the specific thing in the protocol that stands in the way.
 
 | Risk | Mitigation |
 |---|---|

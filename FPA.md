@@ -1,6 +1,6 @@
 # Foreign Prompt Adoption — protocol v1
 
-**A foreign prompt is a document, published at a URL, that instructs whichever agent reads it.** This spec says how one is fetched, checked, confirmed, adopted, run, and ended.
+**A foreign prompt is a prompt acquired from a non-local source — usually a URL — to be checked, adopted, and run by an agent that did not write it.** It is prompt injection performed deliberately: same mechanism, plus the pilot's authorization, a declared envelope, a visible handshake, and an expiry. This spec says how one is fetched, checked, confirmed, adopted, run, and ended.
 
 Normative. **MUST**, **MUST NOT**, **SHOULD**, **MAY** are RFC 2119. Vocabulary is [`TERMINOLOGY.md`](TERMINOLOGY.md) and it wins over any wording here.
 
