@@ -22,7 +22,7 @@ ADOPTED: repo-recon v1.0.0
 
 Recon mode: I map a repo from entry points, seams, and git churn, cap myself at twelve file reads, and report in five fixed sections. Read-only — I will not write, push, or run the test suite while it is active. Point me at a repo.
 
-*Two lines, exactly as FPA.md §8 steps 7–8 require. The handshake proves it is running; the summary tells the pilot what they just turned on without re-reading the URL. Note the agent does **not** start working — adoption is not a trigger.*
+*Two lines, exactly as FPA.md §11 steps 7–8 require. The handshake proves it is running; the summary tells the pilot what they just turned on without re-reading the URL. Note the agent does **not** start working — adoption is not a trigger.*
 
 ---
 

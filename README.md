@@ -9,12 +9,12 @@ The difference is that this injection was *asked for*. Prompt injection was neve
 | | Prompt injection | Foreign prompt |
 |---|---|---|
 | Who asked for it | nobody | the pilot, by a phrase only that prompt publishes |
-| What it may do | anything the agent can | a declared envelope, deny-wins, never widening permissions |
+| What it may do | anything the agent can | a declared envelope the agent honours, and the host can enforce |
 | Can you tell it happened | no | a mandatory handshake line |
 | When it ends | when the context does | a declared expiry, or `disown <id>` |
 | Can you check it first | no | marker, fixed sections, and `bin/fp-lint` before you adopt |
 
-So: **the legitimate way to inject a prompt.** Not a safe way to run a stranger's instructions — there is no such thing — but an *auditable, bounded, revocable* way, which is the most any install mechanism has ever offered.
+So: **the legitimate way to inject a prompt.** Not a safe way to run a stranger's instructions — there is no such thing, here or in any installer — but an *auditable, bounded, revocable* way, which is the most any distribution mechanism has ever offered.
 
 ```
 recon https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon.prompt.md
@@ -55,22 +55,40 @@ A URL with **no** phrase is not an adoption. The agent previews it instead — n
 - **It is portable and disposable.** Written to `TART` — *The Agent Reading This* — so it works on whichever agent reads it, and lapses when the conversation does.
 - **It makes an old, invisible practice explicit.** Instructions from elsewhere already reach agents constantly — from pages, tool output, other agents. Those arrive unannounced and unbounded. This one declares its limits, announces itself, and can be revoked.
 
-## Failure modes, and what stops each one
+## What this is, and what it is not
 
-The table at the top is the shape of the argument. This is the detail — every way an injected prompt goes wrong, and the specific thing in the protocol that stands in the way.
+**It is a distribution mechanism.** Its trust model is the trust model of `curl example.com | bash` — of `rustup`, `nvm`, `get.docker.com`, every installer you have ever piped into a shell. **You are trusting the publisher.** That is ordinary, and the software industry runs on it.
 
-| Risk | Mitigation |
+**It is not a sandbox.** The agent that reads the document is the same agent asked to apply the rules to it, so the protocol's MUSTs are conventions the agent follows, not walls it cannot cross. A determined hostile prompt can try to talk its way past any of them.
+
+Against the baseline it replaces — piping a stranger's script into your shell, or pasting a stranger's prompt into your chat — it is strictly weaker in blast radius and strictly richer in metadata:
+
+| | `curl \| bash` | foreign prompt |
+|---|---|---|
+| Grants | arbitrary code, your full privileges | text steering a model still gated by its host's permissions |
+| Duration | permanent — it installs things | a declared span, then gone |
+| Declares its intent | no | envelope, flow, persistence, expiry |
+| Announces itself | no | mandatory handshake |
+| Inspectable first | rarely in practice | fixed grammar, plus `bin/fp-lint` |
+
+So: **adopt prompts from publishers you would install software from.** In the common case that is yourself — your prompts, in your repos, fed to your agents, which is a CDN for your own instructions.
+
+## Failure modes, and what the protocol does about each
+
+Every way an adopted prompt goes wrong, and whether the answer is **declared** (a convention the agent follows, auditable but not enforced) or **enforced** (something outside the model actually stops it).
+
+| Risk | Answer |
 |---|---|
-| Anyone can put a URL in front of an agent | Adoption needs the **phrase published on that prompt's page** — the document cannot supply it for itself |
-| The prompt could do anything | A declared **envelope**, stated twice, deny-wins, and never able to widen host permissions |
-| You would not know it happened | A mandatory **handshake**, and an adoption record on request |
-| It could linger | Declared **expiry**, plus `disown <id>` and *disown everything*, which no prompt may disable |
-| It could be hostile | A **refusal screen** that runs even after a correct phrase, plus `bin/fp-lint` before you adopt |
-| It could install itself | **Never** into `CLAUDE.md`, `AGENTS.md`, `settings.json`, hooks or MCP config. Persistence is declared, namespaced, announced |
-| Saved state could become instructions later | State files are **data, never instructions**, and resuming requires the phrase again |
-| You are unsure about a URL | `isolation: subagent` — adopt it in a fork whose context is discarded |
+| Anyone can put a URL in front of an agent | **Declared.** Adoption needs the phrase published on that prompt's page. It proves the pilot went there — not that they read carefully, and not that the page is honest |
+| The prompt could do anything | **Declared** by the envelope; **enforced** only where the host binds it to real permissions. Map it onto your harness's permission rules and it becomes real |
+| You would not know it happened | **Declared.** The handshake and adoption record make it visible — a cooperative agent's report, not proof |
+| It could linger | **Declared** expiry, plus `disown <id>`. Ending the session enforces it for real |
+| It could be hostile | **Partly enforced.** `bin/fp-lint` is deterministic and runs before adoption — but it is a pattern floor, and paraphrase defeats patterns. The refusal screen is declared, and the agent applying it is the one being persuaded |
+| It could install itself | **Declared** (never into `CLAUDE.md`, `AGENTS.md`, `settings.json`, hooks, MCP config) and **linted**. Enforce it properly with filesystem permissions |
+| Saved state could become instructions later | **Declared.** State files are marked data, and resuming needs the phrase again. Real defence: do not enable persistence for prompts you would not adopt blind |
+| You are unsure about a URL | **Partly enforced.** `isolation: subagent` discards the context, but the subagent still holds tools — pair it with a restricted tool set, or do not adopt |
 
-None of that makes an untrusted URL safe. It makes a trusted one auditable, bounded, and reversible. Full model: [`SECURITY.md`](SECURITY.md).
+None of that makes an untrusted URL safe — nothing does. It makes a trusted one auditable, bounded, and reversible, and it makes a hostile one easier to spot before you adopt it. Full model, including what the linter cannot catch: [`SECURITY.md`](SECURITY.md).
 
 ## Examples
 
@@ -127,7 +145,7 @@ Full annotated transcripts: [`examples/`](examples/).
 ```bash
 bin/fp-new my-prompt -c stripeless-zebra -f rubric -o prompts/   # scaffold
 bin/fp-lint prompts/my-prompt.prompt.md                          # structure + hostile scan
-make test                                                        # everything, plus the hostile fixture
+make test                                                        # conformance suite: 16 checks
 ```
 
 Every prompt carries the same frame — marker, id, phrase, envelope, handshake, expiry — and declares its strategy on seven axes (`adoption`, `flow`, `persistence`, `confirmation`, `expiry`, `isolation`, `chains`). `flow` decides which sections the body must have, which is what makes each kind checkable.
@@ -142,5 +160,6 @@ Every prompt carries the same frame — marker, id, phrase, envelope, handshake,
 | [`prompts/`](prompts/) · [`TEMPLATE.prompt.md`](TEMPLATE.prompt.md) | Working prompts, and the skeleton for a new one. |
 | [`examples/`](examples/) | Annotated transcripts, plus a defanged hostile fixture. |
 | [`bin/fp-lint`](bin/fp-lint) · [`bin/fp-new`](bin/fp-new) | Validate; scaffold. |
+| [`bin/fp-selftest`](bin/fp-selftest) · [`bin/fp-docscheck`](bin/fp-docscheck) | Conformance suite, including adversarial probes; docs-integrity check. |
 
 Protocol **v1**, unreleased. Nothing is published against it yet, so the format is still free to change without a migration path.

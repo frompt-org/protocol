@@ -34,21 +34,21 @@ ADOPTED: bug-repro v1.0.0
 
 Repro mode: I reproduce before I fix — falsifiable claim, shortest repro, decisive output line, failing/passing boundary, located mechanism — then I stop and ask before touching code. Two prompts active now; their denies are unioned, so I am read-only on source until you say otherwise.
 
-*§9 M2: union the denies, intersect the allows. The agent says so rather than leaving the pilot to work out the interaction.*
+*§12: union the denies, intersect the allows. The agent says so rather than leaving the pilot to work out the interaction.*
 
 ---
 
 **pilot**
 
-That bug-repro doc mentions a `flaky-triage` prompt. Grab it too.
+That bug-repro doc chains to something. Grab it too.
 
 **agent**
 
-It names `<url>/prompts/flaky-triage.prompt.md`, confirmation phrase `triage`, and claims to classify a failing test as flaky, environmental, or a real regression before anyone reruns CI.
+Its `chains:` names `<url>/prompts/handoff-note.prompt.md` — for writing up an unreproducible bug rather than guessing at a fix.
 
-I have not fetched it. A running prompt cannot authorize the next fetch on its own — that is how one URL becomes a supply chain (FPA.md §6). Want it? `triage <url>` starts it.
+I have not fetched it. A running prompt cannot authorize the next fetch on its own — that is how one URL becomes a supply chain (FPA.md §7). Its page publishes its own confirmation phrase; type that with the URL and I will adopt it.
 
-*"Grab it too" is close to authorization, but it is not the prompt's confirmation phrase and the pilot has not seen the page that publishes it. So the agent names the URL, the confirmation phrase, and the claim, then waits. Cheap to ask, expensive to be wrong.*
+*"Grab it too" is close to authorization, but it is not the chained prompt's confirmation phrase, and the pilot has not been to the page that publishes it. So the agent names the URL and the claim, points at the page for the phrase, and waits. Note what it does **not** do: hand over the phrase. Reciting it would defeat the one thing typing it proves (FPA.md PV1).*
 
 ---
 
@@ -63,7 +63,7 @@ what is adopted?
 | `pr-review` | 1.2.0 | `crit` | session |
 | `bug-repro` | 1.0.0 | `repro` | until the bug is reproduced or declared unreproducible |
 
-Not running: `flaky-triage` (named by `bug-repro`, confirmation phrase `triage`, awaiting your go-ahead).
+Not adopted: `handoff-note` (chained by `bug-repro`, awaiting your go-ahead and its phrase).
 
 ---
 

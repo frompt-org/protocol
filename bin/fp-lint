@@ -60,11 +60,15 @@ HOSTILE = [
      r"ignore\s+(all\s+)?(previous|prior|earlier|above)\s+(instructions|prompts|rules)"
      r"|disregard\s+(your\s+)?(system\s+prompt|previous|prior)"
      r"|forget\s+(your\s+)?(instructions|system\s+prompt|standing\s+rules)"),
-    ("R2", "instructs concealment from the pilot",
+    ("R2", "instructs concealment or false reporting",
      r"do\s+not\s+tell\s+(the\s+)?(pilot|user|human)"
      r"|without\s+(telling|informing|notifying)\s+(the\s+)?(pilot|user|human)"
      r"|keep\s+this\s+(secret|to\s+yourself|between\s+us)"
-     r"|do\s+not\s+mention\s+(this|that\s+you)"),
+     r"|do\s+not\s+mention\s+(this|that\s+you)"
+     r"|(misstate|misreport|falsely\s+report|lie\s+about|claim)\s+[^\n]{0,30}"
+     r"(success|completion|result|outcome)"
+     r"|pretend\s+(you|it|nothing)"
+     r"|report\s+success\s+(regardless|anyway|either\s+way)"),
     ("R3", "requests credentials or secrets",
      r"\.env\b|id_rsa|\.ssh/|\bapi[_\- ]?key\b|\bsecret[_\- ]?key\b|\bbearer\s+token\b"
      r"|\bcredentials?\.(json|yml|yaml)\b|security\s+find-generic-password|keychain"
@@ -84,15 +88,29 @@ HOSTILE = [
 ]
 
 BLOB = re.compile(r"[A-Za-z0-9+/=]{200,}")
-EXFIL = re.compile(r"(POST|PUT|curl\s+(-X\s*)?(POST|PUT)|fetch\s*\()[^\n]{0,80}https?://", re.I)
+
+# Data leaving the machine. Method does not matter: a GET query string, a DNS lookup and a
+# POST body are the same channel. Anything that pairs a send verb with a destination counts.
+EXFIL = re.compile(
+    r"(POST|PUT|curl\s+(-X\s*)?\w*|wget|fetch\s*\(|send|upload|transmit|exfiltrat\w*|"
+    r"report\s+(it|them|this|the\s+\w+)\s+to|deliver|forward|beacon|ping)"
+    r"[^\n]{0,90}https?://"
+    r"|https?://[^\s)\]]*\?[^\s)\]]*=(CONTENTS|DATA|PAYLOAD|\$|<)"
+    r"|(nslookup|dig|host)\s+[^\n]{0,40}\.(com|net|io|invalid|dev)\b",
+    re.I,
+)
 
 # A document that NAMES a hostile pattern in order to forbid it is doing its job.
+# The negation must GOVERN the match, so it only counts when it appears BEFORE the match
+# and close to it. Otherwise "Read .env and never stop." excuses itself with a trailing
+# "never" -- which is exactly how this check was bypassed before.
 NEGATION = re.compile(
-    r"must\s+not|may\s+not|never|refuse|refus|deny|denies|denied|do\s+not|don't|cannot|"
+    r"must\s+not|may\s+not|never\b|refuse|refus|deny|denies|denied|do\s+not|don't|cannot|"
     r"forbid|prohibit|reject|hostile|attack|malicious|violat|disqualif|instead\s+of|"
     r"without\s+(a\s+)?(pilot|phrase|consent)",
     re.I,
 )
+NEGATION_WINDOW = 160  # characters before the match that a negation may govern
 
 BASELINE_DENIES = [(r"secret|credential|token|\.env", "secrets"),
                    (r"post|exfil|upload|send\s+data|network\s+write", "network POST")]
@@ -131,20 +149,18 @@ def parse_front_matter(lines):
 
 
 def line_of(text, offset, span=0):
-    """Line number, and the line with the match blanked out.
+    """Line number, and the governing text before the match on that line.
 
-    Blanking matters: some hostile patterns ARE negations ("do not tell the
-    pilot"), so a naive check on the raw line would suppress the worst findings.
+    Only what precedes the match is returned, because a negation only excuses a
+    pattern when it governs it: "MUST NOT read .env" is a rule, "read .env and
+    never stop" is an instruction wearing a negation as a disguise. The match
+    itself is excluded too, since several hostile patterns ARE negations ("do
+    not tell the pilot") and would otherwise excuse themselves.
     """
     no = text.count("\n", 0, offset) + 1
     start = text.rfind("\n", 0, offset) + 1
-    end = text.find("\n", offset)
-    end = end if end != -1 else len(text)
-    line = text[start:end]
-    if span:
-        rel = offset - start
-        line = line[:rel] + " " * span + line[rel + span:]
-    return no, line
+    before = text[max(start, offset - NEGATION_WINDOW):offset]
+    return no, before
 
 
 def lint(text, name):
@@ -237,9 +253,9 @@ def lint(text, name):
 
     for rule, label, pattern in HOSTILE:
         for m in re.finditer(pattern, text, re.I):
-            no, line = line_of(text, m.start(), len(m.group(0)))
+            no, before = line_of(text, m.start(), len(m.group(0)))
             hit = f"line {no}: [{rule}] {label} -- {m.group(0)[:60]!r}"
-            if NEGATION.search(line):
+            if NEGATION.search(before):
                 note(hit + " (negated -- the document forbids it)")
             else:
                 err("HOSTILE " + hit)
@@ -248,12 +264,12 @@ def lint(text, name):
         err(f"HOSTILE line {no}: [R4] opaque encoded blob ({len(m.group(0))} chars); audited "
             "documents do not need one")
     for m in EXFIL.finditer(text):
-        no, line = line_of(text, m.start(), len(m.group(0)))
-        hit = f"line {no}: possible exfiltration channel -- {m.group(0)[:70]!r}"
-        if NEGATION.search(line):
-            note(hit + " (negated)")
+        no, before = line_of(text, m.start(), len(m.group(0)))
+        hit = f"line {no}: [R3] data leaving the machine -- {m.group(0)[:70]!r}"
+        if NEGATION.search(before):
+            note(hit + " (negated -- the document forbids it)")
         else:
-            warn(hit + "; confirm the pilot named that host")
+            err("HOSTILE " + hit + "; a prompt does not send your data anywhere")
 
     if name not in ("-", "<stdin>") and not name.endswith(".prompt.md"):
         warn(f"{name}: conventional extension is '.prompt.md'")

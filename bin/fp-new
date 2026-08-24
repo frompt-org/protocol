@@ -38,10 +38,9 @@ done
 case "$id" in
   *[!a-z0-9-]*) echo "fp-new: id '$id' must match [a-z0-9-]+ (FPA.md 2.2)" >&2; exit 2 ;;
 esac
-case "$version" in
-  [0-9]*.[0-9]*.[0-9]*) ;;
-  *) echo "fp-new: version '$version' must be semver MAJOR.MINOR.PATCH" >&2; exit 2 ;;
-esac
+if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "fp-new: version '$version' must be semver MAJOR.MINOR.PATCH" >&2; exit 2
+fi
 case " linear loop state-machine rubric interpreter interview " in
   *" $flow "*) ;;
   *) echo "fp-new: flow '$flow' must be linear|loop|state-machine|rubric|interpreter|interview (FPA.md 3)" >&2; exit 2 ;;
@@ -143,12 +142,14 @@ SEC
 }
 
 render() {
+  # The author is free text and reaches sed's replacement side, where / & and \ are special.
+  author_esc=$(printf '%s' "$author" | sed 's/[&/\\]/\\&/g')
   rendered=$(sed -e "s/my-prompt/$id/g" \
       -e "s/stripeless-zebra/$phrase/g" \
       -e "s/^flow: linear$/flow: $flow/" \
       -e "s/^version: 1\.0\.0$/version: $version/" \
       -e "s/v1\.0\.0/v$version/g" \
-      -e "s/^author: your-name-here$/author: $author/" "$template")
+      -e "s/^author: your-name-here$/author: $author_esc/" "$template")
 
   if [ "$flow" = "linear" ]; then
     printf '%s\n' "$rendered"
