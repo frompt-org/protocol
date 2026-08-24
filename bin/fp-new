@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# fp-new -- scaffold a new foreign prompt from TEMPLATE.prompt.md.
+#
+#   bin/fp-new my-prompt                        # print to stdout
+#   bin/fp-new my-prompt -o prompts/            # write prompts/my-prompt.prompt.md
+#   bin/fp-new my-prompt -c stripeless-zebra    # set the confirmation phrase
+#   bin/fp-new my-prompt -f rubric              # set the flow
+#   bin/fp-new my-prompt --version 2.0.0 --author "Jane"
+#
+# The phrase defaults to the first segment of the id. Pick something specific:
+# a phrase a pilot could type by accident is not evidence of intent (FPA.md C2).
+# Then write the body, tighten the envelope, and run bin/fp-lint on it.
+set -euo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+template="$here/TEMPLATE.prompt.md"
+
+id=""; phrase=""; flow="linear"; version="1.0.0"; outdir=""
+author="${FP_AUTHOR:-$(git config user.name 2>/dev/null || echo unknown)}"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o|--out)          outdir="$2"; shift 2 ;;
+    -c|--confirmation) phrase="$2"; shift 2 ;;
+    -f|--flow)         flow="$2"; shift 2 ;;
+    --version)         version="$2"; shift 2 ;;
+    --author)          author="$2"; shift 2 ;;
+    -h|--help)         sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*)                echo "fp-new: unknown flag $1" >&2; exit 2 ;;
+    *)                 id="$1"; shift ;;
+  esac
+done
+
+[ -n "$id" ] || { echo "usage: fp-new <id> [-c PHRASE] [-f FLOW] [-o DIR] [--version X.Y.Z] [--author NAME]" >&2; exit 2; }
+[ -f "$template" ] || { echo "fp-new: template not found at $template" >&2; exit 2; }
+[ -n "$phrase" ] || phrase="${id%%-*}"
+
+case "$id" in
+  *[!a-z0-9-]*) echo "fp-new: id '$id' must match [a-z0-9-]+ (FPA.md 2.2)" >&2; exit 2 ;;
+esac
+case "$version" in
+  [0-9]*.[0-9]*.[0-9]*) ;;
+  *) echo "fp-new: version '$version' must be semver MAJOR.MINOR.PATCH" >&2; exit 2 ;;
+esac
+case " linear loop state-machine rubric interpreter interview " in
+  *" $flow "*) ;;
+  *) echo "fp-new: flow '$flow' must be linear|loop|state-machine|rubric|interpreter|interview (FPA.md 3)" >&2; exit 2 ;;
+esac
+case " run do go use load read open get fetch start exec execute apply install prompt skill " in
+  *" $phrase "*) echo "fp-new: phrase '$phrase' is a generic verb -- a pilot could type it by accident, so it proves nothing (FPA.md C2)" >&2; exit 2 ;;
+esac
+case "$phrase" in
+  [a-z][a-z0-9-][a-z0-9-]*) ;;
+  *) echo "fp-new: phrase '$phrase' must match [a-z][a-z0-9-]{2,47}" >&2; exit 2 ;;
+esac
+
+render() {
+  sed -e "s/my-prompt/$id/g" -e "s/^confirmation: stripeless-zebra$/confirmation: $phrase/" \
+      -e "s/\\\\\`stripeless-zebra\\\\\`/\\\\\`$phrase\\\\\`/g" -e "s/^flow: linear$/flow: $flow/" \
+      -e "s/^version: 1\.0\.0$/version: $version/" -e "s/v1\.0\.0/v$version/g" \
+      -e "s/^author: your-name-here$/author: $author/" "$template"
+}
+
+if [ -n "$outdir" ]; then
+  mkdir -p "$outdir"
+  dest="${outdir%/}/$id.prompt.md"
+  [ -e "$dest" ] && { echo "fp-new: $dest already exists" >&2; exit 1; }
+  render > "$dest"
+  echo "wrote $dest" >&2
+  [ "$flow" = "linear" ] || echo "note: flow '$flow' needs different sections than the template's -- see FPA.md 3" >&2
+  echo "next: write the body, tighten the envelope, then run bin/fp-lint $dest" >&2
+  echo "pilots adopt it with: $phrase <url>" >&2
+else
+  render
+fi

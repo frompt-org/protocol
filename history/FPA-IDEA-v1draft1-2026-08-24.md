@@ -2,7 +2,7 @@
 
 **Status:** draft · **Version:** v1-draft1 · **Date:** 2026-08-24
 **Author:** pilot + Claude Opus 5 · **Repo:** `agent-realm/foreign-prompts` (renamed from `remote-skills` 2026-08-24; the shipped spec is still titled Remote Skills until the FPA sweep lands)
-**Supersedes:** nothing. **Superseded by:** nothing yet.
+**Supersedes:** nothing. **Superseded by:** [`../FPA.md`](../FPA.md) — the normative protocol, 2026-08-24. Kept here as the design record: the reasoning, the rejected names, and the open questions.
 **What this is:** the design record for Foreign Prompt Adoption — the idea, the composable pieces, the open questions. Not the normative spec. When this settles, it becomes `FPA.md` and this file moves to `history/`.
 
 ---

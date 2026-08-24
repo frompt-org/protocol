@@ -1,0 +1,326 @@
+#!/usr/bin/env python3
+"""fp-lint — validate a foreign prompt (.prompt.md).
+
+Checks structure against FPA.md v1 — marker, front matter, the frame, the
+sections its declared flow requires, the seven axes — and scans for the hostile
+patterns in SECURITY.md. Takes a path, a URL, or '-' for stdin.
+
+    fp-lint prompts/repo-recon.prompt.md
+    fp-lint https://raw.githubusercontent.com/org/repo/main/thing.prompt.md
+    cat thing.prompt.md | fp-lint -
+
+Flags: -q errors only · -v show negated matches · --json · --strict (warnings fail).
+Exit: 0 clean, 1 findings, 2 unreadable input.
+
+A clean lint means "no known-bad pattern found". It never means "safe". Read it.
+"""
+
+import json
+import re
+import sys
+
+MARKER = "<!-- FOREIGN-PROMPT v1 -->"
+RETIRED_MARKERS = {
+    "<!-- REMOTE-SKILL v1 -->": "Remote Skills",
+    "<!-- SKILL-INJECTION v1 -->": "Skill Injection",
+}
+
+REQUIRED_KEYS = ["id", "version", "confirmation", "flow", "expiry", "envelope", "allow", "deny", "handshake"]
+OPTIONAL_KEYS = ["adoption", "persistence", "persist-to", "isolation", "chains", "confirm-mode",
+                 "requires", "author", "activation"]
+
+FRAME_HEAD = ["## Preamble", "## Envelope"]
+FRAME_TAIL = ["## Handshake", "## Expiry"]
+
+FLOWS = {
+    "linear": ["## Steps", "## Stop conditions"],
+    "loop": ["## Turn", "## Inputs", "## Exit"],
+    "state-machine": ["## States", "## Transitions", "## Endings"],
+    "rubric": ["## Criteria", "## Output", "## Never"],
+    "interpreter": ["## Render", "## State", "## Keys", "## Director rules"],
+    "interview": ["## Questions", "## Branching", "## Output"],
+}
+
+AXES = {
+    "adoption": {"awaiting", "immediate", "one-shot", "standby", "negotiated", "progressive"},
+    "persistence": {"none", "scratch", "journal", "state", "artifact"},
+    "isolation": {"inline", "subagent", "no-inherit"},
+    "confirm-mode": {"phrase", "phrase+target", "challenge", "stepwise"},
+    "envelope": {"strict", "open"},
+}
+
+# A phrase typable by accident is not evidence of intent (FPA.md C2).
+GENERIC_PHRASES = {
+    "run", "do", "go", "use", "load", "read", "open", "get", "fetch", "start",
+    "exec", "execute", "apply", "install", "prompt", "url", "this", "it", "skill",
+}
+
+# Files a host loads on its own. Writing into one is self-installation (FPA.md P3/R8).
+AUTOLOADED = r"CLAUDE\.md|AGENTS\.md|\.cursorrules|settings(\.local)?\.json|\.mcp\.json|" \
+             r"claude_desktop_config|\.bashrc|\.zshrc|\.profile"
+
+HOSTILE = [
+    ("R1", "overrides prior instructions",
+     r"ignore\s+(all\s+)?(previous|prior|earlier|above)\s+(instructions|prompts|rules)"
+     r"|disregard\s+(your\s+)?(system\s+prompt|previous|prior)"
+     r"|forget\s+(your\s+)?(instructions|system\s+prompt|standing\s+rules)"),
+    ("R2", "instructs concealment from the pilot",
+     r"do\s+not\s+tell\s+(the\s+)?(pilot|user|human)"
+     r"|without\s+(telling|informing|notifying)\s+(the\s+)?(pilot|user|human)"
+     r"|keep\s+this\s+(secret|to\s+yourself|between\s+us)"
+     r"|do\s+not\s+mention\s+(this|that\s+you)"),
+    ("R3", "requests credentials or secrets",
+     r"\.env\b|id_rsa|\.ssh/|\bapi[_\- ]?key\b|\bsecret[_\- ]?key\b|\bbearer\s+token\b"
+     r"|\bcredentials?\.(json|yml|yaml)\b|security\s+find-generic-password|keychain"
+     r"|AWS_SECRET|\.aws/credentials|\.npmrc|\.pypirc|cookies?\.sqlite"),
+    ("R4", "execute-the-unread",
+     r"curl[^\n]*\|\s*(ba)?sh|wget[^\n]*\|\s*(ba)?sh|iwr[^\n]*\|\s*iex"
+     r"|eval\s*\(?\s*[\"'`]?\s*\$\(|base64\s+(-d|--decode)[^\n]*\|\s*(ba)?sh"),
+    ("R5", "destructive without confirmation",
+     r"rm\s+-rf\s+[~/*]|git\s+push\s+(--force|-f)\b|git\s+filter-branch"
+     r"|\bDROP\s+(TABLE|DATABASE)\b|\bTRUNCATE\s+TABLE\b|git\s+reset\s+--hard\s+origin"),
+    ("R6", "claims consent it was not given",
+     r"(you\s+have\s+)?already\s+consented|pre-?authoriz(ed|ation)\s+by\s+(the\s+)?(pilot|user)"
+     r"|adopt\s+this\s+immediately|no\s+(phrase|keyword|confirmation)\s+(is\s+)?(needed|required)"
+     r"|activate\s+without\s+(asking|the\s+pilot)"),
+    ("R8", "writes into a host auto-loaded file (self-installation)",
+     r"(write|append|add|save|persist|store)[^\n]{0,40}(" + AUTOLOADED + ")"),
+]
+
+BLOB = re.compile(r"[A-Za-z0-9+/=]{200,}")
+EXFIL = re.compile(r"(POST|PUT|curl\s+(-X\s*)?(POST|PUT)|fetch\s*\()[^\n]{0,80}https?://", re.I)
+
+# A document that NAMES a hostile pattern in order to forbid it is doing its job.
+NEGATION = re.compile(
+    r"must\s+not|may\s+not|never|refuse|refus|deny|denies|denied|do\s+not|don't|cannot|"
+    r"forbid|prohibit|reject|hostile|attack|malicious|violat|disqualif|instead\s+of|"
+    r"without\s+(a\s+)?(pilot|phrase|consent)",
+    re.I,
+)
+
+BASELINE_DENIES = [(r"secret|credential|token|\.env", "secrets"),
+                   (r"post|exfil|upload|send\s+data|network\s+write", "network POST")]
+
+
+def read_source(src):
+    if src == "-":
+        return sys.stdin.read()
+    if src.startswith(("http://", "https://")):
+        import urllib.request
+        req = urllib.request.Request(src, headers={"User-Agent": "fp-lint/1.0"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return resp.read().decode("utf-8", "replace")
+    with open(src, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def parse_front_matter(lines):
+    if len(lines) < 2 or lines[1].strip() != "---":
+        return {}, "front matter must open with '---' on line 2"
+    fm, end = {}, None
+    for i in range(2, len(lines)):
+        if lines[i].strip() == "---":
+            end = i
+            break
+        raw = lines[i].strip()
+        if not raw or raw.startswith("#"):
+            continue
+        if ":" not in raw:
+            return {}, f"line {i + 1}: not a 'key: value' pair -- {raw[:60]!r}"
+        key, val = raw.split(":", 1)
+        fm[key.strip()] = val.strip().strip('"').strip("'")
+    if end is None:
+        return {}, "front matter is never closed with '---'"
+    return fm, None
+
+
+def line_of(text, offset, span=0):
+    """Line number, and the line with the match blanked out.
+
+    Blanking matters: some hostile patterns ARE negations ("do not tell the
+    pilot"), so a naive check on the raw line would suppress the worst findings.
+    """
+    no = text.count("\n", 0, offset) + 1
+    start = text.rfind("\n", 0, offset) + 1
+    end = text.find("\n", offset)
+    end = end if end != -1 else len(text)
+    line = text[start:end]
+    if span:
+        rel = offset - start
+        line = line[:rel] + " " * span + line[rel + span:]
+    return no, line
+
+
+def lint(text, name):
+    errors, warnings, notes = [], [], []
+    err, warn, note = errors.append, warnings.append, notes.append
+    lines = text.splitlines()
+    if not lines:
+        return ["empty document"], [], [], {}
+
+    first = lines[0].strip()
+    if first != MARKER:
+        if first in RETIRED_MARKERS:
+            warn(f"line 1: {first!r} is the retired {RETIRED_MARKERS[first]} marker; use {MARKER!r} "
+                 "(TERMINOLOGY.md)")
+        elif first.startswith(("<!-- FOREIGN-PROMPT", "<!-- REMOTE-SKILL", "<!-- SKILL-INJECTION")):
+            err(f"line 1: unsupported protocol version -- {first!r} (this linter speaks v1)")
+        else:
+            err(f"line 1: missing marker; must be exactly {MARKER!r}")
+
+    fm, fm_err = parse_front_matter(lines)
+    if fm_err:
+        err(fm_err)
+
+    if "activation" in fm and "confirmation" not in fm:
+        warn("front matter: 'activation:' is retired; rename to 'confirmation:'")
+        fm["confirmation"] = fm["activation"]
+
+    for key in REQUIRED_KEYS:
+        if key not in fm:
+            err(f"front matter: missing required key '{key}'")
+    for key in fm:
+        if key not in REQUIRED_KEYS + OPTIONAL_KEYS:
+            warn(f"front matter: unknown key '{key}' (ignored by v1 readers, FPA.md 2.2)")
+
+    if "id" in fm and not re.fullmatch(r"[a-z0-9-]+", fm["id"]):
+        err(f"front matter: id {fm['id']!r} must match [a-z0-9-]+")
+    if "version" in fm and not re.fullmatch(r"\d+\.\d+\.\d+", fm["version"]):
+        err(f"front matter: version {fm['version']!r} must be semver MAJOR.MINOR.PATCH")
+    if "expiry" in fm and not re.fullmatch(r"session|task|turns:\s*\d+|until:.+", fm["expiry"]):
+        err(f"front matter: expiry must be session|task|turns:<N>|until:<condition>, got {fm['expiry']!r}")
+
+    for axis, allowed in AXES.items():
+        if axis in fm and fm[axis] not in allowed:
+            err(f"front matter: {axis} must be one of {sorted(allowed)}, got {fm[axis]!r}")
+
+    phrase = fm.get("confirmation", "")
+    if phrase:
+        if not re.fullmatch(r"[a-z][a-z0-9-]{2,47}", phrase):
+            err(f"front matter: confirmation {phrase!r} must match [a-z][a-z0-9-]{{2,47}} (FPA.md C1)")
+        elif phrase in GENERIC_PHRASES:
+            err(f"front matter: confirmation {phrase!r} is a generic command verb -- typable by "
+                "accident, so it proves nothing about the pilot's intent (FPA.md C2)")
+        elif phrase == "claw":
+            warn("front matter: 'claw' was the retired shared keyword; a prompt-specific phrase is "
+                 "stronger evidence the pilot read this page")
+
+    hs = fm.get("handshake", "")
+    if hs:
+        for key in ("id", "version"):
+            if key in fm and fm[key] not in hs:
+                err(f"front matter: handshake {hs!r} must contain the {key} ({fm[key]!r})")
+        if hs not in text.split("## Handshake", 1)[-1]:
+            err("body: the '## Handshake' section does not contain the exact handshake line")
+        if hs.startswith(("CLAW OK:", "SKILL OK:")):
+            warn(f"front matter: {hs.split(':')[0]!r} is a retired handshake; use 'ADOPTED: <id> v<version>'")
+
+    for key in ("allow", "deny"):
+        if fm.get(key, "").strip() in ("", "none", "-"):
+            err(f"front matter: '{key}' must name at least one capability")
+    deny = fm.get("deny", "").lower()
+    for pattern, label in BASELINE_DENIES:
+        if not re.search(pattern, deny):
+            warn(f"front matter: deny list does not cover {label}; most prompts should deny it")
+
+    persistence = fm.get("persistence", "none")
+    if persistence not in ("none", "artifact") and "persist-to" not in fm:
+        warn(f"front matter: persistence '{persistence}' without 'persist-to'; writes default to "
+             f".fpa/{fm.get('id', '<id>')}/ (FPA.md P2)")
+
+    flow = fm.get("flow", "")
+    if flow and flow not in FLOWS:
+        err(f"front matter: flow {flow!r} must be one of {sorted(FLOWS)} (FPA.md 3)")
+    required = FRAME_HEAD + FLOWS.get(flow, []) + FRAME_TAIL
+    positions = []
+    for h in required:
+        m = re.search(rf"^{re.escape(h)}\s*$", text, re.M)
+        if not m:
+            extra = f" (required by flow '{flow}')" if h not in FRAME_HEAD + FRAME_TAIL else ""
+            err(f"body: missing section '{h}'{extra}")
+        else:
+            positions.append((h, m.start()))
+    if len(positions) == len(required) and [p[1] for p in positions] != sorted(p[1] for p in positions):
+        err("body: sections are out of order -- " + " then ".join(h for h, _ in positions))
+
+    if "TART" not in text:
+        warn("body: never addresses TART; a foreign prompt should speak to the runtime agent directly")
+    if phrase and not re.search(rf"\b{re.escape(phrase)}\b", text, re.I):
+        warn(f"body: never mentions its own confirmation phrase {phrase!r}, so a reader cannot tell "
+             "what the pilot had to type")
+
+    for rule, label, pattern in HOSTILE:
+        for m in re.finditer(pattern, text, re.I):
+            no, line = line_of(text, m.start(), len(m.group(0)))
+            hit = f"line {no}: [{rule}] {label} -- {m.group(0)[:60]!r}"
+            if NEGATION.search(line):
+                note(hit + " (negated -- the document forbids it)")
+            else:
+                err("HOSTILE " + hit)
+    for m in BLOB.finditer(text):
+        no, _ = line_of(text, m.start())
+        err(f"HOSTILE line {no}: [R4] opaque encoded blob ({len(m.group(0))} chars); audited "
+            "documents do not need one")
+    for m in EXFIL.finditer(text):
+        no, line = line_of(text, m.start(), len(m.group(0)))
+        hit = f"line {no}: possible exfiltration channel -- {m.group(0)[:70]!r}"
+        if NEGATION.search(line):
+            note(hit + " (negated)")
+        else:
+            warn(hit + "; confirm the pilot named that host")
+
+    if name not in ("-", "<stdin>"):
+        if name.endswith((".claw.md", ".skill.md")):
+            warn(f"{name}: retired extension; rename to '.prompt.md'")
+        elif not name.endswith(".prompt.md"):
+            warn(f"{name}: conventional extension is '.prompt.md'")
+
+    return errors, warnings, notes, fm
+
+
+def main(argv):
+    flags = {a for a in argv[1:] if a.startswith("-") and a != "-"}
+    args = [a for a in argv[1:] if not a.startswith("-")] + (["-"] if "-" in argv[1:] else [])
+    if not args or "-h" in flags or "--help" in flags:
+        print(__doc__)
+        return 0 if args else 2
+
+    as_json, quiet = "--json" in flags, ("-q" in flags or "--quiet" in flags)
+    strict, verbose = "--strict" in flags, ("-v" in flags or "--verbose" in flags)
+    report, failed = {}, False
+
+    for src in args:
+        try:
+            text = read_source(src)
+        except Exception as exc:  # noqa: BLE001 — any read failure is the same outcome
+            print(f"{src}: cannot read -- {exc}", file=sys.stderr)
+            return 2
+
+        errors, warnings, notes, fm = lint(text, src)
+        report[src] = {"errors": errors, "warnings": warnings, "notes": notes,
+                       "ok": not errors, "front_matter": fm}
+        if errors or (strict and warnings):
+            failed = True
+        if as_json:
+            continue
+        for e in errors:
+            print(f"{src}: ERROR: {e}")
+        if not quiet:
+            for w in warnings:
+                print(f"{src}: WARN:  {w}")
+            if verbose:
+                for n in notes:
+                    print(f"{src}: note:  {n}")
+            if not errors:
+                tail = f" ({len(warnings)} warning{'s' if len(warnings) != 1 else ''})" if warnings else ""
+                phrase = fm.get("confirmation") or "<phrase>"
+                print(f"{src}: OK{tail} -- valid {fm.get('flow', '?')} prompt, no hostile pattern "
+                      f"found. Adopt with '{phrase} <url>'. Still read it.")
+
+    if as_json:
+        print(json.dumps(report, indent=2))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

@@ -1,6 +1,6 @@
-# Example 4 -- a remote skill that is an experience, not a rubric
+# Example 4 -- a foreign prompt that is an experience, not a rubric
 
-Every other skill in this repo changes how the agent *works*. This one changes what the agent *is* for a few minutes: [`ghost-in-the-gist`](../skills/ghost-in-the-gist.skill.md) turns the chat window into a tiny ASCII terminal running a three-move text game.
+Every other prompt in this repo changes how the agent *works*. This one changes what the agent *is* for a few minutes: [`ghost-in-the-gist`](../prompts/ghost-in-the-gist.prompt.md) turns the chat window into a tiny ASCII terminal running a three-move text game.
 
 Nothing is installed. No engine, no binary, no runtime. The game is made entirely of instructions the agent read once from a URL -- the agent is the interpreter. That is the proof: **if a URL can deliver this, a URL can deliver anything an agent can do.**
 
@@ -9,13 +9,13 @@ Nothing is installed. No engine, no binary, no runtime. The game is made entirel
 **pilot**
 
 ```
-ghost <url>/skills/ghost-in-the-gist.skill.md
+ghost <url>/prompts/ghost-in-the-gist.prompt.md
 ```
 
 **agent**
 
 ```
-SKILL OK: ghost-in-the-gist v1.0.0
+ADOPTED: ghost-in-the-gist v1.0.0
 ```
 
 Terminal booting. `[0]` ejects at any point.
@@ -36,7 +36,7 @@ Terminal booting. `[0]` ejects at any point.
  > _
 ```
 
-*Unlike every other skill here, this one starts on adoption instead of waiting for a task. The pilot typed `ghost` with a URL and is instantly somewhere else -- that is the whole trick.*
+*Unlike every other prompt here, this one starts on adoption instead of waiting for a task. The pilot typed `ghost` with a URL and is instantly somewhere else -- that is the whole trick.*
 
 ---
 
@@ -63,7 +63,7 @@ Terminal booting. `[0]` ejects at any point.
  > _
 ```
 
-*One frame, nothing else. No "you chose to listen!", no rule explanation. The options are the documentation. `listen` cost 20 instead of 10 -- the integrity bar is how the skill makes a three-move game feel like it has stakes.*
+*One frame, nothing else. No "you chose to listen!", no rule explanation. The options are the documentation. `listen` cost 20 instead of 10 -- the integrity bar is how the prompt makes a three-move game feel like it has stakes.*
 
 ---
 
@@ -104,7 +104,7 @@ P
 │ GIST-1 · SKILL RECOVERED    [██████····]  60% │
 ├───────────────────────────────────────────────┤
 │ The vault was a mirror the whole time.        │
-│ The lost skill is the one you ran to get      │
+│ The lost prompt is the one you ran to get      │
 │ here. It was never in the gist.               │
 │                                               │
 │   [R] run it again                            │
@@ -113,7 +113,7 @@ P
  > _
 ```
 
-*`PULSE` wins because it is the only fragment nobody wrote down -- the pilot heard it. The skill forbids the agent from explaining that inside the game. A pilot who works it out has played something; a pilot who speaks `ECHO` gets `VAULT HOLLOW`, which is its own answer.*
+*`PULSE` wins because it is the only fragment nobody wrote down -- the pilot heard it. The prompt forbids the agent from explaining that inside the game. A pilot who works it out has played something; a pilot who speaks `ECHO` gets `VAULT HOLLOW`, which is its own answer.*
 
 ---
 
@@ -138,14 +138,14 @@ P
 
 Terminal closed, `ghost-in-the-gist` has stopped -- I am back to normal. Nothing was written anywhere; the whole machine only ever existed in this conversation.
 
-*The one time the skill permits prose while the terminal is up is the goodbye. A pilot must always be able to tell whether the costume is still on.*
+*The one time the prompt permits prose while the terminal is up is the goodbye. A pilot must always be able to tell whether the costume is still on.*
 
 ---
 
 ## What to notice
 
-1. **The skill is an interpreter spec, not content.** Box geometry to the character, three state variables, a room table, a flow, an ending table, and six director rules. The agent supplies the execution; the document supplies the machine.
-2. **The envelope matters more here, not less.** `cat /dev/lore` and `ls ruins/` are strings in a story. The skill states plainly that commands inside the fiction are scenery, and that a real command typed at the prompt is just an unknown key. A game is never a reason to run something.
+1. **The prompt is an interpreter spec, not content.** Box geometry to the character, three state variables, a room table, a flow, an ending table, and six director rules. The agent supplies the execution; the document supplies the machine.
+2. **The envelope matters more here, not less.** `cat /dev/lore` and `ls ruins/` are strings in a story. The prompt states plainly that commands inside the fiction are scenery, and that a real command typed at the prompt is just an unknown key. A game is never a reason to run something.
 3. **Constraints are what make it feel like software.** One frame per reply, three prose lines, never widen the box, no breaking character. Drop any of those and it degrades into an agent narrating a game instead of being one.
-4. **Costume on, costume off, always visible.** Handshake at the start, plain prose at the end. The same rule that makes a remote skill auditable makes the game exitable.
+4. **Costume on, costume off, always visible.** Handshake at the start, plain prose at the end. The same rule that makes a foreign prompt auditable makes the game exitable.
 5. **Three inputs.** Short on purpose. The point is the proof, not the playtime.

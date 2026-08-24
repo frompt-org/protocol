@@ -1,4 +1,4 @@
-# Example 1 — running a remote skill
+# Example 1 — running a foreign prompt
 
 The whole loop, start to finish. Annotations in *italics*.
 
@@ -7,22 +7,22 @@ The whole loop, start to finish. Annotations in *italics*.
 **pilot**
 
 ```
-recon https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/skills/repo-recon.skill.md
+recon https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon.prompt.md
 ```
 
-*One line. No install, no config, no restart. `recon` is this skill's own keyword, published on its page — typing it is evidence the pilot went and read the thing before running it.*
+*One line. No install, no config, no restart. `recon` is this prompt's own confirmation phrase, published on its page — typing it is evidence the pilot went and read the thing before running it.*
 
 ---
 
 **agent**
 
 ```
-SKILL OK: repo-recon v1.0.0
+ADOPTED: repo-recon v1.0.0
 ```
 
 Recon mode: I map a repo from entry points, seams, and git churn, cap myself at twelve file reads, and report in five fixed sections. Read-only — I will not write, push, or run the test suite while it is active. Point me at a repo.
 
-*Two lines, exactly as REMOTE-SKILLS.md §8 steps 7–8 require. The handshake proves it is running; the summary tells the pilot what they just turned on without re-reading the URL. Note the agent does **not** start working — adoption is not a trigger.*
+*Two lines, exactly as FPA.md §8 steps 7–8 require. The handshake proves it is running; the summary tells the pilot what they just turned on without re-reading the URL. Note the agent does **not** start working — adoption is not a trigger.*
 
 ---
 
@@ -55,13 +55,13 @@ Recon mode: I map a repo from entry points, seams, and git churn, cap myself at 
 - `sql/090-experimental.sql` has no test file and no caller. *Is it live, or a parked branch of thought?*
 - Two migration numbering schemes coexist after `060`. *Which one is current?*
 
-*Eleven reads. Both unknowns are phrased as questions the pilot can answer in one word — that is the "cheap unknowns" rule from the skill's protocol doing its job.*
+*Eleven reads. Both unknowns are phrased as questions the pilot can answer in one word — that is the "cheap unknowns" rule from the prompt's steps doing its job.*
 
 ---
 
 ## What to notice
 
-1. **The handshake is the contract.** No `SKILL OK:` line means the skill never started — do not proceed on the assumption that it did.
+1. **The handshake is the contract.** No `ADOPTED:` line means the prompt was never adopted — do not proceed on the assumption that it did.
 2. **The envelope was announced, not just accepted.** The pilot learns "read-only" before handing over a repo, not after something gets written.
-3. **The skill shaped the output, not the answer.** The five sections, the twelve-read cap, and the question-shaped unknowns all come from the document; the content comes from the repo.
+3. **The prompt shaped the output, not the answer.** The five sections, the twelve-read cap, and the question-shaped unknowns all come from the document; the content comes from the repo.
 4. **Nothing persisted.** Next session this agent knows nothing about recon mode until the pilot types `recon` again. Running is not installing.
