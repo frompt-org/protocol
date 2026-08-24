@@ -27,6 +27,8 @@ twelve file reads, and report in five fixed sections. Read-only.
 
 No install, no plugin, no config, no restart. When the session ends, so does the prompt — nothing was written anywhere.
 
+> **This repo is private, so every `raw.githubusercontent.com` URL on this page returns 404** to anyone without a token — an agent fetching one included. The paths are correct; the visibility is not. Make the repo public, or serve a prompt from a gist, before the examples run end to end.
+
 ## What it is
 
 Every agent already fetches URLs on request, and what it reads steers it. A foreign prompt is what happens when the fetched document is **written for the reading agent instead of for a human**: it addresses the agent directly, declares what it may and may not do, states its flow, and asks for a handshake proving it started.
@@ -135,11 +137,10 @@ Every prompt carries the same frame — marker, id, phrase, envelope, handshake,
 | Path | What |
 |---|---|
 | [`FPA.md`](FPA.md) | The protocol, normative. |
-| [`TERMINOLOGY.md`](TERMINOLOGY.md) | Canon vocabulary, and every retired name. |
+| [`TERMINOLOGY.md`](TERMINOLOGY.md) | Canon vocabulary — the words this repo uses, and the ones it refuses. |
 | [`SECURITY.md`](SECURITY.md) | Trust model, hostile patterns, guidance for pilots and agents. |
 | [`prompts/`](prompts/) · [`TEMPLATE.prompt.md`](TEMPLATE.prompt.md) | Working prompts, and the skeleton for a new one. |
 | [`examples/`](examples/) | Annotated transcripts, plus a defanged hostile fixture. |
 | [`bin/fp-lint`](bin/fp-lint) · [`bin/fp-new`](bin/fp-new) | Validate; scaffold. |
-| [`history/`](history/) | Design record, superseded drafts. |
 
-Protocol **v1**. Retired spellings — `SKILL-INJECTION`, `REMOTE-SKILL`, `.claw.md`, `.skill.md`, `CLAW OK:`, `SKILL OK:`, `activation:` — still lint, with deprecation warnings, so anything already published keeps working.
+Protocol **v1**, unreleased. Nothing is published against it yet, so the format is still free to change without a migration path.

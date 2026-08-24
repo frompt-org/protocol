@@ -54,11 +54,110 @@ case "$phrase" in
   *) echo "fp-new: phrase '$phrase' must match [a-z][a-z0-9-]{2,47}" >&2; exit 2 ;;
 esac
 
+# Sections the chosen flow requires (FPA.md 3). The template ships `linear`.
+flow_sections() {
+  case "$flow" in
+    loop) cat <<'SEC'
+## Turn
+
+<!-- What TART emits each iteration. -->
+
+## Inputs
+
+<!-- What it accepts back from the pilot, and what unrecognized input does. -->
+
+## Exit
+
+<!-- What ends the loop. -->
+
+SEC
+    ;;
+    state-machine) cat <<'SEC'
+## States
+
+<!-- One entry per state: what TART shows, what it accepts. -->
+
+## Transitions
+
+<!-- Which input moves which state to which. -->
+
+## Endings
+
+<!-- Terminal states, and what TART says on reaching one. -->
+
+SEC
+    ;;
+    rubric) cat <<'SEC'
+## Criteria
+
+<!-- Ordered tiers. TART stops at the first tier with findings. -->
+
+1. …
+2. …
+
+## Output
+
+<!-- The exact shape of what TART reports, including its verdict. -->
+
+## Never
+
+<!-- The anti-patterns: what TART must not produce, however tempting. -->
+
+SEC
+    ;;
+    interpreter) cat <<'SEC'
+## Render
+
+<!-- Exactly what TART draws each reply. Geometry to the character. -->
+
+## State
+
+<!-- The variables TART holds in context, and their starting values. -->
+
+## Keys
+
+<!-- What the pilot may type, and what unrecognized input does. -->
+
+## Director rules
+
+<!-- The constraints that keep TART in character. -->
+
+SEC
+    ;;
+    interview) cat <<'SEC'
+## Questions
+
+<!-- What TART asks, in order. -->
+
+## Branching
+
+<!-- Which answers change what comes next. -->
+
+## Output
+
+<!-- What TART produces when the questions are done. -->
+
+SEC
+    ;;
+  esac
+}
+
 render() {
-  sed -e "s/my-prompt/$id/g" -e "s/^confirmation: stripeless-zebra$/confirmation: $phrase/" \
-      -e "s/\\\\\`stripeless-zebra\\\\\`/\\\\\`$phrase\\\\\`/g" -e "s/^flow: linear$/flow: $flow/" \
-      -e "s/^version: 1\.0\.0$/version: $version/" -e "s/v1\.0\.0/v$version/g" \
-      -e "s/^author: your-name-here$/author: $author/" "$template"
+  rendered=$(sed -e "s/my-prompt/$id/g" \
+      -e "s/stripeless-zebra/$phrase/g" \
+      -e "s/^flow: linear$/flow: $flow/" \
+      -e "s/^version: 1\.0\.0$/version: $version/" \
+      -e "s/v1\.0\.0/v$version/g" \
+      -e "s/^author: your-name-here$/author: $author/" "$template")
+
+  if [ "$flow" = "linear" ]; then
+    printf '%s\n' "$rendered"
+    return
+  fi
+  # Swap the template's linear middle for the sections this flow requires.
+  printf '%s\n' "$rendered" | sed -n '1,/^## Steps$/p' | sed '$d'
+  flow_sections
+  printf '%s\n' "$rendered" | sed -n '/^## Handshake$/,$p'
 }
 
 if [ -n "$outdir" ]; then
@@ -67,7 +166,6 @@ if [ -n "$outdir" ]; then
   [ -e "$dest" ] && { echo "fp-new: $dest already exists" >&2; exit 1; }
   render > "$dest"
   echo "wrote $dest" >&2
-  [ "$flow" = "linear" ] || echo "note: flow '$flow' needs different sections than the template's -- see FPA.md 3" >&2
   echo "next: write the body, tighten the envelope, then run bin/fp-lint $dest" >&2
   echo "pilots adopt it with: $phrase <url>" >&2
 else

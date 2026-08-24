@@ -101,11 +101,11 @@ P
 
 ```
 ┌───────────────────────────────────────────────┐
-│ GIST-1 · SKILL RECOVERED    [██████····]  60% │
+│ GIST-1 · PROMPT RECOVERED   [██████····]  60% │
 ├───────────────────────────────────────────────┤
 │ The vault was a mirror the whole time.        │
-│ The lost prompt is the one you ran to get      │
-│ here. It was never in the gist.               │
+│ The lost prompt is the one you ran            │
+│ to get here. It was never in the gist.        │
 │                                               │
 │   [R] run it again                            │
 │   [0] eject                                   │

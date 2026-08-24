@@ -20,14 +20,10 @@ import re
 import sys
 
 MARKER = "<!-- FOREIGN-PROMPT v1 -->"
-RETIRED_MARKERS = {
-    "<!-- REMOTE-SKILL v1 -->": "Remote Skills",
-    "<!-- SKILL-INJECTION v1 -->": "Skill Injection",
-}
 
 REQUIRED_KEYS = ["id", "version", "confirmation", "flow", "expiry", "envelope", "allow", "deny", "handshake"]
 OPTIONAL_KEYS = ["adoption", "persistence", "persist-to", "isolation", "chains", "confirm-mode",
-                 "requires", "author", "activation"]
+                 "requires", "author"]
 
 FRAME_HEAD = ["## Preamble", "## Envelope"]
 FRAME_TAIL = ["## Handshake", "## Expiry"]
@@ -160,10 +156,7 @@ def lint(text, name):
 
     first = lines[0].strip()
     if first != MARKER:
-        if first in RETIRED_MARKERS:
-            warn(f"line 1: {first!r} is the retired {RETIRED_MARKERS[first]} marker; use {MARKER!r} "
-                 "(TERMINOLOGY.md)")
-        elif first.startswith(("<!-- FOREIGN-PROMPT", "<!-- REMOTE-SKILL", "<!-- SKILL-INJECTION")):
+        if first.startswith("<!-- FOREIGN-PROMPT"):
             err(f"line 1: unsupported protocol version -- {first!r} (this linter speaks v1)")
         else:
             err(f"line 1: missing marker; must be exactly {MARKER!r}")
@@ -171,10 +164,6 @@ def lint(text, name):
     fm, fm_err = parse_front_matter(lines)
     if fm_err:
         err(fm_err)
-
-    if "activation" in fm and "confirmation" not in fm:
-        warn("front matter: 'activation:' is retired; rename to 'confirmation:'")
-        fm["confirmation"] = fm["activation"]
 
     for key in REQUIRED_KEYS:
         if key not in fm:
@@ -201,9 +190,6 @@ def lint(text, name):
         elif phrase in GENERIC_PHRASES:
             err(f"front matter: confirmation {phrase!r} is a generic command verb -- typable by "
                 "accident, so it proves nothing about the pilot's intent (FPA.md C2)")
-        elif phrase == "claw":
-            warn("front matter: 'claw' was the retired shared keyword; a prompt-specific phrase is "
-                 "stronger evidence the pilot read this page")
 
     hs = fm.get("handshake", "")
     if hs:
@@ -212,8 +198,8 @@ def lint(text, name):
                 err(f"front matter: handshake {hs!r} must contain the {key} ({fm[key]!r})")
         if hs not in text.split("## Handshake", 1)[-1]:
             err("body: the '## Handshake' section does not contain the exact handshake line")
-        if hs.startswith(("CLAW OK:", "SKILL OK:")):
-            warn(f"front matter: {hs.split(':')[0]!r} is a retired handshake; use 'ADOPTED: <id> v<version>'")
+        if not hs.startswith("ADOPTED:"):
+            warn(f"front matter: handshake {hs!r} does not start with 'ADOPTED:'; pilots scan for that word")
 
     for key in ("allow", "deny"):
         if fm.get(key, "").strip() in ("", "none", "-"):
@@ -269,11 +255,8 @@ def lint(text, name):
         else:
             warn(hit + "; confirm the pilot named that host")
 
-    if name not in ("-", "<stdin>"):
-        if name.endswith((".claw.md", ".skill.md")):
-            warn(f"{name}: retired extension; rename to '.prompt.md'")
-        elif not name.endswith(".prompt.md"):
-            warn(f"{name}: conventional extension is '.prompt.md'")
+    if name not in ("-", "<stdin>") and not name.endswith(".prompt.md"):
+        warn(f"{name}: conventional extension is '.prompt.md'")
 
     return errors, warnings, notes, fm
 

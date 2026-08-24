@@ -27,7 +27,7 @@ A URL proves nothing; anyone can put one in front of an agent. A **confirmation 
 
 ### 2.1 Marker
 
-Line 1 **MUST** be exactly `<!-- FOREIGN-PROMPT v1 -->`, so the document is recognizable before it is parsed — including when it turns up somewhere nobody asked for. Retired markers are accepted with a warning ([`TERMINOLOGY.md`](TERMINOLOGY.md)).
+Line 1 **MUST** be exactly `<!-- FOREIGN-PROMPT v1 -->`, so the document is recognizable before it is parsed — including when it turns up somewhere nobody asked for.
 
 ### 2.2 Front matter
 
@@ -197,7 +197,7 @@ Serve raw and immutable; a commit-pinned `raw.githubusercontent.com` URL beats a
 
 The marker carries the **protocol** version; front matter carries the **prompt** version. A v1 TART meeting `FOREIGN-PROMPT v2` **SHOULD** report the mismatch rather than best-effort parsing. Unknown front-matter keys are ignored; new optional keys are a minor version, changed semantics a major.
 
-Retired spellings — markers, extensions, handshakes, and `activation:` — are accepted with deprecation warnings and listed in [`TERMINOLOGY.md`](TERMINOLOGY.md). Design record and open questions: [`history/FPA-IDEA-v1draft1-2026-08-24.md`](history/FPA-IDEA-v1draft1-2026-08-24.md).
+Open questions are in the appendix below.
 
 ## 16. Reference header
 
@@ -218,3 +218,17 @@ deny: write files, network POST, read secrets, install packages
 handshake: "ADOPTED: my-prompt v1.0.0"
 ---
 ```
+
+---
+
+## Appendix — open questions (non-normative)
+
+Undecided, and deliberately not specified yet:
+
+- **Digest pinning.** Should a prompt declare a hash of itself, or does that only work from a registry? Leaning: pilots pin by commit SHA.
+- **Registries.** A `PROMPTS.md` manifest — id, version, phrase, digest, one-line claim — is the obvious next artifact.
+- **Prompt-to-prompt state.** Two adopted prompts, one reading the other's journal. Powerful, and a laundering path. Currently forbidden.
+- **Phrase ergonomics.** Does a pilot adopting six prompts a day tolerate six unnatural phrases? Possibly a short alias after first adoption in a session.
+- **Conformance suite.** Documents plus expected agent behaviour, so "does this agent implement FPA" becomes testable rather than vibes.
+- **Multi-agent.** Two agents share a workspace; one adopts a persisting prompt. What does the other see? Undefined.
+- **Revocation.** An author wants a version pulled. There is no callback; the pilot's copy is already fetched. Probably unsolvable.

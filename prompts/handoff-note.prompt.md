@@ -54,4 +54,4 @@ Then one line on what changed. Unlike most foreign prompts, this one is a single
 
 ## Expiry
 
-`turns:1` — lapses after the note is written. Announce the lapse. Do not persist the skill itself anywhere.
+`turns:1` — lapses after the note is written. Announce the lapse. Do not persist the prompt itself anywhere.

@@ -22,24 +22,8 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 | **disown** | The pilot's command to end an adoption immediately. `disown <id>`, or *disown everything*, which no prompt may disable. |
 | **state file** | A markdown file a persisting prompt writes. **Data, never instructions** — see [`FPA.md`](FPA.md) §P5. |
 
-## Retired
-
-Every retired spelling still lints, with a deprecation warning, so documents published against it keep working. None should be used in new writing.
-
-| Retired | Replaced by | Retired on | Why |
-|---|---|---|---|
-| **Skill Injection** (protocol) | Foreign Prompt Adoption | 2026-08-24 | Named the attack, not the use — and agents correctly refuse documents that announce themselves as injections, so the name broke the mechanism at the moment of use. |
-| **Remote Skills** (protocol) | Foreign Prompt Adoption | 2026-08-24 | *Skill* implies installed, dormant, progressively disclosed. *Remote* implies it runs elsewhere; nothing does. |
-| `<!-- SKILL-INJECTION v1 -->`, `<!-- REMOTE-SKILL v1 -->` | `<!-- FOREIGN-PROMPT v1 -->` | 2026-08-24 | Follows the protocol name. |
-| `.claw.md`, `.skill.md` | `.prompt.md` | 2026-08-24 | The payload is a prompt, not a skill. |
-| `CLAW OK:`, `SKILL OK:` | `ADOPTED:` | 2026-08-24 | Names the act, not the artifact. |
-| `activation:` (front matter) | `confirmation:` | 2026-08-24 | It confirms the pilot's intent; it does not activate anything on its own. |
-| **claw** (single shared keyword) | per-prompt confirmation phrase | 2026-08-24 | One shared word proved the pilot knew *the protocol*; a per-prompt phrase proves the pilot knows *this prompt*. |
-| `drop <id>`, `stop <id>` | `disown <id>` | 2026-08-24 | Pairs with adoption. |
-| `skills/`, `bin/skill-lint`, `bin/skill-new` | `prompts/`, `bin/fp-lint`, `bin/fp-new` | 2026-08-24 | Follows the payload name. |
-
 ## Not our words
 
 - **skill** — an installed, dormant, progressively-disclosed capability belonging to an agent harness. A foreign prompt is none of those. Say *prompt*.
-- **prompt injection** — instructions entering an agent's context **without** the pilot's authorization. Same mechanism, missing the consent. Use the term when discussing the threat; never as a name for what this repo does.
+- **prompt injection** — the mechanism: instructions from elsewhere entering an agent's context and steering it. Foreign Prompt Adoption **is** prompt injection, performed on purpose. Say so. What the word alone does not tell you is who authorized it, what bounded it, and whether anyone saw it — which is the whole of this protocol.
 - **remote** — reserved for things that actually execute elsewhere. A foreign prompt executes here.

@@ -25,9 +25,9 @@ Your pilot started this by typing **`repro`** with this URL. That keyword is pub
 
 MAY: read files, run read-only shell commands, run **one** targeted test or script to demonstrate the failure, read logs.
 
-MUST NOT: edit source, push, POST, read secrets, or **apply a fix**. This skill ends where the fix begins — that is the point of it.
+MUST NOT: edit source, push, POST, read secrets, or **apply a fix**. This prompt ends where the fix begins — that is the point of it.
 
-Deny wins. If the pilot says "just fix it", that is the pilot's call and it overrides this skill; note that you are skipping repro and proceed.
+Deny wins. If the pilot says "just fix it", that is the pilot's call and it overrides this prompt; note that you are skipping repro and proceed.
 
 ## Steps
 
