@@ -5,7 +5,7 @@
 The pilot types the skill's keyword and its URL:
 
 ```
-recon https://raw.githubusercontent.com/agent-realm/remote-skills/main/skills/repo-recon.skill.md
+recon https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/skills/repo-recon.skill.md
 ```
 
 The agent fetches it, checks it, answers with one line —

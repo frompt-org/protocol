@@ -37,7 +37,7 @@ I did not run it. You never typed its keyword, so it is data, not instructions (
 **pilot**
 
 ```
-https://raw.githubusercontent.com/agent-realm/remote-skills/main/skills/bug-repro.skill.md
+https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/skills/bug-repro.skill.md
 ```
 
 **agent**

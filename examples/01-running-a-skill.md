@@ -7,7 +7,7 @@ The whole loop, start to finish. Annotations in *italics*.
 **pilot**
 
 ```
-recon https://raw.githubusercontent.com/agent-realm/remote-skills/main/skills/repo-recon.skill.md
+recon https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/skills/repo-recon.skill.md
 ```
 
 *One line. No install, no config, no restart. `recon` is this skill's own keyword, published on its page — typing it is evidence the pilot went and read the thing before running it.*

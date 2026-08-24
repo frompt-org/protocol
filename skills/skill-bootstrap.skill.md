@@ -9,7 +9,7 @@ allow: fetch a URL the pilot names, read files
 deny: fetch URLs the pilot did not name, write files, network POST, read secrets, act without a keyword
 handshake: "SKILL OK: skill-bootstrap v2.0.0"
 chains: none
-author: agent-realm/remote-skills
+author: agent-realm/foreign-prompts
 ---
 
 ## Preamble
