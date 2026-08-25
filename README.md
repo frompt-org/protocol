@@ -46,7 +46,7 @@ Vocabulary is canon in [`TERMINOLOGY.md`](TERMINOLOGY.md); the protocol is [`FPA
 3. **It adopts, and says so.** One exact line, `ADOPTED: <id> v<version>`, then one line on what changed. Adoption is never silent.
 4. **It ends.** At session end, at `turns:N`, at a declared condition, or the moment the pilot says `disown <id>`.
 
-A URL with **no** phrase is not an adoption. The agent previews it instead — names the prompt, says what it does, names its phrase, waits.
+A URL with **no** phrase is not an adoption. The agent previews it instead — names the prompt, says what it does, points at the page that publishes its phrase, and waits. It does not recite the phrase: that would turn your deliberate act into an accidental one (§PV1).
 
 ## Why it matters
 
