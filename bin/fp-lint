@@ -269,8 +269,14 @@ def lint(text, name):
 
     # Sections. Fenced blocks are stripped first: a heading inside a code fence is
     # an example, not structure, and treating it as structure was a real bypass.
+    # Blank out HTML comments before anything reads structure. A heading inside a
+    # comment is invisible to every reader except a line-oriented regex, so a
+    # document could hide its entire body in one and still validate.
+    body = re.sub(r"<!--.*?-->", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)
+    if body.count("<!--") > body.count("-->"):
+        err("body: an HTML comment is opened and never closed")
     prose, fenced, opener = [], False, None
-    for line in lines:
+    for line in body.splitlines():
         if FENCE_OPEN.match(line):
             if not fenced:
                 fenced, opener = True, FENCE_OPEN.match(line).group(1)

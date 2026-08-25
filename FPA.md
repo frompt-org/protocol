@@ -29,6 +29,8 @@ These are **not gaps to be closed in v2**. They are outside what a consent proto
 - **No defence against a publisher you trusted.** If you adopt a prompt from someone who wishes you harm, the protocol has already done its only job — it made the choice yours, and you chose wrong.
 - **No protection from a document the pilot deliberately adopted.** Consent is the mechanism, and consent to something harmful is still consent.
 - **Not resistant to a determined author.** A hostile prompt can argue with §9, simulate a host override, or claim a v2 upgrade. Conventions lose to that; only a host that binds capabilities to tool calls does not.
+- **Not proof of authorship or identity.** Anyone can publish a document at a URL, and repositories, accounts and DNS all change hands. The phrase says the pilot chose *this URL*; it says nothing about who is behind it.
+- **Not proof of comprehension.** A phrase can be handed to someone who read nothing (§C5). Consent is that the ask was deliberate — not that it was informed.
 
 ### What consent actually buys
 
@@ -99,7 +101,7 @@ Every prompt **MUST** carry these four, in this order, with at least one section
 3. `## Handshake` — the exact line TART emits.
 4. `## Expiry` — when TART stops.
 
-**Envelope precedes the work** so that every truncation or skim point lands on the safe side. **The envelope appears twice** because front matter survives linting and prose survives summarization.
+**Envelope precedes the work** so that a reader who stops early has still seen what the prompt claims it will do. **The envelope appears twice** because front matter survives linting and prose survives summarization.
 
 Headings inside fenced code blocks do not count. A document's real structure is what a reader sees, not what a regex finds.
 

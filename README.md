@@ -162,7 +162,7 @@ Full annotated transcripts: [`examples/`](examples/).
 ```bash
 bin/fp-new my-prompt -c stripeless-zebra -f rubric -o prompts/   # scaffold
 bin/fp-lint prompts/my-prompt.prompt.md                          # structure only — it does not judge intent
-make test                                                        # conformance suite: 37 checks
+make test                                                        # conformance suite: 38 checks
 ```
 
 Every prompt carries the same frame — marker, id, phrase, flow, envelope, expiry — and its `allow`/`deny` are **capability tokens from a fixed vocabulary**, not free-form English, so a host can map them onto real permissions. `flow` declares the shape of the work; its conventional sections are advisory, and the linter notes a mismatch rather than failing on one.

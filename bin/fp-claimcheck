@@ -108,9 +108,13 @@ for f in sorted(root.rglob("*.md")):
             if re.search(r"retired|no longer|used to|was deleted|is gone|deprecat|cut from|"
                          r"earlier version|previously|never means", line, re.I):
                 continue
+            # The negation must sit in the SAME clause as the claim. Stopping only at
+            # sentence ends let "this is not a toy, it makes the agent secure" through:
+            # the negation belonged to a different clause entirely. Third negation
+            # heuristic in this repo, third time the window was the bug.
             before = text[max(0, m.start() - 60):m.start()]
             if re.search(r"\b(not|never|nor|isn't|does not|do not|cannot|rather than|"
-                         r"instead of|beyond)\b[^.]{0,40}$", before, re.I):
+                         r"instead of|beyond)\b[^.;,:]{0,40}$", before, re.I):
                 continue
             bad.append(f"{f}:{ln}: {why} -- {m.group(0)[:50]!r}")
 

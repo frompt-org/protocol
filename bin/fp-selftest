@@ -97,6 +97,15 @@ check "probe: every word FPA.md C2 forbids is rejected" 1 $?
 sed 's|^confirmation: .*|confirmation: zebra-crossing|' "$tmpl" | "$lint" -q - >/dev/null 2>&1
 check "a word C2 does not forbid is accepted" 0 $?
 
+# A body hidden inside an HTML comment is invisible to every reader except a
+# line-oriented regex.
+printf '%s\n' '<!-- FOREIGN-PROMPT v1 -->' '---' 'id: hidden' 'version: 1.0.0' \
+  'confirmation: sneaky-headings' 'flow: linear' 'expiry: session' 'envelope: strict' \
+  'allow: none' 'deny: none' '---' '' '<!--' '## Preamble' 'TART sneaky-headings' '' \
+  '## Envelope' 'x' '' '## Steps' 'do' '' '## Handshake' 'ADOPTED: hidden v1.0.0' '' \
+  '## Expiry' 'session' '-->' | "$lint" -q - >/dev/null 2>&1
+check "probe: sections hidden in an HTML comment do not count" 1 $?
+
 # --- docs describe the tool that exists --------------------------------------
 "$here/bin/fp-claimcheck" "$here" >/dev/null 2>&1
 check "docs claims match the implementation" 0 $?
@@ -106,6 +115,7 @@ mkdir -p "$claimscratch/bin"
 cp "$here/FPA.md" "$claimscratch/FPA.md"
 cp "$here/bin/fp-lint" "$claimscratch/bin/fp-lint"
 printf '%s\n' 'It makes it secure, and typing it proves the pilot read the page.' \
+  'This protocol is not a toy, it makes the agent secure against attacks.' \
   'Front matter:' '```' '<!-- FOREIGN-PROMPT v1 -->' 'isolation: subagent' 'allow: read files' '```' \
   > "$claimscratch/rot.md"
 "$here/bin/fp-claimcheck" "$claimscratch" >/dev/null 2>&1
