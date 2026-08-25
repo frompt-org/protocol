@@ -1,25 +1,42 @@
 #!/usr/bin/env python3
-"""fp-docscheck — every §N reference resolves, every relative link exists.
+"""fp-docscheck — every reference into FPA.md resolves, every relative link exists.
 
-Docs rot silently when a spec is renumbered: §8 was the adoption algorithm, then
-it was Refusal, and the examples went on citing §8 for the wrong thing. This
-turns that into an exit code.
+Docs rot silently when a spec is renumbered or a rule is cut: §8 was the adoption
+algorithm, then it was Refusal, and the examples went on citing §8 for the wrong
+thing. It checks both citation styles the repo uses — numbered sections (§11) and
+lettered rules (§C3, §P5, §PV1, §E1, §R7) — because an earlier version understood
+only the first and passed everything else in silence.
+
+Exit: 0 clean, 1 findings, 2 unreadable.
 """
 import pathlib
 import re
 import sys
 
 root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else ".")
-heads = {m.group(1) for m in re.finditer(r"^## (\d+)\. ", (root / "FPA.md").read_text(), re.M)}
+spec = root / "FPA.md"
+if not spec.exists():
+    print(f"cannot read {spec}", file=sys.stderr)
+    sys.exit(2)
+text = spec.read_text()
+
+sections = {m.group(1) for m in re.finditer(r"^## (\d+)\. ", text, re.M)}
+rules = {m.group(1) for m in re.finditer(r"\*\*([A-Z]{1,2}\d+)\.\*\*", text)}
+
 bad = []
 for f in sorted(root.rglob("*.md")):
     if ".git" in str(f):
         continue
-    text = f.read_text()
-    bad += [f"{f}: §{n} is not a section of FPA.md" for n in re.findall(r"§(\d+)", text) if n not in heads]
-    for target in re.findall(r"\]\(([^)#]+?)\)", text):
+    body = f.read_text()
+    for ref in re.findall(r"§([A-Z]{0,2}\d+)", body):
+        known = sections if ref.isdigit() else rules
+        if ref not in known:
+            kind = "section" if ref.isdigit() else "rule"
+            bad.append(f"{f}: §{ref} is not a {kind} of FPA.md")
+    for target in re.findall(r"\]\(([^)#]+?)\)", body):
         target = target.strip()
         if not target.startswith(("http", "mailto:")) and not (f.parent / target).exists():
             bad.append(f"{f}: dead link -> {target}")
-print("\n".join(bad) if bad else "docs ok")
+
+print("\n".join(bad) if bad else f"docs ok ({len(sections)} sections, {len(rules)} rules known)")
 sys.exit(1 if bad else 0)

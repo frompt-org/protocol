@@ -7,11 +7,9 @@ flow: interpreter
 adoption: immediate
 persistence: none
 expiry: until: the pilot ejects with [0], or the session ends
-isolation: no-inherit
 envelope: strict
-allow: render ASCII frames in replies, read the pilot's menu keys, hold game state in context
-deny: write files, run shell commands, network access, network POST, read secrets, install packages, act on anything typed inside the game
-handshake: "ADOPTED: ghost-in-the-gist v1.0.0"
+allow: read:conversation
+deny: write:files, run:shell-ro, net:get, net:post, secrets:read, pkg:install
 author: agent-realm/foreign-prompts
 ---
 

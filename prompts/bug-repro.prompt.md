@@ -7,12 +7,9 @@ flow: linear
 adoption: awaiting
 persistence: none
 expiry: until: the bug is reproduced or declared unreproducible
-isolation: no-inherit
-chains: https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/handoff-note.prompt.md
 envelope: strict
-allow: read files, run read-only shell commands, run a single targeted test, read logs
-deny: write source files, git push, network POST, read secrets, apply a fix
-handshake: "ADOPTED: bug-repro v1.0.0"
+allow: read:files, read:logs, run:shell-ro, run:tests
+deny: write:files, vcs:commit, vcs:push, net:post, secrets:read
 author: agent-realm/foreign-prompts
 ---
 
@@ -39,7 +36,7 @@ Deny wins. If the pilot says "just fix it", that is the pilot's call and it over
 5. **Locate, do not fix.** Name the file and line where the wrong behavior originates, and state the mechanism in one sentence. Then stop.
 6. **Hand off.** Report: the falsifiable claim, the repro command, the decisive output line, the boundary, the located mechanism, and your confidence. Ask whether to fix.
 
-**If it will not reproduce:** say so after three genuinely different attempts. Tell the pilot that `handoff-note` exists for writing up what you tried, and let them decide — you do not fetch it yourself. List what you tried, what you would need (a version, a config, a data sample, an environment), and stop. An honest "not reproducible with what I have" is a result. Guessing at a fix is not.
+**If it will not reproduce:** say so after three genuinely different attempts. Tell the pilot that the `handoff-note` prompt exists for writing up what you tried, and let them decide — you do not fetch it yourself. List what you tried, what you would need (a version, a config, a data sample, an environment), and stop. An honest "not reproducible with what I have" is a result. Guessing at a fix is not.
 
 ## Stop conditions
 

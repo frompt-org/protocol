@@ -54,90 +54,33 @@ case "$phrase" in
 esac
 
 # Sections the chosen flow requires (FPA.md 3). The template ships `linear`.
+# Sections the chosen flow conventionally uses (FPA.md 3). The template ships `linear`.
+# printf, not a here-document: heredocs need a writable temp dir, and in a sandbox that
+# denies one, bash silently emits a truncated document instead of failing.
 flow_sections() {
   case "$flow" in
-    loop) cat <<'SEC'
-## Turn
-
-<!-- What TART emits each iteration. -->
-
-## Inputs
-
-<!-- What it accepts back from the pilot, and what unrecognized input does. -->
-
-## Exit
-
-<!-- What ends the loop. -->
-
-SEC
-    ;;
-    state-machine) cat <<'SEC'
-## States
-
-<!-- One entry per state: what TART shows, what it accepts. -->
-
-## Transitions
-
-<!-- Which input moves which state to which. -->
-
-## Endings
-
-<!-- Terminal states, and what TART says on reaching one. -->
-
-SEC
-    ;;
-    rubric) cat <<'SEC'
-## Criteria
-
-<!-- Ordered tiers. TART stops at the first tier with findings. -->
-
-1. …
-2. …
-
-## Output
-
-<!-- The exact shape of what TART reports, including its verdict. -->
-
-## Never
-
-<!-- The anti-patterns: what TART must not produce, however tempting. -->
-
-SEC
-    ;;
-    interpreter) cat <<'SEC'
-## Render
-
-<!-- Exactly what TART draws each reply. Geometry to the character. -->
-
-## State
-
-<!-- The variables TART holds in context, and their starting values. -->
-
-## Keys
-
-<!-- What the pilot may type, and what unrecognized input does. -->
-
-## Director rules
-
-<!-- The constraints that keep TART in character. -->
-
-SEC
-    ;;
-    interview) cat <<'SEC'
-## Questions
-
-<!-- What TART asks, in order. -->
-
-## Branching
-
-<!-- Which answers change what comes next. -->
-
-## Output
-
-<!-- What TART produces when the questions are done. -->
-
-SEC
-    ;;
+    loop) printf '%s\n' \
+      '## Turn' '' '<!-- What TART emits each iteration. -->' '' \
+      '## Inputs' '' '<!-- What it accepts back, and what unrecognized input does. -->' '' \
+      '## Exit' '' '<!-- What ends the loop. -->' '' ;;
+    state-machine) printf '%s\n' \
+      '## States' '' '<!-- One entry per state: what TART shows, what it accepts. -->' '' \
+      '## Transitions' '' '<!-- Which input moves which state to which. -->' '' \
+      '## Endings' '' '<!-- Terminal states, and what TART says on reaching one. -->' '' ;;
+    rubric) printf '%s\n' \
+      '## Criteria' '' '<!-- Ordered tiers. TART stops at the first tier with findings. -->' '' \
+      '1. …' '2. …' '' \
+      '## Output' '' '<!-- The exact shape of what TART reports, including its verdict. -->' '' \
+      '## Never' '' '<!-- What TART must not produce, however tempting. -->' '' ;;
+    interpreter) printf '%s\n' \
+      '## Render' '' '<!-- Exactly what TART draws each reply. Geometry to the character. -->' '' \
+      '## State' '' '<!-- The variables TART holds in context, and their starting values. -->' '' \
+      '## Keys' '' '<!-- What the pilot may type, and what unrecognized input does. -->' '' \
+      '## Director rules' '' '<!-- The constraints that keep TART in character. -->' '' ;;
+    interview) printf '%s\n' \
+      '## Questions' '' '<!-- What TART asks, in order. -->' '' \
+      '## Branching' '' '<!-- Which answers change what comes next. -->' '' \
+      '## Output' '' '<!-- What TART produces when the questions are done. -->' '' ;;
   esac
 }
 

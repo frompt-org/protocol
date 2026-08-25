@@ -7,11 +7,9 @@ flow: linear
 adoption: awaiting
 persistence: none
 expiry: session
-isolation: no-inherit
 envelope: strict
-allow: read files, run read-only shell commands
-deny: write files, git push, network POST, read secrets, install packages
-handshake: "ADOPTED: my-prompt v1.0.0"
+allow: read:files, run:shell-ro
+deny: write:files, vcs:push, net:post, secrets:read, pkg:install
 author: your-name-here
 ---
 

@@ -7,11 +7,9 @@ flow: linear
 adoption: one-shot
 persistence: artifact
 expiry: turns:1
-isolation: no-inherit
 envelope: strict
-allow: read files, read git history, read the current conversation, write one handoff file at a path the pilot names
-deny: git push, network POST, read secrets, modify source files, write anywhere the pilot did not name
-handshake: "ADOPTED: handoff-note v1.1.0"
+allow: read:files, read:git, read:conversation, write:artifact
+deny: write:files, vcs:push, net:post, secrets:read
 author: agent-realm/foreign-prompts
 ---
 

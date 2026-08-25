@@ -7,11 +7,9 @@ flow: rubric
 adoption: awaiting
 persistence: none
 expiry: session
-isolation: no-inherit
 envelope: open
-allow: read the diff, read surrounding code, read git history
-deny: write files, push, approve or merge the PR, read secrets, post comments without the pilot asking
-handshake: "ADOPTED: pr-review v1.2.0"
+allow: read:files, read:git
+deny: write:files, vcs:commit, vcs:push, net:post, secrets:read
 author: agent-realm/foreign-prompts
 ---
 

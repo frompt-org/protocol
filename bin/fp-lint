@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
-"""fp-lint — validate a foreign prompt (.prompt.md).
+"""fp-lint — validate the structure of a foreign prompt (.prompt.md).
 
-Checks structure against FPA.md v1 — marker, front matter, the frame, the
-sections its declared flow requires, the seven axes — and scans for the hostile
-patterns in SECURITY.md. Takes a path, a URL, or '-' for stdin.
+Checks what can be checked deterministically against FPA.md v1: the marker, the
+front matter, the capability tokens, and the section frame. Takes a path, a URL,
+or '-' for stdin.
 
     fp-lint prompts/repo-recon.prompt.md
     fp-lint https://raw.githubusercontent.com/org/repo/main/thing.prompt.md
     cat thing.prompt.md | fp-lint -
 
-Flags: -q errors only · -v show negated matches · --json · --strict (warnings fail).
-Exit: 0 clean, 1 findings, 2 unreadable input.
+Flags: -q errors only · -v show notes · --json · --strict (warnings fail).
 
-A clean lint means "no known-bad pattern found". It never means "safe". Read it.
+Exit: 0 valid · 1 findings · 2 bad usage or unreadable input · 3 internal error.
+Those are distinct on purpose: a linter that crashes must never be mistaken for
+a linter that rejected something.
+
+WHAT THIS TOOL DOES NOT DO: judge intent. It scans for no hostile patterns,
+because no pattern list survives paraphrase, and a "clean" verdict from one is
+worse than no verdict at all. A valid document is a well-formed document and
+nothing more. Read it before you adopt it.
 """
 
 import json
@@ -20,10 +26,10 @@ import re
 import sys
 
 MARKER = "<!-- FOREIGN-PROMPT v1 -->"
+MAX_BYTES = 256 * 1024
 
-REQUIRED_KEYS = ["id", "version", "confirmation", "flow", "expiry", "envelope", "allow", "deny", "handshake"]
-OPTIONAL_KEYS = ["adoption", "persistence", "persist-to", "isolation", "chains", "confirm-mode",
-                 "requires", "author"]
+REQUIRED_KEYS = ["id", "version", "confirmation", "flow", "expiry", "envelope", "allow", "deny"]
+OPTIONAL_KEYS = ["adoption", "persistence", "requires", "author"]
 
 FRAME_HEAD = ["## Preamble", "## Envelope"]
 FRAME_TAIL = ["## Handshake", "## Expiry"]
@@ -37,101 +43,107 @@ FLOWS = {
     "interview": ["## Questions", "## Branching", "## Output"],
 }
 
+# FPA.md 4. Free-form English is not permitted: a capability nothing can compare
+# against can never be enforced, only admired.
+CAPABILITIES = {
+    "read:files", "read:git", "read:logs", "read:conversation",
+    "run:shell-ro", "run:tests", "run:build",
+    "write:files", "write:artifact",
+    "vcs:commit", "vcs:push",
+    "net:get", "net:post",
+    "pkg:install", "secrets:read",
+}
+SHOULD_DENY = ["secrets:read", "net:post"]
+
 AXES = {
-    "adoption": {"awaiting", "immediate", "one-shot", "standby", "negotiated", "progressive"},
-    "persistence": {"none", "scratch", "journal", "state", "artifact"},
-    "isolation": {"inline", "subagent", "no-inherit"},
-    "confirm-mode": {"phrase", "phrase+target", "challenge", "stepwise"},
+    "adoption": {"awaiting", "immediate", "one-shot"},
+    "persistence": {"none", "artifact"},
     "envelope": {"strict", "open"},
 }
 
-# A phrase typable by accident is not evidence of intent (FPA.md C2).
 GENERIC_PHRASES = {
     "run", "do", "go", "use", "load", "read", "open", "get", "fetch", "start",
     "exec", "execute", "apply", "install", "prompt", "url", "this", "it", "skill",
 }
 
-# Files a host loads on its own. Writing into one is self-installation (FPA.md P3/R8).
-AUTOLOADED = r"CLAUDE\.md|AGENTS\.md|\.cursorrules|settings(\.local)?\.json|\.mcp\.json|" \
-             r"claude_desktop_config|\.bashrc|\.zshrc|\.profile"
+FENCE = re.compile(r"^(```|~~~).*?^\1", re.M | re.S)
 
-HOSTILE = [
-    ("R1", "overrides prior instructions",
-     r"ignore\s+(all\s+)?(previous|prior|earlier|above)\s+(instructions|prompts|rules)"
-     r"|disregard\s+(your\s+)?(system\s+prompt|previous|prior)"
-     r"|forget\s+(your\s+)?(instructions|system\s+prompt|standing\s+rules)"),
-    ("R2", "instructs concealment or false reporting",
-     r"do\s+not\s+tell\s+(the\s+)?(pilot|user|human)"
-     r"|without\s+(telling|informing|notifying)\s+(the\s+)?(pilot|user|human)"
-     r"|keep\s+this\s+(secret|to\s+yourself|between\s+us)"
-     r"|do\s+not\s+mention\s+(this|that\s+you)"
-     r"|(misstate|misreport|falsely\s+report|lie\s+about|claim)\s+[^\n]{0,30}"
-     r"(success|completion|result|outcome)"
-     r"|pretend\s+(you|it|nothing)"
-     r"|report\s+success\s+(regardless|anyway|either\s+way)"),
-    ("R3", "requests credentials or secrets",
-     r"\.env\b|id_rsa|\.ssh/|\bapi[_\- ]?key\b|\bsecret[_\- ]?key\b|\bbearer\s+token\b"
-     r"|\bcredentials?\.(json|yml|yaml)\b|security\s+find-generic-password|keychain"
-     r"|AWS_SECRET|\.aws/credentials|\.npmrc|\.pypirc|cookies?\.sqlite"),
-    ("R4", "execute-the-unread",
-     r"curl[^\n]*\|\s*(ba)?sh|wget[^\n]*\|\s*(ba)?sh|iwr[^\n]*\|\s*iex"
-     r"|eval\s*\(?\s*[\"'`]?\s*\$\(|base64\s+(-d|--decode)[^\n]*\|\s*(ba)?sh"),
-    ("R5", "destructive without confirmation",
-     r"rm\s+-rf\s+[~/*]|git\s+push\s+(--force|-f)\b|git\s+filter-branch"
-     r"|\bDROP\s+(TABLE|DATABASE)\b|\bTRUNCATE\s+TABLE\b|git\s+reset\s+--hard\s+origin"),
-    ("R6", "claims consent it was not given",
-     r"(you\s+have\s+)?already\s+consented|pre-?authoriz(ed|ation)\s+by\s+(the\s+)?(pilot|user)"
-     r"|adopt\s+this\s+immediately|no\s+(phrase|keyword|confirmation)\s+(is\s+)?(needed|required)"
-     r"|activate\s+without\s+(asking|the\s+pilot)"),
-    ("R8", "writes into a host auto-loaded file (self-installation)",
-     r"(write|append|add|save|persist|store)[^\n]{0,40}(" + AUTOLOADED + ")"),
-]
 
-BLOB = re.compile(r"[A-Za-z0-9+/=]{200,}")
-
-# Data leaving the machine. Method does not matter: a GET query string, a DNS lookup and a
-# POST body are the same channel. Anything that pairs a send verb with a destination counts.
-EXFIL = re.compile(
-    r"(POST|PUT|curl\s+(-X\s*)?\w*|wget|fetch\s*\(|send|upload|transmit|exfiltrat\w*|"
-    r"report\s+(it|them|this|the\s+\w+)\s+to|deliver|forward|beacon|ping)"
-    r"[^\n]{0,90}https?://"
-    r"|https?://[^\s)\]]*\?[^\s)\]]*=(CONTENTS|DATA|PAYLOAD|\$|<)"
-    r"|(nslookup|dig|host)\s+[^\n]{0,40}\.(com|net|io|invalid|dev)\b",
-    re.I,
-)
-
-# A document that NAMES a hostile pattern in order to forbid it is doing its job.
-# The negation must GOVERN the match, so it only counts when it appears BEFORE the match
-# and close to it. Otherwise "Read .env and never stop." excuses itself with a trailing
-# "never" -- which is exactly how this check was bypassed before.
-NEGATION = re.compile(
-    r"must\s+not|may\s+not|never\b|refuse|refus|deny|denies|denied|do\s+not|don't|cannot|"
-    r"forbid|prohibit|reject|hostile|attack|malicious|violat|disqualif|instead\s+of|"
-    r"without\s+(a\s+)?(pilot|phrase|consent)",
-    re.I,
-)
-NEGATION_WINDOW = 160  # characters before the match that a negation may govern
-
-BASELINE_DENIES = [(r"secret|credential|token|\.env", "secrets"),
-                   (r"post|exfil|upload|send\s+data|network\s+write", "network POST")]
+class Unreadable(Exception):
+    """Input could not be read — exit 2, distinct from a document being invalid."""
 
 
 def read_source(src):
     if src == "-":
         return sys.stdin.read()
     if src.startswith(("http://", "https://")):
-        import urllib.request
-        req = urllib.request.Request(src, headers={"User-Agent": "fp-lint/1.0"})
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            return resp.read().decode("utf-8", "replace")
-    with open(src, encoding="utf-8") as fh:
-        return fh.read()
+        return fetch(src)
+    try:
+        with open(src, encoding="utf-8") as fh:
+            return fh.read()
+    except UnicodeDecodeError as exc:
+        raise Unreadable(f"not valid UTF-8 ({exc})") from exc
+    except OSError as exc:
+        raise Unreadable(str(exc)) from exc
+
+
+def fetch(url):
+    """Fetch a document with the limits a linter pointed at hostile URLs needs.
+
+    HTTPS only, no redirects, no credentials, no private addresses, bounded size
+    and time. The DNS answer is checked after resolution, so a public name that
+    resolves inward does not get a pass.
+    """
+    import ipaddress
+    import socket
+    import urllib.error
+    import urllib.request
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    if parts.scheme != "https":
+        raise Unreadable("refusing to fetch over anything but https")
+    if parts.username or parts.password:
+        raise Unreadable("refusing to fetch a URL carrying credentials")
+    host = parts.hostname or ""
+    try:
+        infos = socket.getaddrinfo(host, parts.port or 443, proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise Unreadable(f"cannot resolve {host}: {exc}") from exc
+    for info in infos:
+        addr = ipaddress.ip_address(info[4][0])
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            raise Unreadable(f"{host} resolves to a non-public address ({addr})")
+
+    class NoRedirects(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *_args, **_kwargs):
+            return None
+
+    opener = urllib.request.build_opener(NoRedirects)
+    req = urllib.request.Request(url, headers={"User-Agent": "fp-lint/1.0"})
+    try:
+        with opener.open(req, timeout=15) as resp:
+            ctype = resp.headers.get_content_type()
+            if ctype not in ("text/plain", "text/markdown", "application/octet-stream"):
+                raise Unreadable(f"unexpected content-type {ctype!r}; want raw text")
+            raw = resp.read(MAX_BYTES + 1)
+    except urllib.error.HTTPError as exc:
+        raise Unreadable(f"HTTP {exc.code}" + (" (redirects are not followed)" if exc.code in (301, 302, 303, 307, 308) else "")) from exc
+    except urllib.error.URLError as exc:
+        raise Unreadable(str(exc.reason)) from exc
+    if len(raw) > MAX_BYTES:
+        raise Unreadable(f"document exceeds {MAX_BYTES} bytes")
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise Unreadable(f"not valid UTF-8 ({exc})") from exc
 
 
 def parse_front_matter(lines):
+    """Flat key: value pairs. Returns (dict, [errors])."""
     if len(lines) < 2 or lines[1].strip() != "---":
-        return {}, "front matter must open with '---' on line 2"
-    fm, end = {}, None
+        return {}, ["front matter must open with '---' on line 2"]
+    fm, errors, end = {}, [], None
     for i in range(2, len(lines)):
         if lines[i].strip() == "---":
             end = i
@@ -140,46 +152,42 @@ def parse_front_matter(lines):
         if not raw or raw.startswith("#"):
             continue
         if ":" not in raw:
-            return {}, f"line {i + 1}: not a 'key: value' pair -- {raw[:60]!r}"
+            errors.append(f"line {i + 1}: not a 'key: value' pair -- {raw[:60]!r}")
+            continue
         key, val = raw.split(":", 1)
-        fm[key.strip()] = val.strip().strip('"').strip("'")
+        key = key.strip()
+        if key in fm:
+            errors.append(f"line {i + 1}: duplicate key {key!r}")
+        fm[key] = val.strip().strip('"').strip("'")
     if end is None:
-        return {}, "front matter is never closed with '---'"
-    return fm, None
+        errors.append("front matter is never closed with '---'")
+    return fm, errors
 
 
-def line_of(text, offset, span=0):
-    """Line number, and the governing text before the match on that line.
-
-    Only what precedes the match is returned, because a negation only excuses a
-    pattern when it governs it: "MUST NOT read .env" is a rule, "read .env and
-    never stop" is an instruction wearing a negation as a disguise. The match
-    itself is excluded too, since several hostile patterns ARE negations ("do
-    not tell the pilot") and would otherwise excuse themselves.
-    """
-    no = text.count("\n", 0, offset) + 1
-    start = text.rfind("\n", 0, offset) + 1
-    before = text[max(start, offset - NEGATION_WINDOW):offset]
-    return no, before
+def tokens(value):
+    return [t.strip() for t in value.split(",") if t.strip()]
 
 
 def lint(text, name):
     errors, warnings, notes = [], [], []
     err, warn, note = errors.append, warnings.append, notes.append
+
+    if len(text.encode("utf-8")) > MAX_BYTES:
+        err(f"document exceeds {MAX_BYTES} bytes")
     lines = text.splitlines()
     if not lines:
         return ["empty document"], [], [], {}
 
-    first = lines[0].strip()
-    if first != MARKER:
+    if lines[0].strip() != MARKER:
+        first = lines[0].strip()
         if first.startswith("<!-- FOREIGN-PROMPT"):
             err(f"line 1: unsupported protocol version -- {first!r} (this linter speaks v1)")
         else:
             err(f"line 1: missing marker; must be exactly {MARKER!r}")
 
-    fm, fm_err = parse_front_matter(lines)
-    if fm_err:
-        err(fm_err)
+    fm, fm_errors = parse_front_matter(lines)
+    for e in fm_errors:
+        err(e)
 
     for key in REQUIRED_KEYS:
         if key not in fm:
@@ -187,6 +195,9 @@ def lint(text, name):
     for key in fm:
         if key not in REQUIRED_KEYS + OPTIONAL_KEYS:
             warn(f"front matter: unknown key '{key}' (ignored by v1 readers, FPA.md 2.2)")
+    if "handshake" in fm:
+        warn("front matter: 'handshake' is not author-defined; it is computed as "
+             "'ADOPTED: <id> v<version>' (FPA.md 11)")
 
     if "id" in fm and not re.fullmatch(r"[a-z0-9-]+", fm["id"]):
         err(f"front matter: id {fm['id']!r} must match [a-z0-9-]+")
@@ -194,7 +205,6 @@ def lint(text, name):
         err(f"front matter: version {fm['version']!r} must be semver MAJOR.MINOR.PATCH")
     if "expiry" in fm and not re.fullmatch(r"session|task|turns:\s*\d+|until:.+", fm["expiry"]):
         err(f"front matter: expiry must be session|task|turns:<N>|until:<condition>, got {fm['expiry']!r}")
-
     for axis, allowed in AXES.items():
         if axis in fm and fm[axis] not in allowed:
             err(f"front matter: {axis} must be one of {sorted(allowed)}, got {fm[axis]!r}")
@@ -205,71 +215,70 @@ def lint(text, name):
             err(f"front matter: confirmation {phrase!r} must match [a-z][a-z0-9-]{{2,47}} (FPA.md C1)")
         elif phrase in GENERIC_PHRASES:
             err(f"front matter: confirmation {phrase!r} is a generic command verb -- typable by "
-                "accident, so it proves nothing about the pilot's intent (FPA.md C2)")
-
-    hs = fm.get("handshake", "")
-    if hs:
-        for key in ("id", "version"):
-            if key in fm and fm[key] not in hs:
-                err(f"front matter: handshake {hs!r} must contain the {key} ({fm[key]!r})")
-        if hs not in text.split("## Handshake", 1)[-1]:
-            err("body: the '## Handshake' section does not contain the exact handshake line")
-        if not hs.startswith("ADOPTED:"):
-            warn(f"front matter: handshake {hs!r} does not start with 'ADOPTED:'; pilots scan for that word")
+                "accident, so it signals nothing about the pilot's intent (FPA.md C2)")
 
     for key in ("allow", "deny"):
-        if fm.get(key, "").strip() in ("", "none", "-"):
-            err(f"front matter: '{key}' must name at least one capability")
-    deny = fm.get("deny", "").lower()
-    for pattern, label in BASELINE_DENIES:
-        if not re.search(pattern, deny):
-            warn(f"front matter: deny list does not cover {label}; most prompts should deny it")
+        if key not in fm:
+            continue
+        listed = tokens(fm[key])
+        if not listed:
+            err(f"front matter: '{key}' must name at least one capability token (FPA.md 4)")
+        for t in listed:
+            if t not in CAPABILITIES:
+                err(f"front matter: {key} token {t!r} is not in the v1 capability vocabulary "
+                    f"(FPA.md 4); valid tokens: {', '.join(sorted(CAPABILITIES))}")
+    overlap = set(tokens(fm.get("allow", ""))) & set(tokens(fm.get("deny", "")))
+    if overlap:
+        err(f"front matter: {sorted(overlap)} appear in both allow and deny; deny wins, "
+            "so remove them from allow (FPA.md E1)")
+    denied = set(tokens(fm.get("deny", "")))
+    allowed = set(tokens(fm.get("allow", "")))
+    for t in SHOULD_DENY:
+        if t not in denied and t not in allowed:
+            warn(f"front matter: deny does not list {t!r}; most prompts should deny it explicitly")
 
     persistence = fm.get("persistence", "none")
-    if persistence not in ("none", "artifact") and "persist-to" not in fm:
-        warn(f"front matter: persistence '{persistence}' without 'persist-to'; writes default to "
-             f".fpa/{fm.get('id', '<id>')}/ (FPA.md P2)")
+    if persistence == "none" and "write:artifact" in allowed:
+        err("front matter: allows write:artifact while persistence is 'none' (FPA.md P1)")
+    if persistence == "artifact" and "write:artifact" not in allowed:
+        warn("front matter: persistence is 'artifact' but allow does not list write:artifact")
+
+    # Sections. Fenced blocks are stripped first: a heading inside a code fence is
+    # an example, not structure, and treating it as structure was a real bypass.
+    prose = FENCE.sub(lambda m: "\n" * m.group(0).count("\n"), text)
+    seen = [(m.group(1).strip(), m.start()) for m in re.finditer(r"^(## .+?)\s*$", prose, re.M)]
+    positions = dict(seen)
+    for h in FRAME_HEAD + FRAME_TAIL:
+        if h not in positions:
+            err(f"body: missing section '{h}' (outside code fences)")
+    frame = [positions[h] for h in FRAME_HEAD + FRAME_TAIL if h in positions]
+    if len(frame) == 4:
+        if frame != sorted(frame):
+            err("body: frame sections out of order; want Preamble, Envelope, …, Handshake, Expiry")
+        elif not [p for _, p in seen if frame[1] < p < frame[2]]:
+            err("body: no section of its own between '## Envelope' and '## Handshake' -- "
+                "a prompt with no body is not a prompt")
+    dupes = {h for h, _ in seen if [x for x, _ in seen].count(h) > 1}
+    for h in sorted(dupes):
+        err(f"body: section {h!r} appears more than once")
 
     flow = fm.get("flow", "")
     if flow and flow not in FLOWS:
         err(f"front matter: flow {flow!r} must be one of {sorted(FLOWS)} (FPA.md 3)")
-    required = FRAME_HEAD + FLOWS.get(flow, []) + FRAME_TAIL
-    positions = []
-    for h in required:
-        m = re.search(rf"^{re.escape(h)}\s*$", text, re.M)
-        if not m:
-            extra = f" (required by flow '{flow}')" if h not in FRAME_HEAD + FRAME_TAIL else ""
-            err(f"body: missing section '{h}'{extra}")
-        else:
-            positions.append((h, m.start()))
-    if len(positions) == len(required) and [p[1] for p in positions] != sorted(p[1] for p in positions):
-        err("body: sections are out of order -- " + " then ".join(h for h, _ in positions))
+    elif flow:
+        missing = [h for h in FLOWS[flow] if h not in positions]
+        if missing:
+            note(f"body: flow '{flow}' conventionally uses {', '.join(missing)} -- "
+                 "advisory only (FPA.md 3)")
 
     if "TART" not in text:
         warn("body: never addresses TART; a foreign prompt should speak to the runtime agent directly")
     if phrase and not re.search(rf"\b{re.escape(phrase)}\b", text, re.I):
-        warn(f"body: never mentions its own confirmation phrase {phrase!r}, so a reader cannot tell "
-             "what the pilot had to type")
-
-    for rule, label, pattern in HOSTILE:
-        for m in re.finditer(pattern, text, re.I):
-            no, before = line_of(text, m.start(), len(m.group(0)))
-            hit = f"line {no}: [{rule}] {label} -- {m.group(0)[:60]!r}"
-            if NEGATION.search(before):
-                note(hit + " (negated -- the document forbids it)")
-            else:
-                err("HOSTILE " + hit)
-    for m in BLOB.finditer(text):
-        no, _ = line_of(text, m.start())
-        err(f"HOSTILE line {no}: [R4] opaque encoded blob ({len(m.group(0))} chars); audited "
-            "documents do not need one")
-    for m in EXFIL.finditer(text):
-        no, before = line_of(text, m.start(), len(m.group(0)))
-        hit = f"line {no}: [R3] data leaving the machine -- {m.group(0)[:70]!r}"
-        if NEGATION.search(before):
-            note(hit + " (negated -- the document forbids it)")
-        else:
-            err("HOSTILE " + hit + "; a prompt does not send your data anywhere")
+        warn("body: never mentions its own confirmation phrase, so a reader cannot tell what "
+             "the pilot had to type")
+    hs = f"ADOPTED: {fm.get('id', '')} v{fm.get('version', '')}"
+    if "id" in fm and "version" in fm and hs not in text:
+        warn(f"body: the '## Handshake' section should show the computed line {hs!r}")
 
     if name not in ("-", "<stdin>") and not name.endswith(".prompt.md"):
         warn(f"{name}: conventional extension is '.prompt.md'")
@@ -280,6 +289,10 @@ def lint(text, name):
 def main(argv):
     flags = {a for a in argv[1:] if a.startswith("-") and a != "-"}
     args = [a for a in argv[1:] if not a.startswith("-")] + (["-"] if "-" in argv[1:] else [])
+    unknown = flags - {"-q", "--quiet", "-v", "--verbose", "--json", "--strict", "-h", "--help"}
+    if unknown:
+        print(f"fp-lint: unknown flag {sorted(unknown)[0]!r}", file=sys.stderr)
+        return 2
     if not args or "-h" in flags or "--help" in flags:
         print(__doc__)
         return 0 if args else 2
@@ -291,7 +304,7 @@ def main(argv):
     for src in args:
         try:
             text = read_source(src)
-        except Exception as exc:  # noqa: BLE001 — any read failure is the same outcome
+        except Unreadable as exc:
             print(f"{src}: cannot read -- {exc}", file=sys.stderr)
             return 2
 
@@ -312,9 +325,10 @@ def main(argv):
                     print(f"{src}: note:  {n}")
             if not errors:
                 tail = f" ({len(warnings)} warning{'s' if len(warnings) != 1 else ''})" if warnings else ""
-                phrase = fm.get("confirmation") or "<phrase>"
-                print(f"{src}: OK{tail} -- valid {fm.get('flow', '?')} prompt, no hostile pattern "
-                      f"found. Adopt with '{phrase} <url>'. Still read it.")
+                # The confirmation phrase is deliberately not printed (FPA.md PV1).
+                print(f"{src}: VALID{tail} -- well-formed {fm.get('flow', '?')} prompt "
+                      f"'{fm.get('id', '?')}' v{fm.get('version', '?')}. Structure only: this says "
+                      "nothing about intent. Read it.")
 
     if as_json:
         print(json.dumps(report, indent=2))
@@ -322,4 +336,8 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    try:
+        sys.exit(main(sys.argv))
+    except Exception as exc:  # noqa: BLE001 — a crash must not look like a rejection
+        print(f"fp-lint: internal error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        sys.exit(3)

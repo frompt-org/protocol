@@ -7,11 +7,9 @@ flow: linear
 adoption: awaiting
 persistence: none
 expiry: session
-isolation: no-inherit
 envelope: strict
-allow: read files, run read-only shell commands, read git history
-deny: write files, git push, network POST, read secrets, install packages, run test suites
-handshake: "ADOPTED: repo-recon v1.0.0"
+allow: read:files, read:git, run:shell-ro
+deny: write:files, vcs:commit, vcs:push, net:post, secrets:read, pkg:install, run:tests
 author: agent-realm/foreign-prompts
 ---
 
