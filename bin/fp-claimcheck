@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""fp-claimcheck — the docs must describe the tool that exists.
+
+Four review rounds, and nearly every defect was the same shape: a scripted rename
+updated the identifiers faithfully while the sentences around them went on
+describing a design that had been cut. Prose rot is invisible to a linter that
+only reads prompts, so this reads the *documentation* and checks it against the
+implementation:
+
+  1. Front-matter keys shown in docs must be keys fp-lint accepts.
+  2. Capability tokens shown in docs must be in fp-lint's vocabulary.
+  3. Flow values shown in docs must be flows fp-lint knows.
+  4. Retired names and known overclaims must not reappear.
+
+Rules 1-3 are derived from bin/fp-lint at runtime, so cutting a key or a token
+makes every doc that still advertises it fail, without anyone maintaining a list.
+
+Exit: 0 clean, 1 findings, 2 unreadable.
+"""
+import importlib.machinery
+import importlib.util
+import pathlib
+import re
+import sys
+
+root = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else ".")
+
+# fp-lint has no .py suffix, so name the loader explicitly. Importing it is safe:
+# everything executable sits behind its __main__ guard.
+loader = importlib.machinery.SourceFileLoader("fp_lint", str(root / "bin" / "fp-lint"))
+spec = importlib.util.spec_from_loader("fp_lint", loader)
+if spec is None:
+    print("cannot load bin/fp-lint", file=sys.stderr)
+    sys.exit(2)
+fp = importlib.util.module_from_spec(spec)
+try:
+    loader.exec_module(fp)
+except Exception as exc:  # noqa: BLE001
+    print(f"cannot load bin/fp-lint: {exc}", file=sys.stderr)
+    sys.exit(2)
+
+KNOWN_KEYS = set(fp.REQUIRED_KEYS) | set(fp.OPTIONAL_KEYS)
+KNOWN_CAPS = set(fp.CAPABILITIES) | {"none"}
+KNOWN_FLOWS = set(fp.FLOWS)
+
+# Things that were true once. Each entry: pattern, why it is wrong now.
+RETIRED = [
+    (r"\bSKILL-INJECTION\b|\bREMOTE-SKILL\b", "retired marker"),
+    (r"\.skill\.md\b|\.claw\.md\b", "retired extension"),
+    (r"\bSKILL OK:|\bCLAW OK:", "retired handshake"),
+    (r"\bremote skills?\b|\bskill injection\b", "retired protocol name"),
+    (r"structure \+ hostile scan|scans for hostile|hostile-pattern scan (?:catches|finds)",
+     "there is no hostile scan"),
+    (r"proves? (?:the pilot|they) read|went and read the thing|evidence (?:the pilot|they) read",
+     "the phrase is consent, not comprehension (FPA.md C5)"),
+    (r"\balways safe\b", "nothing here is always safe (FPA.md 10)"),
+    (r"bounded,? and reversible|is reversible\b", "disown cannot un-send or un-write"),
+    (r"\bguarantees\b|\bprevents (?:the|a) (?:prompt|document)", "the protocol enforces nothing itself"),
+    (r"seven axes", "there are no longer seven axes"),
+]
+
+FENCE = re.compile(r"^(```|~~~)", re.M)
+KEYLINE = re.compile(r"^([a-z][a-z0-9-]*): *(.*)$")
+
+bad = []
+for f in sorted(root.rglob("*.md")):
+    if ".git" in str(f):
+        continue
+    text = f.read_text()
+    lines = text.splitlines()
+
+    # Rules 1-3: only inside fenced blocks that are showing a foreign prompt.
+    fenced, block, start = False, [], 0
+    for n, line in enumerate(lines, 1):
+        if FENCE.match(line):
+            if fenced and any("FOREIGN-PROMPT" in b for b in block):
+                for offset, b in enumerate(block):
+                    m = KEYLINE.match(b)
+                    if not m:
+                        continue
+                    key, val = m.group(1), m.group(2).strip()
+                    ln = start + offset
+                    if key not in KNOWN_KEYS and key not in ("id",):
+                        bad.append(f"{f}:{ln}: front-matter key '{key}' is not one fp-lint accepts")
+                    if key in ("allow", "deny"):
+                        for tok in [t.strip() for t in val.split(",") if t.strip()]:
+                            if tok not in KNOWN_CAPS:
+                                bad.append(f"{f}:{ln}: capability {tok!r} is not in the vocabulary")
+                    if key == "flow" and val and val not in KNOWN_FLOWS:
+                        bad.append(f"{f}:{ln}: flow {val!r} is not a flow fp-lint knows")
+            fenced, block, start = not fenced, [], n + 1
+            continue
+        if fenced:
+            block.append(line)
+
+    # Rule 4: retired names and overclaims, anywhere.
+    for pattern, why in RETIRED:
+        for m in re.finditer(pattern, text, re.I):
+            ln = text[: m.start()].count("\n") + 1
+            line = lines[ln - 1] if ln <= len(lines) else ""
+            # Two ways a match is not a claim: the sentence says the thing is gone,
+            # or the phrase is negated right in front of it ("not as evidence they
+            # read every line"). Check the text immediately before the match, since
+            # that is where a negation governing it has to sit.
+            if re.search(r"retired|no longer|used to|was deleted|is gone|deprecat|cut from|"
+                         r"earlier version|previously|never means", line, re.I):
+                continue
+            before = text[max(0, m.start() - 60):m.start()]
+            if re.search(r"\b(not|never|nor|isn't|does not|do not|cannot|rather than|"
+                         r"instead of|beyond)\b[^.]{0,40}$", before, re.I):
+                continue
+            bad.append(f"{f}:{ln}: {why} -- {m.group(0)[:50]!r}")
+
+print("\n".join(bad) if bad else
+      f"claims ok ({len(KNOWN_KEYS)} keys, {len(KNOWN_CAPS)} capabilities, {len(KNOWN_FLOWS)} flows known)")
+sys.exit(1 if bad else 0)

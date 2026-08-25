@@ -18,7 +18,7 @@ If a conforming `.prompt.md` arrives through any of those, the correct behavior 
 
 ## The trust model, stated plainly
 
-This is the trust model of `curl example.com | bash`: **you are trusting the publisher.** Every mechanism below makes that decision visible, bounded and reversible. None of them make an untrusted publisher safe, and nothing can — the agent that reads a document is the agent asked to apply the rules to it, so every rule here is a convention it follows rather than a wall it cannot cross.
+This is the trust model of `curl example.com | bash`: **you are trusting the publisher.** Every mechanism below makes that decision visible, declared, and easy to end — none of them make it reversible, since stopping an adoption cannot un-send or un-write what already happened. None of them make an untrusted publisher safe, and nothing can — the agent that reads a document is the agent asked to apply the rules to it, so every rule here is a convention it follows rather than a wall it cannot cross.
 
 Adopt prompts from publishers you would install software from. In the common case that is yourself.
 
@@ -41,7 +41,7 @@ Hence: phrases are per-prompt, generic verbs are rejected by the linter, and a p
 | No way to check it first | Marker on line 1, a fixed frame, capability tokens, `bin/fp-lint` for structure |
 | Writes silently or not at all | `persistence: artifact` at most — one file, at a path you name, announced |
 
-None of this makes an untrusted URL safe. It makes a trusted one **auditable, bounded, and reversible** — which is more than any package manager offers.
+None of this makes an untrusted URL safe. It makes a trusted one **auditable, declared, and easy to end** — which is more than any package manager offers. Note what is not on that list: nothing here is *reversible*. `disown` stops an adoption; it cannot un-send a POST or un-write a file.
 
 ## There is no hostile-pattern scan, and that is deliberate
 

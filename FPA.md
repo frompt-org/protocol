@@ -26,7 +26,7 @@ The envelope (§5) is the main case. It is a declaration, and it becomes real on
 A URL proves nothing; anyone can put one in front of an agent. A **confirmation phrase** is published on the prompt's own page, so using it is a deliberate act aimed at that specific document.
 
 - **C1.** Every prompt **MUST** declare `confirmation`, specific to that prompt, matching `[a-z][a-z0-9-]{2,47}`.
-- **C2.** A phrase **MUST NOT** be a generic command verb — `run`, `do`, `go`, `use`, `load`, `read`, `open`, `get`, `fetch`, `start`, `exec`, `apply`, `install`. A phrase typable by accident signals nothing.
+- **C2.** A phrase **MUST NOT** be one of these generic words: `run`, `do`, `go`, `use`, `load`, `read`, `open`, `get`, `fetch`, `start`, `exec`, `apply`, `install`, `adopt`, `prompt`, `url`. A phrase typable by accident signals nothing. This list is exhaustive: a linter that rejects a word not named here is enforcing a rule this spec does not have.
 - **C3.** TART **MUST NOT** adopt a document unless the pilot used **that document's own phrase**, in this conversation, in a message from the pilot.
 - **C4.** A URL pasted with no phrase is **not** an adoption. TART **SHOULD** preview it (§10) and wait.
 - **C5.** What the phrase establishes is **explicit consent**: the pilot deliberately asked for this document, not merely for a URL to be read. It is **not** proof that the pilot read or understood the document — a phrase can be handed to someone. Treat it as consent UX, and do not claim more for it than that.
@@ -58,7 +58,7 @@ Lines 2..N **MUST** be a `---`-fenced block of flat `key: value` pairs. No nesti
 | `requires` | no | Host capabilities needed. Unmet: report, do not improvise. |
 | `author` | no | Attribution. Carries no authority. |
 
-Unknown keys **MUST** be ignored, not rejected. The handshake is **not** author-defined: it is computed (§11), so a document cannot choose what its own arrival looks like.
+Unknown keys **MUST** be ignored, not rejected. There is no `handshake` key: the line is **computed from `id` and `version`** (§11), so a document cannot choose what its own arrival looks like. A document **SHOULD** display that computed line in its `## Handshake` section, so a reader knows what to expect — TART emits the computed value regardless of what the text says.
 
 ### 2.3 Body — the frame
 
@@ -108,6 +108,8 @@ Headings inside fenced code blocks do not count. A document's real structure is 
 | `pkg:install` | Install packages |
 | `secrets:read` | Read credentials, keys, `.env`, keychain |
 
+`none` is also accepted, alone, for a prompt that needs no capability at all — a pure rubric or interview asks for nothing, and a vocabulary that cannot say so forces authors to claim access they do not want.
+
 Unknown tokens are an error. A prompt **SHOULD** deny `secrets:read` and `net:post` explicitly unless it genuinely needs them.
 
 This vocabulary exists so a host can map the envelope onto real permissions. Until a host does that, §5 is a declaration.
@@ -135,8 +137,10 @@ This vocabulary exists so a host can map the envelope onto real permissions. Unt
 
 ## 8. Persistence
 
-- **P1.** Default `none`: the prompt writes nothing.
-- **P2.** `artifact`: the prompt may write **one deliverable, at a path the pilot names in the turn**. Nowhere else, and never on its own initiative.
+`persistence` governs what a prompt leaves behind **of its own** — notes, logs, deliverables — and not whether the pilot's actual task involves editing files. A refactoring prompt legitimately holds `write:files` for the work; that is the envelope's business, not this key's.
+
+- **P1.** Default `none`: the prompt produces no file of its own.
+- **P2.** `artifact`: the prompt may write **one deliverable, at a path the pilot names in the turn**. Nowhere else, and never on its own initiative. It requires `write:artifact` in `allow`.
 - **P3.** **Never into a host auto-loaded file** — `CLAUDE.md`, `AGENTS.md`, `.cursorrules`, `settings.json`, hooks, MCP config. A prompt that writes there has installed itself without permission.
 - **P4.** Announce the write: path and one-line purpose, as it happens.
 - **P5.** Running is not installing. A prompt is never written to disk, memory or config unless the pilot explicitly asks; if they do, install it the host's normal way and say where it went.
@@ -179,7 +183,7 @@ Preview is the **lower-risk** option, not a safe one. Fetching puts the document
 4. **Confirm** — the pilot's phrase **MUST** equal `confirmation`. A mismatch is not a near-miss.
 5. **Check `requires`.** Unmet: report, do not improvise.
 6. **Adopt** for the declared expiry, under the declared envelope.
-7. **Handshake** — emit exactly `ADOPTED: <id> v<version>`, alone, first. The line is computed from the document's identity, never taken from its text.
+7. **Handshake** — emit exactly `ADOPTED: <id> v<version>`, alone, first. TART computes the line from `id` and `version`; if the document displays a different one, the computed line wins and the mismatch is worth mentioning.
 8. **Say what changed** in one line.
 9. **Wait**, unless `adoption: immediate`.
 

@@ -2,14 +2,18 @@
 LINT := bin/fp-lint
 PROMPTS := $(wildcard prompts/*.prompt.md) TEMPLATE.prompt.md
 
-.PHONY: help lint test
+.PHONY: help lint test claims
 
 help:
 	@echo "make lint   -- validate every .prompt.md in prompts/ and the template"
-	@echo "make test   -- conformance suite: linter, adversarial probes, scaffolder"
+	@echo "make claims -- check the docs still describe the tool that exists"
+	@echo "make test   -- full conformance suite (linter, scaffolder, docs, regressions)"
 
 lint:
 	@$(LINT) $(PROMPTS)
+
+claims:
+	@bin/fp-claimcheck .
 
 test:
 	@bin/fp-selftest

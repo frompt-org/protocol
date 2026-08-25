@@ -155,8 +155,8 @@ Full annotated transcripts: [`examples/`](examples/).
 
 ```bash
 bin/fp-new my-prompt -c stripeless-zebra -f rubric -o prompts/   # scaffold
-bin/fp-lint prompts/my-prompt.prompt.md                          # structure + hostile scan
-make test                                                        # conformance suite: 26 checks
+bin/fp-lint prompts/my-prompt.prompt.md                          # structure only — it does not judge intent
+make test                                                        # conformance suite: 36 checks
 ```
 
 Every prompt carries the same frame — marker, id, phrase, flow, envelope, expiry — and its `allow`/`deny` are **capability tokens from a fixed vocabulary**, not free-form English, so a host can map them onto real permissions. `flow` declares the shape of the work; its conventional sections are advisory, and the linter notes a mismatch rather than failing on one.
@@ -171,6 +171,7 @@ Every prompt carries the same frame — marker, id, phrase, flow, envelope, expi
 | [`prompts/`](prompts/) · [`TEMPLATE.prompt.md`](TEMPLATE.prompt.md) | Working prompts, and the skeleton for a new one. |
 | [`examples/`](examples/) | Annotated transcripts, plus a defanged hostile fixture. |
 | [`bin/fp-lint`](bin/fp-lint) · [`bin/fp-new`](bin/fp-new) | Validate; scaffold. |
-| [`bin/fp-selftest`](bin/fp-selftest) · [`bin/fp-docscheck`](bin/fp-docscheck) | Conformance suite, including adversarial probes; docs-integrity check. |
+| [`bin/fp-selftest`](bin/fp-selftest) | Conformance suite — every defect four review rounds found, as an assertion. |
+| [`bin/fp-docscheck`](bin/fp-docscheck) · [`bin/fp-claimcheck`](bin/fp-claimcheck) | References and links resolve; the docs still describe the tool that exists. |
 
 Protocol **v1**, unreleased. Nothing is published against it yet, so the format is still free to change without a migration path.

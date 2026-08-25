@@ -10,7 +10,7 @@ The whole loop, start to finish. Annotations in *italics*.
 recon https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon.prompt.md
 ```
 
-*One line. No install, no config, no restart. `recon` is this prompt's own confirmation phrase, published on its page — typing it is evidence the pilot went and read the thing before running it.*
+*One line. No install, no config, no restart. `recon` is this prompt's own confirmation phrase, published on its page — typing it makes the ask deliberate and specific to this document. It does not prove the pilot read it; a phrase can be handed to someone.*
 
 ---
 
@@ -22,7 +22,7 @@ ADOPTED: repo-recon v1.0.0
 
 Recon mode: I map a repo from entry points, seams, and git churn, cap myself at twelve file reads, and report in five fixed sections. Read-only — I will not write, push, or run the test suite while it is active. Point me at a repo.
 
-*Two lines, exactly as FPA.md §11 steps 7–8 require. The handshake proves it is running; the summary tells the pilot what they just turned on without re-reading the URL. Note the agent does **not** start working — adoption is not a trigger.*
+*Two lines, exactly as FPA.md §11 steps 7–8 require. The handshake is the agent's report that it started; the summary tells the pilot what they just turned on without re-reading the URL. Both are cooperative — an agent that ignored the prompt entirely could print the same two lines. Note the agent does **not** start working — adoption is not a trigger.*
 
 ---
 
