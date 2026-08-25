@@ -8,18 +8,48 @@ Two audiences: **authors**, who publish `.prompt.md` documents, and **TART** —
 
 ---
 
-## 0. What this protocol is, and is not
+## 0. The premise
 
-**It is a distribution mechanism.** A way to move a prompt from a URL into an agent, with a declared shape, an announced start, and an end. Its trust model is the trust model of `curl example.com | bash`, of `rustup`, of any installer: **you are trusting the publisher.**
+**Every LLM agent is injectable. That is the substrate, not a flaw this protocol introduces.** Any text an agent reads can steer it — a README, a search result, an issue comment, a tool's output, a file in the repo. No agent in existence is immune, and none is likely to be soon.
 
-**It is not a sandbox and it contains nothing.** The runtime agent both reads the document and is asked to apply these rules to it, so every rule here is a **convention the agent follows**, not a barrier it cannot cross. A hostile document can attempt to talk its way past all of it.
+Given that, "how do we stop instructions from reaching the agent" is not an answerable question. The answerable one is:
 
-That distinction decides what belongs in this spec:
+> **Whose instructions got in, and did the pilot choose them?**
 
-- Conventions about **usefulness** — flow, expiry, the handshake, the section frame — are worth declaring even though nothing enforces them, the way semver is worth declaring.
-- Claims about **safety** are worth nothing unless something outside the model enforces them. Where this spec names a limit, it says plainly who enforces it: the host, or nobody.
+That is what this protocol is for. FPA does not make injection safe; it makes injection **consented**. The pilot names a specific document with a phrase only that document publishes, the document declares what it intends, the agent announces that it started, and the whole thing ends. Instructions arrive on purpose instead of by accident.
 
-The envelope (§5) is the main case. It is a declaration, and it becomes real only when a host maps it onto actual tool permissions. §4 exists so that mapping is possible.
+The trust model is the trust model of `curl example.com | bash`, of `rustup`, of every installer anyone has ever piped into a shell: **you are trusting the publisher.** That is an ordinary decision people make daily, and it is the decision FPA asks you to make deliberately rather than unknowingly.
+
+### Non-goals
+
+These are **not gaps to be closed in v2**. They are outside what a consent protocol can do, and a version that claimed them would be lying:
+
+- **Not a sandbox.** The runtime agent reads the document and is asked to apply these rules to it. Every rule here is a convention it follows, not a barrier it cannot cross.
+- **Not a filter.** Nothing here detects hostile intent. `bin/fp-lint` checks structure; it says so in its own output, and the repo ships a hostile document that passes it.
+- **No defence against a publisher you trusted.** If you adopt a prompt from someone who wishes you harm, the protocol has already done its only job — it made the choice yours, and you chose wrong.
+- **No protection from a document the pilot deliberately adopted.** Consent is the mechanism, and consent to something harmful is still consent.
+- **Not resistant to a determined author.** A hostile prompt can argue with §9, simulate a host override, or claim a v2 upgrade. Conventions lose to that; only a host that binds capabilities to tool calls does not.
+
+### What consent actually buys
+
+| Without a consent protocol | With one |
+|---|---|
+| Instructions arrive from anywhere the agent happens to read | They arrive because the pilot named a document |
+| Nobody declared what they intend | `flow`, `envelope`, `persistence`, `expiry`, up front and machine-readable |
+| Adoption is silent | A handshake line, every time |
+| It ends whenever | A declared end, and `disown` |
+| No way to look first | A fixed frame, and a linter for its structure |
+
+None of that is security. All of it is **agency** — the pilot knows what got in, chose it, and can end it. That is the middle ground this protocol occupies, deliberately.
+
+### What follows from the premise
+
+Two rules shape everything below:
+
+1. **Delete every unenforced claim about safety.** A limit nothing enforces is worse than no limit, because it reads as protection.
+2. **Keep unenforced conventions about usefulness.** `flow`, `expiry`, the handshake and the section frame are worth declaring for the same reason semver is worth declaring: they help, and nobody pretends they are a police force.
+
+Where this spec names a limit, it says who enforces it: the host, the pilot, or nobody. §5 is the main case — the envelope becomes real only when a host maps §4's tokens onto tool permissions.
 
 ## 1. Consent
 

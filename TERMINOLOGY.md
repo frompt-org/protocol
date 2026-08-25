@@ -8,6 +8,8 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 |---|---|
 | **foreign prompt** | A prompt acquired from a non-local source — usually a URL — to be checked, adopted, and run by an agent that did not write it. Prompt injection with the pilot's authorization, declared limits, and a visible handshake. Extension `.prompt.md`, marker `<!-- FOREIGN-PROMPT v1 -->` on line 1. "Foreign" names **origin, never location** — like a foreign key, which lives in your table. |
 | **Foreign Prompt Adoption (FPA)** | The protocol in [`FPA.md`](FPA.md): how a foreign prompt is fetched, checked, confirmed, adopted, run, and ended. |
+| **consent** | The pilot deliberately choosing *this document*, by typing the phrase it publishes. The point of the protocol, and the only thing it establishes — not comprehension, not safety, not containment. |
+| **non-goal** | Something FPA deliberately does not attempt: sandboxing, filtering, detecting hostility, or defending against a publisher the pilot trusted. Listed in [`FPA.md`](FPA.md) §0. Non-goals are not a roadmap. |
 | **adoption** | The runtime agent holding a foreign prompt as active instructions for a declared span. The way a committee adopts a resolution — not the way a family adopts a child. |
 | **pilot** | Whoever sends commands to the agent. The only party who can authorize an adoption. |
 | **runtime agent** | The agent that fetches and runs the foreign prompt. |

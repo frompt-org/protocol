@@ -101,6 +101,17 @@ check "a word C2 does not forbid is accepted" 0 $?
 "$here/bin/fp-claimcheck" "$here" >/dev/null 2>&1
 check "docs claims match the implementation" 0 $?
 
+claimscratch=$(mktemp -d 2>/dev/null || echo "/tmp/fp-claims-$$")
+mkdir -p "$claimscratch/bin"
+cp "$here/FPA.md" "$claimscratch/FPA.md"
+cp "$here/bin/fp-lint" "$claimscratch/bin/fp-lint"
+printf '%s\n' 'It makes it secure, and typing it proves the pilot read the page.' \
+  'Front matter:' '```' '<!-- FOREIGN-PROMPT v1 -->' 'isolation: subagent' 'allow: read files' '```' \
+  > "$claimscratch/rot.md"
+"$here/bin/fp-claimcheck" "$claimscratch" >/dev/null 2>&1
+check "claimcheck catches a protection claim, a cut key and an English capability" 1 $?
+rm -rf "$claimscratch"
+
 # --- docs integrity ----------------------------------------------------------
 "$here/bin/fp-docscheck" "$here" >/dev/null 2>&1
 check "repo docs: references resolve, links exist" 0 $?

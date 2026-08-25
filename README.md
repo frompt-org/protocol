@@ -4,17 +4,23 @@
 
 Say the quiet part first: **this is prompt injection.** Same mechanism, byte for byte — text written by a stranger enters an agent's context and steers what it does. Nothing here pretends otherwise.
 
-The difference is that this injection was *asked for*. Prompt injection was never frightening because text can steer an agent; that is simply how agents work, and it is equally true of a README, a search result, or a tool's output. It is frightening because **nobody authorized it, nothing bounded it, and no one could see it happen.** Fix those three and the same mechanism becomes a delivery system:
+**You cannot stop that. You can decide whose.**
 
-| | Prompt injection | Foreign prompt |
-|---|---|---|
-| Who asked for it | nobody | the pilot, by the phrase that prompt publishes |
-| What it may do | anything the agent can | capability tokens the agent honours, and a host can enforce |
-| Can you tell it happened | no | a mandatory handshake line |
-| When it ends | when the context does | a declared expiry, or `disown <id>` |
-| Can you check it first | no | marker, fixed sections, and `bin/fp-lint` before you adopt |
+Every LLM agent is injectable; that is the substrate, not a flaw this introduces. A README, a search result, an issue comment, a tool's output — all of it can steer an agent, and none of it asked your permission. So the question is not *how do we keep instructions out*, which nobody can answer. It is:
 
-So: **the legitimate way to inject a prompt.** Not a safe way to run a stranger's instructions — there is no such thing, here or in any installer — but a way that is *declared, announced, and easy to end*, which is more than the alternative of pasting a stranger's text into your chat window.
+> **Whose instructions got in, and did you choose them?**
+
+A foreign prompt is injection you chose. The pilot names one specific document with a phrase only that document publishes; the document declares up front what it intends; the agent announces that it started; and it ends. Instructions arrive **on purpose instead of by accident** — that is the entire proposition, and it is not a security claim.
+
+| Injection that just happens to you | A foreign prompt |
+|---|---|
+| Arrives from anywhere the agent reads | Arrives because you named a document |
+| Declares nothing | `flow`, `envelope`, `persistence`, `expiry`, machine-readable |
+| Silent | A handshake line, every time |
+| Ends whenever | A declared end, and `disown <id>` |
+| No way to look first | A fixed frame, and a linter for its structure |
+
+That is **agency, not security** — you know what got in, you chose it, you can end it. The trust model is `curl example.com | bash`: you are trusting the publisher, deliberately rather than unknowingly. What the protocol explicitly does **not** attempt is in [`FPA.md` §0](FPA.md) — those are non-goals, not a roadmap.
 
 ```
 recon https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon.prompt.md
@@ -58,11 +64,11 @@ A URL with **no** phrase is not an adoption. The agent previews it instead — n
 
 ## What this is, and what it is not
 
-**It is a distribution mechanism.** Its trust model is the trust model of `curl example.com | bash` — of `rustup`, `nvm`, `get.docker.com`, every installer you have ever piped into a shell. **You are trusting the publisher.** That is ordinary, and the software industry runs on it.
+**It is a consent protocol for something that happens anyway.** Agents read instructions from elsewhere constantly; FPA is the case where the pilot picked which ones, in advance, by name.
 
-**It is not a sandbox.** The agent that reads the document is the same agent asked to apply the rules to it, so the protocol's MUSTs are conventions the agent follows, not walls it cannot cross. A determined hostile prompt can try to talk its way past any of them.
+**It is not a sandbox, a filter, or a defence against a publisher you trusted.** The agent that reads the document is the agent asked to apply the rules to it, so every rule is a convention it follows rather than a wall it cannot cross. A hostile prompt can argue with any of them. The full list of non-goals is in [`FPA.md` §0](FPA.md), and they are deliberate: a version claiming otherwise would be lying.
 
-Against the baseline it replaces — piping a stranger's script into your shell, or pasting a stranger's prompt into your chat — it grants no more than your agent already had, and says far more about what it intends to do:
+Against the baseline it replaces — piping a stranger's script into your shell, or pasting a stranger's prompt into your chat — it grants no more than your agent already had, and says far more about what it intends:
 
 | | `curl \| bash` | foreign prompt |
 |---|---|---|
@@ -74,9 +80,9 @@ Against the baseline it replaces — piping a stranger's script into your shell,
 
 So: **adopt prompts from publishers you would install software from.** In the common case that is yourself — your prompts, in your repos, fed to your agents, which is a CDN for your own instructions.
 
-## Failure modes, and what the protocol does about each
+## What consent does not buy
 
-Every way an adopted prompt goes wrong, and who actually stops it — **the host**, **the pilot**, or **nobody** (a convention the agent follows, worth declaring, worth nothing under pressure).
+Consent settles *whose* instructions got in. It settles nothing else. Here is every way an adopted prompt still goes wrong, and who actually stops it — **the host**, **the pilot**, or **nobody** (a convention the agent follows, worth declaring, worth nothing under pressure).
 
 | Risk | Who stops it |
 |---|---|
@@ -156,7 +162,7 @@ Full annotated transcripts: [`examples/`](examples/).
 ```bash
 bin/fp-new my-prompt -c stripeless-zebra -f rubric -o prompts/   # scaffold
 bin/fp-lint prompts/my-prompt.prompt.md                          # structure only — it does not judge intent
-make test                                                        # conformance suite: 36 checks
+make test                                                        # conformance suite: 37 checks
 ```
 
 Every prompt carries the same frame — marker, id, phrase, flow, envelope, expiry — and its `allow`/`deny` are **capability tokens from a fixed vocabulary**, not free-form English, so a host can map them onto real permissions. `flow` declares the shape of the work; its conventional sections are advisory, and the linter notes a mismatch rather than failing on one.

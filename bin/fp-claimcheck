@@ -57,6 +57,9 @@ RETIRED = [
     (r"bounded,? and reversible|is reversible\b", "disown cannot un-send or un-write"),
     (r"\bguarantees\b|\bprevents (?:the|a) (?:prompt|document)", "the protocol enforces nothing itself"),
     (r"seven axes", "there are no longer seven axes"),
+    (r"makes? (?:it|you|this|the agent) secure|protects? (?:you|the pilot|the agent) from|"
+     r"safe from (?:injection|prompts?|attack)|blocks? (?:hostile|malicious)",
+     "FPA is a consent protocol, not protection (FPA.md 0 non-goals)"),
 ]
 
 FENCE = re.compile(r"^(```|~~~)", re.M)
