@@ -27,7 +27,8 @@ twelve file reads, and report in five fixed sections. Read-only.
 
 No install, no plugin, no config, no restart. When the session ends, so does the prompt — nothing was written anywhere.
 
-> **This repo is private, so every `raw.githubusercontent.com` URL on this page returns 404** to anyone without a token — an agent fetching one included. The paths are correct; the visibility is not. Make the repo public, or serve a prompt from a gist, before the examples run end to end.
+Those URLs are live: every prompt in this repo is fetchable as raw text, which is the entire distribution mechanism. Pin to a commit when you care what you are adopting —
+`https://raw.githubusercontent.com/agent-realm/foreign-prompts/8f20b7c…/prompts/repo-recon.prompt.md` — because `main` can change under you and a commit cannot.
 
 ## What it is
 
