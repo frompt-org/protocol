@@ -7,10 +7,10 @@ The whole loop, start to finish. Annotations in *italics*.
 **pilot**
 
 ```
-recon https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon.prompt.md
+i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-8b060ea https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon.prompt.md
 ```
 
-*One line. No install, no config, no restart. `recon` is this prompt's own confirmation phrase, published on its page — typing it makes the ask deliberate and specific to this document. It does not prove the pilot read it; a phrase can be handed to someone.*
+*One line, three parts: a sentence written for this prompt and published only at the end of it, the prompt's id, and a digest of the exact bytes. The agent recomputes that digest over what it fetched — if the two disagree, it refuses. Deliberate and byte-bound. Still not proof the pilot read it.*
 
 ---
 

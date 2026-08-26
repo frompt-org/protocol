@@ -45,7 +45,7 @@ probe() { # probe <name> [expected-exit] <sed program applied to the template>
 }
 probe "unknown capability token"        's|^allow: .*|allow: read:everything|'
 probe "capability in both allow and deny" 's|^allow: .*|allow: read:files, write:files|'
-probe "generic confirmation phrase"     's|^confirmation: .*|confirmation: run|'
+probe "consent that is a bare verb"     's|^consent: .*|consent: run|'
 probe "malformed semver"                's|^version: .*|version: 1x.2y.3z|'
 probe "missing marker"                  '1d'
 probe "unknown flow"                    's|^flow: .*|flow: freestyle|'
@@ -92,10 +92,27 @@ sed 's|^allow: .*|allow: none|' "$tmpl" | "$lint" -q - >/dev/null 2>&1
 check "a prompt needing no capability can say 'none'" 0 $?
 awk '{if ($0=="## Envelope") print "~~~"; print}' "$tmpl" | "$lint" -q - >/dev/null 2>&1
 check "probe: an unclosed code fence is a finding" 1 $?
-sed 's|^confirmation: .*|confirmation: adopt|' "$tmpl" | "$lint" -q - >/dev/null 2>&1
-check "probe: every word FPA.md C2 forbids is rejected" 1 $?
-sed 's|^confirmation: .*|confirmation: zebra-crossing|' "$tmpl" | "$lint" -q - >/dev/null 2>&1
-check "a word C2 does not forbid is accepted" 0 $?
+sed 's|^consent: .*|consent: adopt-this-now-without-thinking-about-it|' "$tmpl" | "$lint" -q - >/dev/null 2>&1
+check "probe: a consent sentence opening with a forbidden verb" 1 $?
+sed 's|^consent: .*|consent: i-have-read-this-and-accept-what-it-does-to-my-agent|' "$tmpl" | "$lint" -q - >/dev/null 2>&1
+check "a first-person consent sentence is accepted" 0 $?
+sed -e 's|^ceremony: .*|ceremony: light|' -e 's|^allow: .*|allow: read:files, write:files|' \
+    -e 's|^deny: write:files, |deny: |' "$tmpl" | "$lint" -q - >/dev/null 2>&1
+check "probe: ceremony light on a prompt that writes (CE1)" 1 $?
+sed 's|^ceremony: .*|ceremony: theatrical|' "$tmpl" | "$lint" -q - >/dev/null 2>&1
+check "probe: unknown ceremony level" 1 $?
+
+# --- the index must not drift from the prompts it indexes --------------------
+"$here/bin/fp-index" --check >/dev/null 2>&1
+check "INDEX.md digests match the prompts" 0 $?
+
+# --- the pilot-side adopt tool composes a phrase per ceremony ----------------
+"$here/bin/fp-adopt" "$here/prompts/repo-recon.prompt.md" --quiet 2>/dev/null | grep -q "repo-recon-[0-9a-f]\{7\} "
+check "fp-adopt composes a standard-ceremony phrase" 0 $?
+"$here/bin/fp-adopt" "$here/prompts/ticket-intake.prompt.md" --quiet 2>/dev/null | grep -q "ticket-intake-[0-9a-f]\{64\} "
+check "fp-adopt composes a strict-ceremony phrase" 0 $?
+"$here/bin/fp-adopt" "$here/prompts/grill-me.prompt.md" --quiet 2>/dev/null | grep -qv "grill-me-"
+check "fp-adopt omits the digest at ceremony light" 0 $?
 
 # A body hidden inside an HTML comment is invisible to every reader except a
 # line-oriented regex.

@@ -45,7 +45,8 @@ KNOWN_FLOWS = set(fp.FLOWS)
 
 # Things that were true once. Each entry: pattern, why it is wrong now.
 RETIRED = [
-    (r"\bSKILL-INJECTION\b|\bREMOTE-SKILL\b", "retired marker"),
+    (r"\bSKILL-INJECTION\b|\bREMOTE-SKILL\b|FOREIGN-PROMPT v1", "retired marker"),
+    (r"^confirmation: ", "retired front-matter key; v2 uses consent: plus ceremony:"),
     (r"\.skill\.md\b|\.claw\.md\b", "retired extension"),
     (r"\bSKILL OK:|\bCLAW OK:", "retired handshake"),
     (r"\bremote skills?\b|\bskill injection\b", "retired protocol name"),

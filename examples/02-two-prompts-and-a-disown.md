@@ -7,7 +7,7 @@ Foreign prompts compose. This is what that looks like when it is behaving.
 **pilot**
 
 ```
-crit <url>/prompts/pr-review.prompt.md
+i-have-read-this-prompt-and-want-my-diff-judged-without-mercy <url>/prompts/pr-review.prompt.md
 ```
 
 **agent**
@@ -23,7 +23,7 @@ Review mode: tiered rubric (correctness → blast radius → failure mode → re
 **pilot**
 
 ```
-repro <url>/prompts/bug-repro.prompt.md
+i-have-read-this-prompt-and-accept-that-it-refuses-to-fix-anything-bug-repro-<digest> <url>/prompts/bug-repro.prompt.md
 ```
 
 **agent**
@@ -35,6 +35,8 @@ ADOPTED: bug-repro v1.0.0
 Repro mode: I reproduce before I fix — falsifiable claim, shortest repro, decisive output line, failing/passing boundary, located mechanism — then I stop and ask before touching code. Two prompts active now; their denies are unioned, so I am read-only on source until you say otherwise.
 
 *§12: denies accumulate across adopted prompts. The agent says so rather than leaving the pilot to work out the interaction.*
+
+*Notice the two phrases differ in shape. `pr-review` is `ceremony: light` — it reads a diff and argues, so the sentence alone is the phrase. `bug-repro` is `standard` and carries a digest, because it runs commands. The ceremony is the author's judgement about their own prompt's consequences, and it is visible before you adopt.*
 
 ---
 

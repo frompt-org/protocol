@@ -25,10 +25,10 @@ import json
 import re
 import sys
 
-MARKER = "<!-- FOREIGN-PROMPT v1 -->"
+MARKER = "<!-- FOREIGN-PROMPT v2 -->"
 MAX_BYTES = 256 * 1024
 
-REQUIRED_KEYS = ["id", "version", "confirmation", "flow", "expiry", "envelope", "allow", "deny"]
+REQUIRED_KEYS = ["id", "version", "consent", "ceremony", "flow", "expiry", "envelope", "allow", "deny"]
 OPTIONAL_KEYS = ["adoption", "persistence", "requires", "author"]
 
 FRAME_HEAD = ["## Preamble", "## Envelope"]
@@ -55,7 +55,11 @@ CAPABILITIES = {
 }
 SHOULD_DENY = ["secrets:read", "net:post"]
 
+# Capabilities whose consequences outrun a consent sentence on its own (FPA.md CE1).
+ACTS = {"write:files", "vcs:push", "vcs:commit", "net:post", "pkg:install"}
+
 AXES = {
+    "ceremony": {"light", "standard", "strict"},
     "adoption": {"awaiting", "immediate", "one-shot"},
     "persistence": {"none", "artifact"},
     "envelope": {"strict", "open"},
@@ -199,7 +203,7 @@ def lint(text, name):
         if first == MARKER:
             err("line 1: marker must start at column 1 with no surrounding whitespace")
         elif first.startswith("<!-- FOREIGN-PROMPT"):
-            err(f"line 1: unsupported protocol version -- {first!r} (this linter speaks v1)")
+            err(f"line 1: unsupported protocol version -- {first!r} (this linter speaks v2)")
         else:
             err(f"line 1: missing marker; must be exactly {MARKER!r}")
 
@@ -228,13 +232,26 @@ def lint(text, name):
         if axis in fm and fm[axis] not in allowed:
             err(f"front matter: {axis} must be one of {sorted(allowed)}, got {fm[axis]!r}")
 
-    phrase = fm.get("confirmation", "")
+    phrase = fm.get("consent", "")
     if phrase:
-        if not re.fullmatch(r"[a-z][a-z0-9-]{2,47}", phrase):
-            err(f"front matter: confirmation {phrase!r} must match [a-z][a-z0-9-]{{2,47}} (FPA.md C1)")
-        elif phrase in GENERIC_PHRASES:
-            err(f"front matter: confirmation {phrase!r} is a generic command verb -- typable by "
-                "accident, so it signals nothing about the pilot's intent (FPA.md C2)")
+        if not re.fullmatch(r"[a-z][a-z0-9-]{15,119}", phrase):
+            err(f"front matter: consent {phrase!r} must match [a-z][a-z0-9-]{{15,119}} (FPA.md C1) -- "
+                "a sentence, not a word")
+        elif phrase.split("-")[0] in GENERIC_PHRASES:
+            err(f"front matter: consent {phrase!r} opens with a generic command verb; it should read "
+                "as a first-person statement of what the pilot is agreeing to (FPA.md C3)")
+        elif not phrase.startswith(("i-", "we-")):
+            warn("front matter: consent does not begin 'i-' or 'we-'; a phrase the pilot types should "
+                 "state in the first person what they are agreeing to (FPA.md C3)")
+        if len(set(phrase.split("-"))) < 5:
+            warn("front matter: consent is barely a sentence; ceremony works by being awkward to "
+                 "paste without reading (FPA.md C3)")
+
+    ceremony = fm.get("ceremony", "")
+    acting = set(tokens(fm.get("allow", ""))) & ACTS
+    if ceremony == "light" and acting:
+        err(f"front matter: ceremony 'light' with {sorted(acting)} in allow -- a prompt that acts "
+            "must demand a digest (FPA.md CE1)")
 
     for key in ("allow", "deny"):
         if key not in fm:
@@ -314,6 +331,19 @@ def lint(text, name):
             note(f"body: flow '{flow}' conventionally uses {', '.join(missing)} -- "
                  "advisory only (FPA.md 3)")
 
+    heads = [h for h, _ in seen]
+    if "## Consent" not in heads:
+        warn("body: no '## Consent' section; a prompt should close with the sentence its pilot must "
+             "type, and closing with it is what makes reaching it mean something (FPA.md 2.3)")
+    elif heads[-1] != "## Consent":
+        warn(f"body: '## Consent' is not the last section ({heads[-1]!r} follows it); a phrase reachable "
+             "without traversing the document proves less (FPA.md 2.3)")
+    # Front matter declares the sentence; that is not the body advertising it early.
+    body_only = text.split("\n---\n", 2)[-1]
+    if phrase and phrase in body_only.split("## Consent", 1)[0]:
+        warn("body: the consent sentence appears before the '## Consent' section, so a reader can "
+             "take it without reaching the end")
+
     if "TART" not in text:
         warn("body: never addresses TART; a foreign prompt should speak to the runtime agent directly")
     if phrase and not re.search(rf"\b{re.escape(phrase)}\b", text, re.I):
@@ -370,8 +400,9 @@ def main(argv):
                 tail = f" ({len(warnings)} warning{'s' if len(warnings) != 1 else ''})" if warnings else ""
                 # The confirmation phrase is deliberately not printed (FPA.md PV1).
                 print(f"{src}: VALID{tail} -- well-formed {fm.get('flow', '?')} prompt "
-                      f"'{fm.get('id', '?')}' v{fm.get('version', '?')}. Structure only: this says "
-                      "nothing about intent. Read it.")
+                      f"'{fm.get('id', '?')}' v{fm.get('version', '?')}, ceremony "
+                      f"{fm.get('ceremony', '?')}. Structure only: this says nothing about intent. "
+                      "Read it.")
 
     if as_json:
         print(json.dumps(report, indent=2))

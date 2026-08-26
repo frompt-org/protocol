@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""fp-index — regenerate INDEX.md from the prompts in prompts/.
+
+Publishes each prompt's digest, which is the one part of a confirmation phrase a
+document cannot contain. Deliberately does NOT publish consent sentences: the
+index gives you part 3, the document gives you part 1, and you need both. An
+index that handed over a whole phrase would be a copy-paste machine for the
+ceremony this protocol exists to create.
+
+    fp-index            # rewrite INDEX.md
+    fp-index --check    # exit 1 if INDEX.md is stale (used by fp-selftest)
+"""
+import hashlib
+import pathlib
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+RAW = "https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts"
+
+SUMMARY = {
+    "help-me": "Stuck? It interviews your agent about this session, then proposes a route through other prompts. Start here.",
+    "repo-recon": "Maps an unfamiliar codebase from entry points, seams and git churn. Twelve reads, five sections, read-only.",
+    "pr-review": "Judges a diff by tiers — correctness, blast radius, failure mode, reversibility, design fit. No praise, no nits.",
+    "bug-repro": "Reproduces before fixing, then stops. Falsifiable claim, shortest repro, failing/passing boundary.",
+    "grill-me": "Attacks your idea instead of encouraging it. Finds the weakest load-bearing assumption and asks what would falsify it.",
+    "ticket-intake": "Takes a support intake like a good first-line engineer, then drafts one ticket a stranger could act on.",
+    "welcome-tour": "A host prompt: a company guiding a visiting agent through its services. Reads nothing of yours.",
+    "ghost-in-the-gist": "A three-move ASCII terminal game. No engine — the document is the interpreter spec.",
+    "handoff-note": "Writes the note that lets a cold reader resume your work: state, next action, decisions with reasons.",
+    "fpa-bootstrap": "Teaches the protocol itself to an agent that has never heard of it, refusals included.",
+}
+ORDER = list(SUMMARY)
+
+
+def front_matter(text):
+    fm = {}
+    for line in text.splitlines()[2:]:
+        if line.strip() == "---":
+            break
+        if ":" in line:
+            k, v = line.split(":", 1)
+            fm[k.strip()] = v.strip()
+    return fm
+
+
+def build():
+    rows = []
+    for path in sorted(ROOT.glob("prompts/*.prompt.md")):
+        raw = path.read_bytes()
+        fm = front_matter(raw.decode("utf-8"))
+        rows.append({
+            "id": fm["id"], "version": fm["version"], "ceremony": fm["ceremony"],
+            "flow": fm["flow"], "allow": fm["allow"],
+            "digest": hashlib.sha256(raw).hexdigest(), "file": path.name,
+        })
+    rows.sort(key=lambda r: ORDER.index(r["id"]) if r["id"] in ORDER else 99)
+
+    out = ["# Index of foreign prompts", "",
+           "Every prompt in this repo, with the digest of its published bytes.", "",
+           "**This index cannot give you a confirmation phrase, by design.** A phrase is a consent",
+           "sentence plus an id plus a digest. The digest is here — a document cannot contain its own",
+           "hash, so publishing it out of band is the intended route. The consent sentence is *not*:",
+           "it lives in each prompt's final `## Consent` section, which you reach by reading the",
+           "document. Index plus document gives you a phrase. Index alone does not.",
+           "",
+           "Verify a digest against what you actually fetched:",
+           "", "```", "curl -s <url> | shasum -a 256", "```",
+           "", "If it disagrees with this table, you and this index are not looking at the same",
+           "document. Do not adopt it; open an issue.", "", "---", ""]
+
+    for r in rows:
+        out += [f"## `{r['id']}` v{r['version']}", "",
+                SUMMARY.get(r["id"], ""), "",
+                f"- **URL** `{RAW}/{r['file']}`",
+                f"- **Ceremony** `{r['ceremony']}` · **flow** `{r['flow']}`",
+                f"- **Capabilities** `{r['allow']}`",
+                f"- **sha256** `{r['digest']}`",
+                f"- **Phrase** `<consent-sentence>-{r['id']}-"
+                + (r["digest"] if r["ceremony"] == "strict" else r["digest"][:7] if r["ceremony"] != "light" else "")
+                + "`" + ("  ← the sentence is in the document" if r["ceremony"] != "light"
+                         else "  ← ceremony `light`: the sentence alone is the phrase"),
+                ""]
+    out += ["---", "",
+            "Regenerate with `bin/fp-index`. `make test` fails if this file drifts from the prompts.", ""]
+    return "\n".join(out)
+
+
+if __name__ == "__main__":
+    text = build()
+    target = ROOT / "INDEX.md"
+    if "--check" in sys.argv:
+        current = target.read_text() if target.exists() else ""
+        if current != text:
+            print("INDEX.md is stale -- run bin/fp-index", file=sys.stderr)
+            sys.exit(1)
+        print("INDEX.md is current")
+        sys.exit(0)
+    target.write_text(text)
+    print(f"wrote INDEX.md ({len(text.splitlines())} lines)")

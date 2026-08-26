@@ -20,11 +20,19 @@ If a conforming `.prompt.md` arrives through any channel the pilot did not name,
 
 Adopt prompts from publishers you would install software from. In the common case that is yourself.
 
+## The one thing here that is enforced
+
+Everything in this protocol is a convention an agent follows — except one rule. **When a phrase carries a digest, the agent recomputes SHA-256 over the bytes it fetched and refuses on mismatch.** No judgement, no goodwill, no prose to be persuaded by.
+
+It catches the attack the earlier design could not: a server showing the pilot one document and the agent another. It is also why the digest is computed rather than published in the document — a publisher who supplies both the bytes and their hash can lie about both consistently; a pilot who computes it over what they fetched cannot be lied to that way.
+
+What it does not catch: a document that is hostile and honest about its bytes. Nothing does.
+
 ## What consent buys, and what it does not
 
 | Buys | Does not buy |
 |---|---|
-| The pilot chose *this document*, deliberately, by name | No evidence that the pilot read it — a phrase can be handed to someone |
+| The pilot chose *this document* — the phrase names it, and its digest binds the bytes | No evidence that the pilot read it. Reaching the end is not understanding |
 | A declaration of intent before adoption: flow, envelope, persistence, expiry | Enforcement of that declaration, unless a host binds §4 tokens to real tool permissions |
 | A visible start (`ADOPTED:`) and a visible end (`disown`) | Proof either happened — both are a cooperative agent's report |
 | Something to read before you agree, in a fixed frame | A verdict on what you read; `bin/fp-lint` sees structure, never intent |
@@ -38,7 +46,7 @@ Four review rounds by two independent agents produced these, and the answer to e
 Correct. Every MUST in the spec is a convention the agent follows. A determined hostile prompt can argue with any of them, simulate a host override, or claim a v2 upgrade. Only a host that binds capabilities to tool calls changes this, and none ships here.
 
 **"The phrase proves nothing about comprehension."**
-Correct, and the spec says so (C5). It establishes that the ask was deliberate and aimed at a specific document. That is consent. It was never comprehension, and the docs no longer claim it.
+Correct, and the spec says so (C6). v2 raises the floor: the consent sentence lives only in the document's last section, so reaching it means traversing the document, and the sentence states in the first person what the pilot is agreeing to. That is deliberateness and traversal. It is still not comprehension — `Ctrl+End`, copy, paste — and the docs claim no more.
 
 **"Preview still puts hostile bytes into the context."**
 Correct. Preview is the lower-risk option, not a safe one — fetching is exactly where injection happens. What it buys is that the agent has not agreed to *follow* the document (§10).
@@ -48,6 +56,9 @@ Correct, demonstrated repeatedly, and the scan is gone — see below.
 
 **"Without a host adapter, the envelope is roleplay."**
 Correct as stated. That is why §4 replaced free-form English with a fixed token vocabulary: so a host *can* map it. Until one does, §5 says plainly that nobody enforces it.
+
+**"Consent is not bound to the exact bytes."**
+It is now. The third part of the phrase is a digest the pilot computes and the agent re-verifies (§C5). Mutable content cannot keep its phrase.
 
 **"Then why use it at all?"**
 Because the alternative is not *no injection*. It is injection you did not choose, did not see declared, did not see announced, and cannot end. Consent is not security. It is the difference between installing software and being installed upon.

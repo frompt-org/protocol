@@ -9,7 +9,7 @@ Nothing is installed. No engine, no binary, no runtime. The game is made entirel
 **pilot**
 
 ```
-ghost <url>/prompts/ghost-in-the-gist.prompt.md
+i-have-read-this-prompt-and-consent-to-my-agent-becoming-a-terminal-ghost-in-the-gist-<digest> <url>
 ```
 
 **agent**
@@ -36,7 +36,7 @@ Terminal booting. `[0]` ejects at any point.
  > _
 ```
 
-*Unlike every other prompt here, this one starts on adoption instead of waiting for a task. The pilot typed `ghost` with a URL and is instantly somewhere else -- that is the whole trick.*
+*Unlike every other prompt here, this one starts on adoption instead of waiting for a task. The pilot sent a sentence they had to reach the end of the document to find, and is instantly somewhere else -- that is the whole trick.*
 
 ---
 

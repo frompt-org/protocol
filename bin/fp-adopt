@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""fp-adopt — fetch a foreign prompt, show it, and compose its phrase.
+
+This is the pilot's own tool, which is the whole distinction: automation you chose
+is fine, automation the publisher shipped is the thing ceremony exists to prevent.
+It never adopts anything and never talks to an agent — it fetches bytes, prints
+them for you to read, computes the digest, and hands you the line to send.
+
+    fp-adopt https://example.org/thing.prompt.md          # read it, then get the phrase
+    fp-adopt <url> --quiet                                # phrase only, you have read it already
+
+Exit: 0 composed, 1 the document is not a valid foreign prompt, 2 unreadable.
+
+Reading the document is your job. This tool makes that easy and then gets out of
+the way; it cannot tell you whether what you read is a good idea.
+"""
+import hashlib
+import re
+import subprocess
+import sys
+import pathlib
+
+HERE = pathlib.Path(__file__).resolve().parent
+
+
+def main(argv):
+    args = [a for a in argv[1:] if not a.startswith("-")]
+    quiet = "--quiet" in argv or "-q" in argv
+    if not args or "-h" in argv or "--help" in argv:
+        print(__doc__)
+        return 0 if args else 2
+    url = args[0]
+
+    if url.startswith(("http://", "https://")):
+        sys.path.insert(0, str(HERE))
+        import importlib.machinery, importlib.util
+        loader = importlib.machinery.SourceFileLoader("fp_lint", str(HERE / "fp-lint"))
+        spec = importlib.util.spec_from_loader("fp_lint", loader)
+        fp = importlib.util.module_from_spec(spec)
+        loader.exec_module(fp)
+        try:
+            text = fp.fetch(url)
+        except Exception as exc:  # noqa: BLE001
+            print(f"fp-adopt: cannot fetch -- {exc}", file=sys.stderr)
+            return 2
+    else:
+        try:
+            text = pathlib.Path(url).read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"fp-adopt: cannot read -- {exc}", file=sys.stderr)
+            return 2
+
+    raw = text.encode("utf-8")
+    digest = hashlib.sha256(raw).hexdigest()
+
+    fm = {}
+    for line in text.splitlines()[2:]:
+        if line.strip() == "---":
+            break
+        if ":" in line:
+            k, v = line.split(":", 1)
+            fm[k.strip()] = v.strip().strip('"').strip("'")
+
+    missing = [k for k in ("id", "version", "consent", "ceremony") if k not in fm]
+    if not text.startswith("<!-- FOREIGN-PROMPT v2 -->") or missing:
+        print(f"fp-adopt: not a valid v2 foreign prompt (missing {missing or 'marker'}). "
+              f"Run bin/fp-lint on it.", file=sys.stderr)
+        return 1
+
+    if not quiet:
+        print(text)
+        print("=" * 72)
+        print(f"  id         {fm['id']} v{fm['version']}")
+        print(f"  flow       {fm.get('flow', '?')}   adoption {fm.get('adoption', 'awaiting')}   "
+              f"expiry {fm.get('expiry', '?')}")
+        print(f"  allow      {fm.get('allow', '?')}")
+        print(f"  deny       {fm.get('deny', '?')}")
+        print(f"  ceremony   {fm['ceremony']}")
+        print(f"  sha256     {digest}")
+        print("=" * 72)
+        print("  You have just been shown the whole document. Read it before you send this.")
+        print()
+
+    ceremony = fm["ceremony"]
+    if ceremony == "light":
+        phrase = fm["consent"]
+    elif ceremony == "strict":
+        phrase = f"{fm['consent']}-{fm['id']}-{digest}"
+    else:
+        phrase = f"{fm['consent']}-{fm['id']}-{digest[:7]}"
+    print(f"{phrase} {url}")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv))
+    except Exception as exc:  # noqa: BLE001
+        print(f"fp-adopt: internal error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        sys.exit(3)
