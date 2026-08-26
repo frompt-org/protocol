@@ -228,6 +228,7 @@ To adopt one as a pilot, `bin/fp-adopt <url>` fetches the document, prints it fo
 | [`INDEX.md`](INDEX.md) | Every prompt, with digests. No consent sentences. |
 | [`bin/fp-lint`](bin/fp-lint) · [`bin/fp-new`](bin/fp-new) | Validate structure; scaffold. |
 | [`bin/fp-adopt`](bin/fp-adopt) · [`bin/fp-index`](bin/fp-index) | Pilot-side: read a prompt and compose its phrase; regenerate the index. |
+| [`history/`](history/) | Retired documents, read-only. What used to be true, kept rather than deleted. |
 | [`bin/fp-selftest`](bin/fp-selftest) | Conformance suite — every defect four review rounds found, as an assertion. |
 | [`bin/fp-docscheck`](bin/fp-docscheck) · [`bin/fp-claimcheck`](bin/fp-claimcheck) | References and links resolve; the docs still describe the tool that exists. |
 

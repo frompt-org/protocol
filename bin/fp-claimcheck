@@ -68,7 +68,9 @@ KEYLINE = re.compile(r"^([a-z][a-z0-9-]*): *(.*)$")
 
 bad = []
 for f in sorted(root.rglob("*.md")):
-    if ".git" in str(f):
+    if ".git" in str(f) or "history/" in str(f):
+        # history/ is skipped: retired documents describe what was true when written,
+# including names and claims this repo has since dropped. That is their job.
         continue
     text = f.read_text()
     lines = text.splitlines()

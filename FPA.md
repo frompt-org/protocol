@@ -248,8 +248,6 @@ Plural by design: many authorities, pilots choose whose observations they value,
 
 The marker carries the protocol version; front matter carries the prompt version. A v2 TART meeting `FOREIGN-PROMPT v3` **SHOULD** report the mismatch rather than best-effort parsing. Unknown front-matter keys are ignored.
 
-**v1 → v2:** the single `confirmation:` phrase became `consent:` plus `ceremony:`, the phrase gained the id and digest parts, and digest verification became the protocol's one enforceable MUST. v1 documents do not validate under v2.
-
 ## 17. Reference header
 
 ```
