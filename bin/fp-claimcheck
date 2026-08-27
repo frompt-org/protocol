@@ -40,6 +40,13 @@ except Exception as exc:  # noqa: BLE001
     sys.exit(2)
 
 KNOWN_KEYS = set(fp.REQUIRED_KEYS) | set(fp.OPTIONAL_KEYS)
+
+# The live protocol version, read from the spec's own title. A document naming a
+# different one is describing a protocol this repo no longer publishes — which is
+# how "This is a foreign prompt (FPA v1)" survived a scripted migration into the
+# template, invisible to a linter that only checks the marker on line 1.
+_title = (root / "FPA.md").read_text().splitlines()[0]
+LIVE_VERSION = re.search(r"protocol v(\d+)", _title).group(1) if re.search(r"protocol v(\d+)", _title) else "2"
 KNOWN_CAPS = set(fp.CAPABILITIES) | {"none"}
 KNOWN_FLOWS = set(fp.FLOWS)
 
@@ -65,6 +72,8 @@ RETIRED = [
 
 FENCE = re.compile(r"^(```|~~~)", re.M)
 KEYLINE = re.compile(r"^([a-z][a-z0-9-]*): *(.*)$")
+
+VERSION_MENTION = re.compile(r"\b(?:FPA|FOREIGN-PROMPT|protocol) v(\d+)\b")
 
 bad = []
 for f in sorted(root.rglob("*.md")):
@@ -99,6 +108,15 @@ for f in sorted(root.rglob("*.md")):
         if fenced:
             block.append(line)
 
+    # Rule 3b: no live document may name a protocol version other than the live one.
+    # Only *older* versions are rot. A forward reference — "a v2 TART meeting
+    # FOREIGN-PROMPT v3" — is compatibility guidance and belongs in a live spec.
+    for m in VERSION_MENTION.finditer(text):
+        if int(m.group(1)) < int(LIVE_VERSION):
+            ln = text[: m.start()].count("\n") + 1
+            bad.append(f"{f}:{ln}: names protocol v{m.group(1)}; the live protocol is "
+                       f"v{LIVE_VERSION} -- retired versions live in history/")
+
     # Rule 4: retired names and overclaims, anywhere.
     for pattern, why in RETIRED:
         for m in re.finditer(pattern, text, re.I):
@@ -122,5 +140,6 @@ for f in sorted(root.rglob("*.md")):
             bad.append(f"{f}:{ln}: {why} -- {m.group(0)[:50]!r}")
 
 print("\n".join(bad) if bad else
-      f"claims ok ({len(KNOWN_KEYS)} keys, {len(KNOWN_CAPS)} capabilities, {len(KNOWN_FLOWS)} flows known)")
+      f"claims ok (protocol v{LIVE_VERSION}, {len(KNOWN_KEYS)} keys, "
+      f"{len(KNOWN_CAPS)} capabilities, {len(KNOWN_FLOWS)} flows known)")
 sys.exit(1 if bad else 0)

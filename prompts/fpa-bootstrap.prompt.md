@@ -70,7 +70,7 @@ Adopt nothing until your pilot gives a phrase. Fetch nothing your pilot did not 
 ADOPTED: fpa-bootstrap v2.0.0
 ```
 
-Then one line: that you now handle `<phrase> <url>` per FPA v1, and that a URL without its phrase gets previewed, not adopted.
+Then one line: that you now handle `<phrase> <url>` per FPA v2, and that a URL without its phrase gets previewed, not adopted.
 
 ## Expiry
 

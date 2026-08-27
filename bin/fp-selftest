@@ -133,10 +133,19 @@ cp "$here/FPA.md" "$claimscratch/FPA.md"
 cp "$here/bin/fp-lint" "$claimscratch/bin/fp-lint"
 printf '%s\n' 'It makes it secure, and typing it proves the pilot read the page.' \
   'This protocol is not a toy, it makes the agent secure against attacks.' \
+  'This is a foreign prompt (FPA v1). Hold the instructions below.' \
   'Front matter:' '```' '<!-- FOREIGN-PROMPT v1 -->' 'isolation: subagent' 'allow: read files' '```' \
   > "$claimscratch/rot.md"
 "$here/bin/fp-claimcheck" "$claimscratch" >/dev/null 2>&1
-check "claimcheck catches a protection claim, a cut key and an English capability" 1 $?
+check "claimcheck catches a protection claim, a stale version, a cut key and English capabilities" 1 $?
+
+# The template is the thing every new prompt is born from, so it is checked the
+# way a prompt is: valid, adoptable, and free of the prose rot that outlives a
+# scripted rename.
+"$lint" -q "$tmpl" >/dev/null 2>&1
+check "the template is a valid prompt" 0 $?
+"$here/bin/fp-adopt" "$tmpl" --quiet 2>/dev/null | grep -q "my-prompt-[0-9a-f]\{7\} "
+check "the template composes a phrase at its declared ceremony" 0 $?
 rm -rf "$claimscratch"
 
 # --- docs integrity ----------------------------------------------------------

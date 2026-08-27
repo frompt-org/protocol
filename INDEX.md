@@ -116,8 +116,8 @@ Teaches the protocol itself to an agent that has never heard of it, refusals inc
 - **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/fpa-bootstrap.prompt.md`
 - **Ceremony** `standard` · **flow** `linear`
 - **Capabilities** `net:get, read:files`
-- **sha256** `071a7e7ef91e224dc52298acb98aae107e42af21053f765f9f288fa593cb543d`
-- **Phrase** `<consent-sentence>-fpa-bootstrap-071a7e7`  ← the sentence is in the document
+- **sha256** `5fc90f082eaa1a3d3862da2ad6f2e53c59d38153933e6590427900f7dde9619b`
+- **Phrase** `<consent-sentence>-fpa-bootstrap-5fc90f0`  ← the sentence is in the document
 
 ---
 
