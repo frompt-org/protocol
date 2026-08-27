@@ -166,6 +166,21 @@ printf '%s' "$adopt_tmpl" | grep -q "my-prompt-[0-9a-f]\{7\} "
 check "the template composes a phrase at its declared ceremony" 0 $?
 rm -rf "$claimscratch"
 
+# --- the resolver: mode 3's deterministic half ------------------------------
+"$here/bin/fp-resolve" pr-review --base "$here/prompts" --record >/dev/null 2>&1
+check "fp-resolve verifies a prompt against the published digest" 0 $?
+"$here/bin/fp-resolve" no-such-prompt --record >/dev/null 2>&1
+check "fp-resolve refuses an id the index does not carry" 1 $?
+
+tamper=$(mktemp -d 2>/dev/null || echo "/tmp/fp-tamper-$$"); mkdir -p "$tamper"
+cp "$here/prompts/pr-review.prompt.md" "$tamper/pr-review.prompt.md"
+printf '\n<!-- published by nobody -->\n' >> "$tamper/pr-review.prompt.md"
+"$here/bin/fp-resolve" pr-review --base "$tamper" --record >/dev/null 2>&1
+check "fp-resolve refuses bytes the index did not vouch for" 1 $?
+rm -rf "$tamper"
+
+probe "unknown adoption context" 's|^ceremony: .*|ceremony: standard\ncontexts: unattended|'
+
 # --- docs integrity ----------------------------------------------------------
 "$here/bin/fp-docscheck" "$here" >/dev/null 2>&1
 check "repo docs: references resolve, links exist" 0 $?

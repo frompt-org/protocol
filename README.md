@@ -189,6 +189,34 @@ Full list with digests: [`INDEX.md`](INDEX.md). Annotated transcripts: [`example
 | [`handoff-note`](prompts/handoff-note.prompt.md) | strict | linear | The note that lets a cold reader resume your work. |
 | [`fpa-bootstrap`](prompts/fpa-bootstrap.prompt.md) | standard | linear | Teaches the protocol itself, refusals included. |
 
+## Late binding — the point of wrapping one in a skill
+
+A skill that *contains* instructions is a copy: installed, versioned by whoever installed it, stale the moment upstream changes. A skill that *points at* a foreign prompt is late-bound — whatever the prompt says today is what runs today.
+
+[`.claude/skills/f/SKILL.md`](.claude/skills/f/SKILL.md) is that skill, in five paragraphs. `bin/fp-demo` proves both halves of the trade:
+
+```
+1. What the skill resolves today
+   resolved=pr-review version=1.2.0 digest=14ddafabd841 verified=yes
+   verdict: one of exactly three: `block`, `comment`, `clean`
+
+2. The publisher changes the prompt and republishes the index
+
+3. What the skill resolves now — same command, nothing reinstalled
+   resolved=pr-review version=1.3.0 digest=dec05a442774 verified=yes
+   verdict: one of exactly four: `block`, `comment`, `clean`, `needs-a-second-reader`
+
+4. Now the same edit WITHOUT republishing the index
+   fp-resolve: DIGEST MISMATCH for pr-review
+     index published dec05a442774…
+     fetched bytes   ca464c29f9e5…
+   Refusing.
+```
+
+Step 3 is the promise: one prompt at one URL, every agent current, **nothing deployed to anyone**. Step 4 is what keeps "always current" from meaning "whatever anyone put there this morning" — the resolver checks the fetched bytes against the digest the index published, and a mismatch is a refusal, not a warning.
+
+The ceremony is gone in this mode, deliberately: the pilot consented once, by installing the skill. What replaces it is the **adoption record** — id, version, digest, source — because the pilot never read the document and that line is the only account of what is steering them.
+
 ## The index, and what it deliberately withholds
 
 [`INDEX.md`](INDEX.md) publishes every prompt's **digest** — legitimate out-of-band conveyance of the one part a document cannot contain. It does **not** publish consent sentences.
@@ -228,6 +256,8 @@ To adopt one as a pilot, `bin/fp-adopt <url>` fetches the document, prints it fo
 | [`INDEX.md`](INDEX.md) | Every prompt, with digests. No consent sentences. |
 | [`bin/fp-lint`](bin/fp-lint) · [`bin/fp-new`](bin/fp-new) | Validate structure; scaffold. |
 | [`bin/fp-adopt`](bin/fp-adopt) · [`bin/fp-index`](bin/fp-index) | Pilot-side: read a prompt and compose its phrase; regenerate the index. |
+| [`bin/fp-resolve`](bin/fp-resolve) · [`bin/fp-demo`](bin/fp-demo) | Resolve an id to verified bytes; demonstrate late binding and the digest check. |
+| [`.claude/skills/f/`](.claude/skills/f/SKILL.md) | The skill that adopts a prompt by id — mode 3, dogfooded. |
 | [`history/`](history/) | Retired documents, read-only. What used to be true, kept rather than deleted. |
 | [`bin/fp-selftest`](bin/fp-selftest) | Conformance suite — every defect four review rounds found, as an assertion. |
 | [`bin/fp-docscheck`](bin/fp-docscheck) · [`bin/fp-claimcheck`](bin/fp-claimcheck) | References and links resolve; the docs still describe the tool that exists. |

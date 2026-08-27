@@ -29,7 +29,11 @@ MARKER = "<!-- FOREIGN-PROMPT v2 -->"
 MAX_BYTES = 256 * 1024
 
 REQUIRED_KEYS = ["id", "version", "consent", "ceremony", "flow", "expiry", "envelope", "allow", "deny"]
-OPTIONAL_KEYS = ["adoption", "persistence", "requires", "author"]
+OPTIONAL_KEYS = ["adoption", "persistence", "contexts", "requires", "author"]
+
+# FPA.md AC1. Unattended use is opt-in: a prompt that acts has no business
+# defaulting into a context where nobody is watching it start.
+CONTEXTS = {"interactive", "registered", "managed"}
 
 FRAME_HEAD = ["## Preamble", "## Envelope"]
 FRAME_TAIL = ["## Handshake", "## Expiry"]
@@ -277,6 +281,14 @@ def lint(text, name):
     for t in SHOULD_DENY:
         if t not in denied and t not in allowed:
             warn(f"front matter: deny does not list {t!r}; most prompts should deny it explicitly")
+
+    listed_contexts = tokens(fm.get("contexts", "interactive"))
+    for c in listed_contexts:
+        if c not in CONTEXTS:
+            err(f"front matter: context {c!r} must be one of {sorted(CONTEXTS)} (FPA.md AC1)")
+    if acting and listed_contexts != ["interactive"] and "requires" not in fm:
+        warn(f"front matter: {sorted(acting)} in allow with contexts {listed_contexts} -- a prompt "
+             "that acts unattended should declare what the host must provide (FPA.md AC1)")
 
     persistence = fm.get("persistence", "none")
     if persistence == "none" and "write:artifact" in allowed:

@@ -46,7 +46,7 @@ Judges a diff by tiers — correctness, blast radius, failure mode, reversibilit
 - **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/pr-review.prompt.md`
 - **Ceremony** `light` · **flow** `rubric`
 - **Capabilities** `read:files, read:git`
-- **sha256** `14ddafabd841a323cded6b84b88d31f30dd2ccb3ca4a4296db9dd68c3b923cee`
+- **sha256** `7f364c1f8cd45ae8924b2732ced253951ea2c5af10831517e75373269c675b00`
 - **Phrase** `<consent-sentence>-pr-review-`  ← ceremony `light`: the sentence alone is the phrase
 
 ## `bug-repro` v1.0.0

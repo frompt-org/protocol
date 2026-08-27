@@ -4,6 +4,7 @@ id: pr-review
 version: 1.2.0
 consent: i-have-read-this-prompt-and-want-my-diff-judged-without-mercy
 ceremony: light
+contexts: interactive, registered, managed
 flow: rubric
 adoption: awaiting
 persistence: none

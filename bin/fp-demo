@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# fp-demo -- show late binding, and show the digest check biting.
+#
+# Two things happen here, and the second is the more important one:
+#
+#   1. A prompt changes at its source, and the next resolve picks up the new
+#      behaviour. Nothing was reinstalled, nothing was redeployed, and the skill
+#      that adopts it still says the same four characters: /f pr-review.
+#
+#   2. A prompt changes WITHOUT the index being republished, and the resolve is
+#      refused. That is what stops "always current" from meaning "whatever
+#      anyone put there this morning".
+#
+# It edits the working tree and restores it on exit, including on Ctrl-C.
+set -uo pipefail
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$here" || exit 2
+target="prompts/pr-review.prompt.md"
+
+restore() { git checkout -- "$target" INDEX.md 2>/dev/null; }
+
+# Check BEFORE arming the trap. Armed first, refusing to run still fired restore
+# on the way out and discarded the very uncommitted work the check exists to
+# protect -- a guard that destroys what it guards.
+if ! git diff --quiet -- "$target" INDEX.md; then
+  echo "fp-demo: $target or INDEX.md has uncommitted changes; commit or stash first." >&2
+  exit 2
+fi
+trap restore EXIT INT TERM
+
+rule() { printf '\n\033[1m%s\033[0m\n' "$*"; }
+
+rule "1. What the skill resolves today"
+bin/fp-resolve pr-review --base ./prompts --record
+echo "   verdict vocabulary in the document:"
+grep -n "one of exactly three" "$target" | sed 's/^/   /'
+
+rule "2. The publisher changes the prompt and republishes the index"
+python3 - <<'PY'
+import pathlib
+p = pathlib.Path("prompts/pr-review.prompt.md"); s = p.read_text()
+s = s.replace("one of exactly three: `block` (correctness or reversibility finding), `comment` (everything else), `clean` (nothing above tier 5)",
+              "one of exactly four: `block`, `comment`, `clean`, or `needs-a-second-reader` (a finding you are not sure about)")
+s = s.replace("version: 1.2.0", "version: 1.3.0")
+p.write_text(s)
+print("   edited prompts/pr-review.prompt.md, bumped to v1.3.0")
+PY
+bin/fp-index | sed 's/^/   /'
+
+rule "3. What the skill resolves now — same command, nothing reinstalled"
+bin/fp-resolve pr-review --base ./prompts --record
+echo "   verdict vocabulary in the document:"
+grep -n "one of exactly four" "$target" | sed 's/^/   /'
+
+rule "4. Now the same edit WITHOUT republishing the index"
+python3 - <<'PY'
+import pathlib
+p = pathlib.Path("prompts/pr-review.prompt.md")
+before = p.read_bytes()
+p.write_text(p.read_text() + "\n<!-- one more line, published by nobody -->\n")
+assert p.read_bytes() != before, "the demo edit changed nothing"
+print("   appended a line to the prompt; index deliberately left stale")
+PY
+if bin/fp-resolve pr-review --base ./prompts --record 2>&1 | sed 's/^/   /'; then
+  echo "   UNEXPECTED: the resolve succeeded against a stale index"
+else
+  echo "   refused, as it must"
+fi
+
+rule "Restoring the working tree"
+restore
+git status --porcelain -- "$target" INDEX.md | grep -q . && echo "   still dirty" || echo "   clean"

@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""fp-resolve — turn a prompt id into verified bytes, ready to adopt.
+
+This is the deterministic half of a skill that adopts foreign prompts. It looks
+an id up in the index, fetches it, recomputes the digest, and refuses if that
+digest is not the one the index published. Nothing here interprets the document;
+that is the agent's job, and it happens only after this exits 0.
+
+    fp-resolve pr-review                      # resolve from the published URL
+    fp-resolve pr-review --base ./prompts     # resolve from a local checkout
+    fp-resolve --list                         # what the index offers
+    fp-resolve pr-review --record             # the adoption record, without the body
+
+Exit: 0 verified · 1 digest mismatch or unknown id · 2 unreachable.
+
+A mismatch is not a warning. If the bytes are not the bytes the index vouched
+for, the pilot and the agent are not looking at the same document, and there is
+nothing to discuss.
+"""
+import hashlib
+import pathlib
+import re
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+INDEX = ROOT / "INDEX.md"
+
+
+def entries():
+    """id -> {url, digest, ceremony, flow} parsed out of the published index."""
+    out, current = {}, None
+    for line in INDEX.read_text().splitlines():
+        m = re.match(r"^## `([a-z0-9-]+)` v(\S+)", line)
+        if m:
+            current = {"id": m.group(1), "version": m.group(2)}
+            out[m.group(1)] = current
+            continue
+        if not current:
+            continue
+        for key, pat in (("url", r"\*\*URL\*\* `(\S+)`"),
+                         ("digest", r"\*\*sha256\*\* `([0-9a-f]{64})`"),
+                         ("ceremony", r"\*\*Ceremony\*\* `(\w+)`"),
+                         ("flow", r"\*\*flow\*\* `([a-z-]+)`")):
+            hit = re.search(pat, line)
+            if hit:
+                current[key] = hit.group(1)
+    return out
+
+
+def read(source):
+    if source.startswith(("http://", "https://")):
+        import importlib.machinery
+        import importlib.util
+        loader = importlib.machinery.SourceFileLoader("fp_lint", str(ROOT / "bin" / "fp-lint"))
+        spec = importlib.util.spec_from_loader("fp_lint", loader)
+        fp = importlib.util.module_from_spec(spec)
+        loader.exec_module(fp)
+        return fp.fetch(source)
+    return pathlib.Path(source).read_text(encoding="utf-8")
+
+
+def main(argv):
+    args = [a for a in argv[1:] if not a.startswith("-")]
+    flags = [a for a in argv[1:] if a.startswith("-")]
+    if "-h" in flags or "--help" in flags or (not args and "--list" not in flags):
+        print(__doc__)
+        return 0 if ("-h" in flags or "--help" in flags) else 2
+
+    known = entries()
+    if "--list" in flags:
+        for e in known.values():
+            print(f"{e['id']:<20} v{e['version']:<8} {e.get('ceremony','?'):<9} {e.get('flow','?')}")
+        return 0
+
+    wanted = args[0]
+    base = None
+    if "--base" in argv:
+        base = argv[argv.index("--base") + 1]
+
+    if wanted in known:
+        entry = known[wanted]
+        source = f"{base.rstrip('/')}/{wanted}.prompt.md" if base else entry["url"]
+    elif wanted.startswith(("http://", "https://")) or pathlib.Path(wanted).exists():
+        entry, source = None, wanted
+    else:
+        print(f"fp-resolve: no prompt {wanted!r} in the index. Try --list.", file=sys.stderr)
+        return 1
+
+    try:
+        text = read(source)
+    except Exception as exc:  # noqa: BLE001
+        print(f"fp-resolve: cannot read {source} -- {exc}", file=sys.stderr)
+        return 2
+
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    if entry and digest != entry["digest"]:
+        print(f"fp-resolve: DIGEST MISMATCH for {wanted}\n"
+              f"  index published {entry['digest']}\n"
+              f"  fetched bytes   {digest}\n"
+              f"  source          {source}\n"
+              "Refusing. Either the document changed and the index is stale, or these are not "
+              "the bytes the index vouched for.", file=sys.stderr)
+        return 1
+
+    record = (f"resolved={wanted} version={entry['version'] if entry else '?'} "
+              f"digest={digest[:12]} source={source} verified={'yes' if entry else 'unindexed'}")
+    if "--record" in flags:
+        print(record)
+        return 0
+    print(f"<!-- fp-resolve: {record} -->")
+    print(text)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv))
+    except Exception as exc:  # noqa: BLE001
+        print(f"fp-resolve: internal error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        sys.exit(3)

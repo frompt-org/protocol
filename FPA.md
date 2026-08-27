@@ -70,6 +70,24 @@ How much proof a prompt demands of its own pilot is **the author's choice**, dec
 - **CE2.** How the pilot obtains the digest is **not specified**. Compute it by hand, use tooling you trust, take it out of band. An author **MAY** ship a command that composes the whole phrase; that trades friction for convenience, and it is their prompt.
 - **CE3.** TART **MUST** verify what is present (C5). It **MUST NOT** invent ceremony the document did not ask for, nor accept less.
 
+### Adoption contexts
+
+A phrase is the mode-1 instrument: a human, at a keyboard, adopting one document. Two other contexts exist, and each replaces the ceremony with a different authorization — because in neither is there a pilot to perform one.
+
+| Context | Who authorizes, and when | Mechanism | The pilot is trusting |
+|---|---|---|---|
+| `interactive` | the pilot, per adoption | the phrase (§1) | this document |
+| `registered` | the pilot, once, at registration | a **pin**: URL, version, or digest | this publisher, at this URL, until they unregister |
+| `managed` | the operator, once, by policy | a **signature** over a manifest | whoever holds the signing key |
+
+- **AC1.** A prompt **MAY** declare `contexts` — a comma-separated subset of `interactive`, `registered`, `managed`. Default: `interactive` only. A prompt that acts irreversibly has no business defaulting into unattended use.
+- **AC2.** In `registered`, consent is given once and covers future fetches, so the pin is what bounds it. `float` (URL only) accepts whatever is served next; `version` accepts a bump; `digest` freezes. An implementation **SHOULD** record which pin a registration used, because that is the entire content of what the pilot agreed to.
+- **AC3.** In `managed`, no per-adoption human act exists at all. Authorization comes from a **signed manifest** — id, version, digest, URL, and any role scoping — and the runtime agent **MUST** verify that the digest of what it fetched appears in that manifest. A digest proves the bytes are the expected bytes; only a signature proves who expected them, which is why a manifest is signed and a document is not.
+- **AC4.** In `managed`, an agent that cannot reach or verify the manifest **MUST** fail closed. Falling back to an unsigned fetch converts a policy boundary into a suggestion at exactly the moment it matters.
+- **AC5.** Whatever the context, the runtime agent **MUST** be able to report an **adoption record**: id, version, source, digest, and how it was authorized. In `interactive` the pilot read the document; in the other two they did not, so the record is the only account of what is steering them.
+
+The manifest is also the deployment unit. Rollback is serving the previous manifest; staged rollout is different manifests for different rings; revocation is dropping an entry. None of that is in this spec — it belongs to whoever operates the fleet — but it is why §15 keys attestations by digest rather than by URL.
+
 ## 2. Document format
 
 ### 2.1 Marker
@@ -92,6 +110,7 @@ Lines 2..N **MUST** be a `---`-fenced block of flat `key: value` pairs. No nesti
 | `allow` / `deny` | yes | Capability tokens from §4. |
 | `adoption` | no | When it takes hold (§6). Default `awaiting`. |
 | `persistence` | no | `none` or `artifact` (§8). Default `none`. |
+| `contexts` | no | Which adoption contexts this prompt is fit for. Default `interactive`. |
 | `requires` | no | Host capabilities needed. |
 | `author` | no | Attribution. Carries no authority. |
 
