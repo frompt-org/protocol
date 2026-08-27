@@ -1,0 +1,16 @@
+{
+  "name": "f",
+  "description": "Adopt foreign prompts: instructions fetched from a URL at use time rather than installed. Find what a house publishes, adopt one by id with its digest verified against a signed manifest or a lock file, and see what this agent has adopted. Skills install as /f:find, /f:prompt and /f:adopted.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Ramazan Polat"
+  },
+  "homepage": "https://github.com/agent-realm/foreign-prompts",
+  "keywords": [
+    "foreign-prompts",
+    "late-binding",
+    "prompt-adoption",
+    "manifest",
+    "agent-instructions"
+  ]
+}

@@ -220,6 +220,35 @@ else
   echo "skip -- no signature present; run bin/fp-sign to enable the managed checks"
 fi
 
+# --- identity and the adoption record ---------------------------------------
+FPA_AGENT_NAME=selftest "$here/bin/fp-agent" --ensure >/dev/null 2>&1
+check "fp-agent mints an identity" 0 $?
+"$here/bin/fp-agent" --id >/dev/null 2>&1
+check "fp-agent reports the id it minted" 0 $?
+"$here/bin/fp-record" selftest-prompt 1.0.0 abc123abc123 managed ./selftest >/dev/null 2>&1
+check "fp-record appends an adoption" 0 $?
+"$here/bin/fp-record" selftest-prompt 1.0.0 abc123abc123 wishful ./selftest >/dev/null 2>&1
+check "fp-record rejects an authorization it does not recognise" 2 $?
+"$here/bin/fp-record" --list >/dev/null 2>&1
+check "fp-record lists what this agent adopted" 0 $?
+
+# --- the plugin ships what it claims -----------------------------------------
+python3 - "$here" <<'PY' >/dev/null 2>&1
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1]) / "plugin"
+manifest = json.loads((root / ".claude-plugin" / "plugin.json").read_text())
+assert manifest["name"] and manifest["description"] and manifest["version"]
+named = {"find", "prompt", "adopted"}
+found = {p.parent.name for p in root.glob("skills/*/SKILL.md")}
+assert named == found, f"{named} != {found}"
+for p in root.glob("skills/*/SKILL.md"):
+    head = p.read_text().split("---")[1]
+    assert "name:" in head and "description:" in head, p
+PY
+check "the plugin manifest and its three skills are well formed" 0 $?
+bash "$here/plugin/hooks/session-start.sh" >/dev/null 2>&1 </dev/null
+check "the session-start hook runs and reports context" 0 $?
+
 # --- docs integrity ----------------------------------------------------------
 "$here/bin/fp-docscheck" "$here" >/dev/null 2>&1
 check "repo docs: references resolve, links exist" 0 $?

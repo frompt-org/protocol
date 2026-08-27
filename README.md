@@ -245,6 +245,25 @@ authorized: pr-review v1.2.0 digest 7f364c1f8cd4 contexts [interactive, register
 
 The private key never enters the repository. What ships is the manifest, its signature, and the public key: enough to verify, not enough to forge. And `fp-verify` exits 2 — not 0 — when it cannot check at all, because an agent that falls back to an unsigned fetch has turned a policy boundary into a suggestion.
 
+## The plugin
+
+[`plugin/`](plugin/) packages the three verbs an agent needs, as `/f:find`, `/f:prompt` and `/f:adopted`. Discovery, adoption and the record are separate skills on purpose: in an unattended context nobody reads the document before it runs, so the steps stay visibly distinct rather than collapsing into one convenient action.
+
+A session-start hook gives the agent an identity and tells it what exists:
+
+```
+agent fpa-a2b937c86b4f · signed manifest verified · 10 pinned in fpa.lock
+Foreign prompts available here (adopt with /f:prompt, browse with /f:find):
+  help-me              v1.0.0    standard  interview
+  repo-recon           v1.0.0    standard  linear
+  ...
+Nothing above is adopted. Adoption is an act, not a listing.
+```
+
+The hook **prints context and never instructions**. A hook that adopted prompts on startup would be adopting on nobody's authority — the exact thing the protocol exists to prevent, wearing the badge of the platform.
+
+`bin/fp-agent` mints the identity; `bin/fp-record` keeps the append-only log of what was adopted, at which digest, on whose authorization. It is local and unsigned: it names an actor for an audit trail, it does not authenticate one. A managed deployment issues identities from the platform that starts the agent — this is what a laptop gets.
+
 ## The index, and what it deliberately withholds
 
 [`INDEX.md`](INDEX.md) publishes every prompt's **digest** — legitimate out-of-band conveyance of the one part a document cannot contain. It does **not** publish consent sentences.
@@ -288,6 +307,8 @@ To adopt one as a pilot, `bin/fp-adopt <url>` fetches the document, prints it fo
 | [`bin/fp-lock`](bin/fp-lock) · [`fpa.lock`](fpa.lock) | Pin what a team adopts, so re-pinning is a reviewed diff. |
 | [`bin/fp-sign`](bin/fp-sign) · [`bin/fp-verify`](bin/fp-verify) · [`index.json`](index.json) | Sign the manifest; verify a prompt against it. The managed path. |
 | [`.claude/skills/f/`](.claude/skills/f/SKILL.md) | The skill that adopts a prompt by id — mode 3, dogfooded. |
+| [`plugin/`](plugin/) | `/f:find`, `/f:prompt`, `/f:adopted`, and a session-start hook. |
+| [`bin/fp-agent`](bin/fp-agent) · [`bin/fp-record`](bin/fp-record) | Who this agent is; what it has adopted. |
 | [`history/`](history/) | Retired documents, read-only. What used to be true, kept rather than deleted. |
 | [`bin/fp-selftest`](bin/fp-selftest) | Conformance suite — every defect four review rounds found, as an assertion. |
 | [`bin/fp-docscheck`](bin/fp-docscheck) · [`bin/fp-claimcheck`](bin/fp-claimcheck) | References and links resolve; the docs still describe the tool that exists. |

@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""fp-record — the adoption record: what steered this agent, and on whose say-so.
+
+FPA.md AC5. In two of the three contexts the pilot never read the document, so
+this line is the only account of what is running. Append-only, local, and boring
+on purpose — an audit trail nobody can be bothered to read is still the thing you
+reach for when something has gone strange.
+
+    fp-record pr-review 1.2.0 7f364c1f8cd4 managed ./prompts/pr-review.prompt.md
+    fp-record --list                  # what this agent has adopted
+    fp-record --list --all            # every agent that has written here
+
+Exit: 0 written · 2 bad usage.
+"""
+import json
+import pathlib
+import sys
+import time
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+LOG = ROOT / ".fpa" / "adoptions.log"
+AGENT = ROOT / ".fpa" / "agent.json"
+
+HOW = {"interactive", "registered", "managed"}
+
+
+def agent_id():
+    if AGENT.exists():
+        try:
+            return json.loads(AGENT.read_text())["agent_id"]
+        except (json.JSONDecodeError, KeyError):
+            pass
+    return "unidentified"
+
+
+def main(argv):
+    args = [a for a in argv[1:] if not a.startswith("--")]
+    if "-h" in argv or "--help" in argv:
+        print(__doc__)
+        return 0
+
+    if "--list" in argv:
+        if not LOG.exists():
+            print("nothing adopted yet")
+            return 0
+        me, rows = agent_id(), []
+        for line in LOG.read_text().splitlines():
+            if line.strip():
+                rows.append(json.loads(line))
+        if "--all" not in argv:
+            rows = [r for r in rows if r["agent"] == me]
+        if not rows:
+            print(f"nothing adopted by {me}")
+            return 0
+        for r in rows:
+            print(f"{r['at']}  {r['agent']}  {r['id']} v{r['version']}  "
+                  f"{r['digest']}  via {r['how']}  {r['source']}")
+        return 0
+
+    if len(args) < 5:
+        print("usage: fp-record <id> <version> <digest> <how> <source>", file=sys.stderr)
+        return 2
+    pid, version, digest, how, source = args[:5]
+    if how not in HOW:
+        print(f"fp-record: how must be one of {sorted(HOW)} (FPA.md AC1)", file=sys.stderr)
+        return 2
+
+    entry = {"at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "agent": agent_id(),
+             "id": pid, "version": version, "digest": digest, "how": how, "source": source}
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    with LOG.open("a") as fh:
+        fh.write(json.dumps(entry, sort_keys=True) + "\n")
+    print(f"recorded: {pid} v{version} {digest} via {how}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

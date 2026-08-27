@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""fp-agent — give this agent an identity, so an adoption can be attributed.
+
+In the interactive context a pilot watched the adoption happen. In the other two
+nobody did, so "which agent adopted what, when, at which digest" has to be
+recorded or it is not knowable. That needs a subject, and this mints one.
+
+    fp-agent --ensure     # create an identity for this session if absent
+    fp-agent              # print it
+    fp-agent --id         # just the id, for scripting
+
+The identity is local and unsigned: it names an actor for an audit trail, it does
+not authenticate one. A managed deployment issues identities from the platform
+that starts the agent; this is what a laptop gets.
+"""
+import json
+import os
+import pathlib
+import secrets
+import socket
+import sys
+import time
+
+STORE = pathlib.Path(__file__).resolve().parent.parent / ".fpa" / "agent.json"
+
+
+def mint():
+    return {
+        "agent_id": "fpa-" + secrets.token_hex(6),
+        "name": os.environ.get("FPA_AGENT_NAME", "unnamed-agent"),
+        "host": socket.gethostname(),
+        "session": os.environ.get("CLAUDE_SESSION_ID", os.environ.get("FPA_SESSION", "local")),
+        "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    }
+
+
+def load():
+    if STORE.exists():
+        try:
+            return json.loads(STORE.read_text())
+        except json.JSONDecodeError:
+            pass
+    return None
+
+
+def main(argv):
+    if "-h" in argv or "--help" in argv:
+        print(__doc__)
+        return 0
+    identity = load()
+    if identity is None:
+        if "--ensure" not in argv:
+            print("fp-agent: no identity yet -- run 'fp-agent --ensure'", file=sys.stderr)
+            return 1
+        identity = mint()
+        STORE.parent.mkdir(parents=True, exist_ok=True)
+        STORE.write_text(json.dumps(identity, indent=2, sort_keys=True) + "\n")
+    if "--id" in argv:
+        print(identity["agent_id"])
+    else:
+        print(json.dumps(identity, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
