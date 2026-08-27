@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""fp-lock — pin the prompts a team adopts, so every agent resolves the same bytes.
+
+Late binding is the point of a foreign prompt, and it is also the risk: whatever
+the publisher changed this morning is what your agents run this afternoon. A lock
+file is where a team says which version of that freedom they want.
+
+    fp-lock                     # write fpa.lock from the current index
+    fp-lock --check             # exit 1 if a prompt no longer matches its pin
+    fp-lock --update <id>       # re-pin one prompt, deliberately, as a reviewed diff
+
+The point is not that pinning is safer than floating. It is that the choice
+becomes a line in a file somebody reviews, instead of an event nobody sees.
+
+Exit: 0 in sync · 1 drift · 2 unreadable.
+"""
+import hashlib
+import json
+import pathlib
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+LOCK = ROOT / "fpa.lock"
+HEADER = [
+    "# fpa.lock -- pinned foreign prompts.",
+    "#",
+    "# Each line: <id> <version> sha256:<digest> <url>",
+    "# An agent resolving one of these MUST refuse bytes whose digest is not the",
+    "# one pinned here. Updating a pin is a reviewed diff, not a surprise.",
+    "#",
+    "# Regenerate with bin/fp-lock. Check with bin/fp-lock --check.",
+]
+
+
+def manifest():
+    try:
+        return json.loads((ROOT / "index.json").read_text())
+    except OSError as exc:
+        print(f"fp-lock: cannot read index.json -- {exc}", file=sys.stderr)
+        sys.exit(2)
+
+
+def current():
+    """id -> (version, digest, url), hashed from the prompt files themselves.
+
+    Deliberately not read out of index.json: the manifest can be stale, and a
+    lock check that trusts a stale manifest reports "in sync" about a prompt that
+    has already moved. What an agent resolves is bytes, so bytes are what this
+    compares.
+    """
+    m = manifest()
+    urls = {p["id"]: f"{m['base']}/{p['file']}" for p in m["prompts"]}
+    out = {}
+    for path in sorted(ROOT.glob("prompts/*.prompt.md")):
+        raw = path.read_bytes()
+        fm = {}
+        for line in raw.decode("utf-8").splitlines()[2:]:
+            if line.strip() == "---":
+                break
+            if ":" in line:
+                k, v = line.split(":", 1)
+                fm[k.strip()] = v.strip()
+        out[fm["id"]] = (fm["version"], hashlib.sha256(raw).hexdigest(),
+                         urls.get(fm["id"], f"{m['base']}/{path.name}"))
+    return out
+
+
+def parse():
+    if not LOCK.exists():
+        return {}
+    out = {}
+    for line in LOCK.read_text().splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        pid, version, digest, url = line.split()
+        out[pid] = (version, digest.removeprefix("sha256:"), url)
+    return out
+
+
+def render(pins):
+    lines = list(HEADER) + [""]
+    for pid in sorted(pins):
+        version, digest, url = pins[pid]
+        lines.append(f"{pid} {version} sha256:{digest} {url}")
+    return "\n".join(lines) + "\n"
+
+
+def main(argv):
+    if "-h" in argv or "--help" in argv:
+        print(__doc__)
+        return 0
+
+    if "--update" in argv:
+        wanted = argv[argv.index("--update") + 1]
+        pins, now = parse(), current()
+        if wanted not in now:
+            print(f"fp-lock: {wanted!r} is not in the index", file=sys.stderr)
+            return 2
+        was = pins.get(wanted)
+        pins[wanted] = now[wanted]
+        LOCK.write_text(render(pins))
+        if was and was[1] != now[wanted][1]:
+            print(f"re-pinned {wanted}: {was[0]} {was[1][:12]} -> {now[wanted][0]} {now[wanted][1][:12]}")
+        else:
+            print(f"pinned {wanted} {now[wanted][0]} {now[wanted][1][:12]}")
+        return 0
+
+    if "--check" in argv:
+        pins, now = parse(), current()
+        if not pins:
+            print("fp-lock: no fpa.lock -- nothing is pinned", file=sys.stderr)
+            return 1
+        drift = []
+        for pid, (version, digest, _url) in sorted(pins.items()):
+            if pid not in now:
+                drift.append(f"  {pid}: pinned, but no longer published")
+            elif now[pid][1] != digest:
+                drift.append(f"  {pid}: pinned {version} {digest[:12]}, "
+                             f"published {now[pid][0]} {now[pid][1][:12]}")
+        if drift:
+            print("fp-lock: prompts have moved since they were pinned:\n" + "\n".join(drift)
+                  + "\nRe-pin deliberately with 'fp-lock --update <id>'.", file=sys.stderr)
+            return 1
+        print(f"fpa.lock is in sync ({len(pins)} pinned)")
+        return 0
+
+    LOCK.write_text(render(current()))
+    print(f"wrote fpa.lock ({len(current())} pinned)")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv))
+    except Exception as exc:  # noqa: BLE001
+        print(f"fp-lock: internal error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        sys.exit(3)

@@ -217,6 +217,34 @@ Step 3 is the promise: one prompt at one URL, every agent current, **nothing dep
 
 The ceremony is gone in this mode, deliberately: the pilot consented once, by installing the skill. What replaces it is the **adoption record** — id, version, digest, source — because the pilot never read the document and that line is the only account of what is steering them.
 
+## Running it unattended
+
+Ceremony is for a human at a keyboard. Two other contexts have no human at use time, so each replaces the phrase with something an agent can check by itself.
+
+**`registered`** — consent given once, bounded by a pin. `fpa.lock` records id, version, digest and URL; `fp-resolve --lock` refuses bytes that are not the pinned ones:
+
+```
+$ bin/fp-resolve pr-review --lock
+fp-resolve: pr-review has moved since it was pinned
+  pinned  1.2.0 7f364c1f8cd4…
+  fetched 6c0aaea5c2f3…
+Re-pin deliberately with 'bin/fp-lock --update' if that is what you want.
+```
+
+Pinning is not safer than floating by itself. It makes the choice **a line somebody reviews** instead of an event nobody sees.
+
+**`managed`** — no human at all. `index.json` is a deterministic manifest, signed with `ssh-keygen -Y`; `allowed_signers` and `index.json.sig` ship beside it. `fp-verify` checks the signature, then checks the fetched bytes against the digest the signed manifest carries:
+
+```
+$ bin/fp-verify pr-review
+manifest verified: index.json signed by foreign-prompts-publisher
+authorized: pr-review v1.2.0 digest 7f364c1f8cd4 contexts [interactive, registered, managed]
+```
+
+**A digest proves the bytes are the bytes you expected; only a signature proves who expected them.** That is why the manifest is signed and the documents are not — one signature covers the set, and revocation is dropping an entry rather than reaching every agent.
+
+The private key never enters the repository. What ships is the manifest, its signature, and the public key: enough to verify, not enough to forge. And `fp-verify` exits 2 — not 0 — when it cannot check at all, because an agent that falls back to an unsigned fetch has turned a policy boundary into a suggestion.
+
 ## The index, and what it deliberately withholds
 
 [`INDEX.md`](INDEX.md) publishes every prompt's **digest** — legitimate out-of-band conveyance of the one part a document cannot contain. It does **not** publish consent sentences.
@@ -257,6 +285,8 @@ To adopt one as a pilot, `bin/fp-adopt <url>` fetches the document, prints it fo
 | [`bin/fp-lint`](bin/fp-lint) · [`bin/fp-new`](bin/fp-new) | Validate structure; scaffold. |
 | [`bin/fp-adopt`](bin/fp-adopt) · [`bin/fp-index`](bin/fp-index) | Pilot-side: read a prompt and compose its phrase; regenerate the index. |
 | [`bin/fp-resolve`](bin/fp-resolve) · [`bin/fp-demo`](bin/fp-demo) | Resolve an id to verified bytes; demonstrate late binding and the digest check. |
+| [`bin/fp-lock`](bin/fp-lock) · [`fpa.lock`](fpa.lock) | Pin what a team adopts, so re-pinning is a reviewed diff. |
+| [`bin/fp-sign`](bin/fp-sign) · [`bin/fp-verify`](bin/fp-verify) · [`index.json`](index.json) | Sign the manifest; verify a prompt against it. The managed path. |
 | [`.claude/skills/f/`](.claude/skills/f/SKILL.md) | The skill that adopts a prompt by id — mode 3, dogfooded. |
 | [`history/`](history/) | Retired documents, read-only. What used to be true, kept rather than deleted. |
 | [`bin/fp-selftest`](bin/fp-selftest) | Conformance suite — every defect four review rounds found, as an assertion. |

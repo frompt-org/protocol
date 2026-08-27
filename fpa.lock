@@ -1,0 +1,18 @@
+# fpa.lock -- pinned foreign prompts.
+#
+# Each line: <id> <version> sha256:<digest> <url>
+# An agent resolving one of these MUST refuse bytes whose digest is not the
+# one pinned here. Updating a pin is a reviewed diff, not a surprise.
+#
+# Regenerate with bin/fp-lock. Check with bin/fp-lock --check.
+
+bug-repro 1.0.0 sha256:6fab555a1486cc92e8bab4ce1641925b0f9599ddd24dd3f1d8e1ccb0be8d1537 https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/bug-repro.prompt.md
+fpa-bootstrap 2.0.0 sha256:5fc90f082eaa1a3d3862da2ad6f2e53c59d38153933e6590427900f7dde9619b https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/fpa-bootstrap.prompt.md
+ghost-in-the-gist 1.0.0 sha256:459e58d5684fa69983bbb5c0d5d68dee892f2112b141cce4d33940d7ec022812 https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/ghost-in-the-gist.prompt.md
+grill-me 1.0.0 sha256:f437677c449ebda4b4e2a093e01905aaeb1adb198f4d55b8266b95fd95974abc https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/grill-me.prompt.md
+handoff-note 1.1.0 sha256:d0aa2f3526411a4f7c989bc663e81d6078b7ea82ed56aaf49d75bda42218c67e https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/handoff-note.prompt.md
+help-me 1.0.0 sha256:c990f2ce90906e25dc76ae3997ea3b25e6a46231eae4c382e08966444f0652c4 https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/help-me.prompt.md
+pr-review 1.2.0 sha256:7f364c1f8cd45ae8924b2732ced253951ea2c5af10831517e75373269c675b00 https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/pr-review.prompt.md
+repo-recon 1.0.0 sha256:9d7accf11b879bff0f176ab5225f0fb2d4e86344037927dac1ca4d3cab8279f2 https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon.prompt.md
+ticket-intake 1.0.0 sha256:39f138092f087eb2c95e7704352553e799dc620b766b7cb3d8124a09edbbf9f7 https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/ticket-intake.prompt.md
+welcome-tour 1.0.0 sha256:531894a1e44d8c092c354178a85afcef69fede922d27fd1bc9113e5b772ca233 https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/welcome-tour.prompt.md

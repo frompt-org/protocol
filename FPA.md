@@ -86,6 +86,16 @@ A phrase is the mode-1 instrument: a human, at a keyboard, adopting one document
 - **AC4.** In `managed`, an agent that cannot reach or verify the manifest **MUST** fail closed. Falling back to an unsigned fetch converts a policy boundary into a suggestion at exactly the moment it matters.
 - **AC5.** Whatever the context, the runtime agent **MUST** be able to report an **adoption record**: id, version, source, digest, and how it was authorized. In `interactive` the pilot read the document; in the other two they did not, so the record is the only account of what is steering them.
 
+### The manifest
+
+`registered` and `managed` both need something the document cannot carry, so both read a **manifest**: the same prompt list, machine-readable, with a digest per prompt.
+
+- **M1.** A manifest **MUST** be deterministic — no timestamps, sorted keys — so a signature over it stays valid until the prompts themselves change. A manifest that differs on every regeneration cannot be signed usefully.
+- **M2.** It carries, per prompt: `id`, `version`, `digest`, `file`, `ceremony`, `contexts`, `allow`, `deny`. Enough to decide whether to adopt without fetching, and enough to verify after.
+- **M3.** A **lock file** pins a subset of it: id, version, digest, URL. An agent resolving a pinned prompt **MUST** refuse bytes whose digest is not the pinned one, and re-pinning **SHOULD** be a reviewed change rather than an automatic one. Pinning is not safer than floating in itself — it makes the choice a line somebody reviews instead of an event nobody sees.
+- **M4.** In `managed`, the manifest is **signed** and the documents are not. Each document's digest lives inside the signed manifest, so one signature covers the whole set, and revocation is dropping an entry rather than reaching every agent.
+- **M5.** A lock check **MUST** compare against the prompt bytes, not against the manifest. A manifest can be stale, and a check that trusts a stale manifest reports agreement about a document that has already moved.
+
 The manifest is also the deployment unit. Rollback is serving the previous manifest; staged rollout is different manifests for different rings; revocation is dropping an entry. None of that is in this spec — it belongs to whoever operates the fleet — but it is why §15 keys attestations by digest rather than by URL.
 
 ## 2. Document format

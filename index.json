@@ -1,0 +1,117 @@
+{
+  "base": "https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts",
+  "manifest_version": 1,
+  "prompts": [
+    {
+      "allow": "read:conversation, read:files, read:git, read:logs",
+      "ceremony": "standard",
+      "contexts": "interactive",
+      "deny": "net:get, net:post, write:files, vcs:commit, vcs:push, secrets:read, pkg:install",
+      "digest": "c990f2ce90906e25dc76ae3997ea3b25e6a46231eae4c382e08966444f0652c4",
+      "file": "help-me.prompt.md",
+      "flow": "interview",
+      "id": "help-me",
+      "version": "1.0.0"
+    },
+    {
+      "allow": "read:files, read:git, run:shell-ro",
+      "ceremony": "standard",
+      "contexts": "interactive",
+      "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read, pkg:install, run:tests",
+      "digest": "9d7accf11b879bff0f176ab5225f0fb2d4e86344037927dac1ca4d3cab8279f2",
+      "file": "repo-recon.prompt.md",
+      "flow": "linear",
+      "id": "repo-recon",
+      "version": "1.0.0"
+    },
+    {
+      "allow": "read:files, read:git",
+      "ceremony": "light",
+      "contexts": "interactive, registered, managed",
+      "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read",
+      "digest": "7f364c1f8cd45ae8924b2732ced253951ea2c5af10831517e75373269c675b00",
+      "file": "pr-review.prompt.md",
+      "flow": "rubric",
+      "id": "pr-review",
+      "version": "1.2.0"
+    },
+    {
+      "allow": "read:files, read:logs, run:shell-ro, run:tests",
+      "ceremony": "standard",
+      "contexts": "interactive",
+      "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read",
+      "digest": "6fab555a1486cc92e8bab4ce1641925b0f9599ddd24dd3f1d8e1ccb0be8d1537",
+      "file": "bug-repro.prompt.md",
+      "flow": "linear",
+      "id": "bug-repro",
+      "version": "1.0.0"
+    },
+    {
+      "allow": "read:conversation, read:files",
+      "ceremony": "light",
+      "contexts": "interactive",
+      "deny": "write:files, vcs:push, net:post, secrets:read, pkg:install",
+      "digest": "f437677c449ebda4b4e2a093e01905aaeb1adb198f4d55b8266b95fd95974abc",
+      "file": "grill-me.prompt.md",
+      "flow": "rubric",
+      "id": "grill-me",
+      "version": "1.0.0"
+    },
+    {
+      "allow": "read:conversation, read:files, read:logs, write:artifact",
+      "ceremony": "strict",
+      "contexts": "interactive",
+      "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read, pkg:install",
+      "digest": "39f138092f087eb2c95e7704352553e799dc620b766b7cb3d8124a09edbbf9f7",
+      "file": "ticket-intake.prompt.md",
+      "flow": "interview",
+      "id": "ticket-intake",
+      "version": "1.0.0"
+    },
+    {
+      "allow": "read:conversation",
+      "ceremony": "standard",
+      "contexts": "interactive",
+      "deny": "read:files, read:git, write:files, net:get, net:post, secrets:read, pkg:install",
+      "digest": "531894a1e44d8c092c354178a85afcef69fede922d27fd1bc9113e5b772ca233",
+      "file": "welcome-tour.prompt.md",
+      "flow": "state-machine",
+      "id": "welcome-tour",
+      "version": "1.0.0"
+    },
+    {
+      "allow": "read:conversation",
+      "ceremony": "standard",
+      "contexts": "interactive",
+      "deny": "write:files, run:shell-ro, net:get, net:post, secrets:read, pkg:install",
+      "digest": "459e58d5684fa69983bbb5c0d5d68dee892f2112b141cce4d33940d7ec022812",
+      "file": "ghost-in-the-gist.prompt.md",
+      "flow": "interpreter",
+      "id": "ghost-in-the-gist",
+      "version": "1.0.0"
+    },
+    {
+      "allow": "read:files, read:git, read:conversation, write:artifact",
+      "ceremony": "strict",
+      "contexts": "interactive",
+      "deny": "write:files, vcs:push, net:post, secrets:read",
+      "digest": "d0aa2f3526411a4f7c989bc663e81d6078b7ea82ed56aaf49d75bda42218c67e",
+      "file": "handoff-note.prompt.md",
+      "flow": "linear",
+      "id": "handoff-note",
+      "version": "1.1.0"
+    },
+    {
+      "allow": "net:get, read:files",
+      "ceremony": "standard",
+      "contexts": "interactive",
+      "deny": "write:files, net:post, secrets:read, pkg:install",
+      "digest": "5fc90f082eaa1a3d3862da2ad6f2e53c59d38153933e6590427900f7dde9619b",
+      "file": "fpa-bootstrap.prompt.md",
+      "flow": "linear",
+      "id": "fpa-bootstrap",
+      "version": "2.0.0"
+    }
+  ],
+  "protocol": "FOREIGN-PROMPT v2"
+}

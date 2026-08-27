@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""fp-index — regenerate INDEX.md from the prompts in prompts/.
+"""fp-index — regenerate INDEX.md and index.json from the prompts in prompts/.
 
 Publishes each prompt's digest, which is the one part of a confirmation phrase a
 document cannot contain. Deliberately does NOT publish consent sentences: the
@@ -11,6 +11,7 @@ ceremony this protocol exists to create.
     fp-index --check    # exit 1 if INDEX.md is stale (used by fp-selftest)
 """
 import hashlib
+import json
 import pathlib
 import sys
 
@@ -43,17 +44,34 @@ def front_matter(text):
     return fm
 
 
-def build():
-    rows = []
+def rows():
+    out = []
     for path in sorted(ROOT.glob("prompts/*.prompt.md")):
         raw = path.read_bytes()
         fm = front_matter(raw.decode("utf-8"))
-        rows.append({
+        out.append({
             "id": fm["id"], "version": fm["version"], "ceremony": fm["ceremony"],
-            "flow": fm["flow"], "allow": fm["allow"],
+            "flow": fm["flow"], "allow": fm["allow"], "deny": fm["deny"],
+            "contexts": fm.get("contexts", "interactive"),
             "digest": hashlib.sha256(raw).hexdigest(), "file": path.name,
         })
-    rows.sort(key=lambda r: ORDER.index(r["id"]) if r["id"] in ORDER else 99)
+    out.sort(key=lambda r: ORDER.index(r["id"]) if r["id"] in ORDER else 99)
+    return out
+
+
+def manifest():
+    """The machine-readable half. Deterministic: no timestamps, sorted keys, so a
+    signature over it stays valid until the prompts themselves change."""
+    return json.dumps({
+        "manifest_version": 1,
+        "protocol": "FOREIGN-PROMPT v2",
+        "base": RAW,
+        "prompts": [{k: r[k] for k in sorted(r)} for r in rows()],
+    }, indent=2, sort_keys=True) + "\n"
+
+
+def build():
+    rows_ = rows()
 
     out = ["# Index of foreign prompts", "",
            "Every prompt in this repo, with the digest of its published bytes.", "",
@@ -68,7 +86,7 @@ def build():
            "", "If it disagrees with this table, you and this index are not looking at the same",
            "document. Do not adopt it; open an issue.", "", "---", ""]
 
-    for r in rows:
+    for r in rows_:
         out += [f"## `{r['id']}` v{r['version']}", "",
                 SUMMARY.get(r["id"], ""), "",
                 f"- **URL** `{RAW}/{r['file']}`",
@@ -81,19 +99,23 @@ def build():
                          else "  ← ceremony `light`: the sentence alone is the phrase"),
                 ""]
     out += ["---", "",
-            "Regenerate with `bin/fp-index`. `make test` fails if this file drifts from the prompts.", ""]
+            "Regenerate with `bin/fp-index`, which also writes `index.json` — the same data, "
+            "machine-readable, and the thing a signature covers. `make test` fails if either "
+            "drifts from the prompts.", ""]
     return "\n".join(out)
 
 
 if __name__ == "__main__":
-    text = build()
-    target = ROOT / "INDEX.md"
+    text, mtext = build(), manifest()
+    md, js = ROOT / "INDEX.md", ROOT / "index.json"
     if "--check" in sys.argv:
-        current = target.read_text() if target.exists() else ""
-        if current != text:
-            print("INDEX.md is stale -- run bin/fp-index", file=sys.stderr)
+        stale = [p.name for p, want in ((md, text), (js, mtext))
+                 if (p.read_text() if p.exists() else "") != want]
+        if stale:
+            print(f"stale, run bin/fp-index: {', '.join(stale)}", file=sys.stderr)
             sys.exit(1)
-        print("INDEX.md is current")
+        print("INDEX.md and index.json are current")
         sys.exit(0)
-    target.write_text(text)
-    print(f"wrote INDEX.md ({len(text.splitlines())} lines)")
+    md.write_text(text)
+    js.write_text(mtext)
+    print(f"wrote INDEX.md ({len(text.splitlines())} lines) and index.json ({len(rows())} prompts)")

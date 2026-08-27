@@ -121,4 +121,4 @@ Teaches the protocol itself to an agent that has never heard of it, refusals inc
 
 ---
 
-Regenerate with `bin/fp-index`. `make test` fails if this file drifts from the prompts.
+Regenerate with `bin/fp-index`, which also writes `index.json` — the same data, machine-readable, and the thing a signature covers. `make test` fails if either drifts from the prompts.

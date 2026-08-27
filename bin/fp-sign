@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# fp-sign -- sign index.json, so a managed agent can verify a publisher.
+#
+# A digest proves the bytes are the bytes you expected. Only a signature proves
+# who expected them -- which is what an unattended agent needs, because there is
+# no pilot to have expected anything. So the manifest is signed and the documents
+# are not: each document's digest is inside the signed manifest.
+#
+#   fp-sign                        # sign index.json with .fpa/signing_key
+#   fp-sign --keygen               # create that key if it does not exist
+#   FPA_SIGNING_KEY=~/.ssh/id_ed25519 fp-sign
+#
+# Uses ssh-keygen -Y, which is present wherever OpenSSH is, needs no GPG
+# keyring, and verifies with a plain allowed_signers file.
+#
+# The private key never enters the repository (.fpa/ is gitignored). What ships
+# is index.json, index.json.sig and allowed_signers -- enough to verify, not
+# enough to forge.
+set -euo pipefail
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$here"
+
+key="${FPA_SIGNING_KEY:-$here/.fpa/signing_key}"
+identity="${FPA_SIGNING_IDENTITY:-foreign-prompts-publisher}"
+
+if [ "${1:-}" = "--keygen" ]; then
+  mkdir -p "$(dirname "$key")"
+  if [ -f "$key" ]; then
+    echo "fp-sign: $key already exists; refusing to overwrite a signing key" >&2
+    exit 2
+  fi
+  ssh-keygen -t ed25519 -N "" -C "$identity" -f "$key" >/dev/null
+  echo "created $key (gitignored) and $key.pub"
+fi
+
+[ -f "$key" ] || { echo "fp-sign: no signing key at $key -- run 'fp-sign --keygen'" >&2; exit 2; }
+[ -f index.json ] || { echo "fp-sign: no index.json -- run bin/fp-index" >&2; exit 2; }
+
+ssh-keygen -Y sign -f "$key" -n foreign-prompts index.json >/dev/null 2>&1
+printf '%s %s\n' "$identity" "$(cat "$key.pub")" > allowed_signers
+echo "signed index.json -> index.json.sig"
+echo "published allowed_signers for identity '$identity'"
+echo
+echo "The private key stays in $key and is gitignored. Commit index.json,"
+echo "index.json.sig and allowed_signers; a managed agent needs exactly those three."

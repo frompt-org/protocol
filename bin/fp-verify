@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# fp-verify -- the managed path: verify the manifest, then a prompt against it.
+#
+#   fp-verify                       # is index.json signed by a known publisher?
+#   fp-verify <id> [--base DIR]     # ...and are these the bytes it vouched for?
+#
+# Exit: 0 verified · 1 not verified · 2 cannot check (missing signature, key, tool).
+#
+# Exit 2 is not exit 0. An agent in a managed context that cannot verify must
+# fail closed -- falling back to an unsigned fetch turns a policy boundary into
+# a suggestion at the moment it matters (FPA.md AC4).
+set -uo pipefail
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$here"
+
+for f in index.json index.json.sig allowed_signers; do
+  [ -f "$f" ] || { echo "fp-verify: missing $f -- cannot verify, failing closed" >&2; exit 2; }
+done
+command -v ssh-keygen >/dev/null || { echo "fp-verify: ssh-keygen not found" >&2; exit 2; }
+
+signer=$(awk '{print $1; exit}' allowed_signers)
+if ! ssh-keygen -Y verify -f allowed_signers -I "$signer" -n foreign-prompts \
+     -s index.json.sig < index.json >/dev/null 2>&1; then
+  echo "fp-verify: index.json is NOT signed by $signer" >&2
+  echo "  Either the manifest was modified after signing, or it was signed by someone else." >&2
+  exit 1
+fi
+echo "manifest verified: index.json signed by $signer"
+
+[ $# -gt 0 ] && [ "${1#-}" = "$1" ] || exit 0
+id="$1"; shift
+base=""
+[ "${1:-}" = "--base" ] && base="$2"
+
+python3 - "$id" "$base" <<'PY'
+import hashlib, json, pathlib, sys, urllib.request
+wanted, base = sys.argv[1], sys.argv[2]
+manifest = json.load(open("index.json"))
+entry = next((p for p in manifest["prompts"] if p["id"] == wanted), None)
+if entry is None:
+    print(f"fp-verify: {wanted!r} is not in the signed manifest -- refusing", file=sys.stderr)
+    sys.exit(1)
+src = f"{base.rstrip('/')}/{entry['file']}" if base else f"{manifest['base']}/{entry['file']}"
+try:
+    raw = (pathlib.Path(src).read_bytes() if not src.startswith("http")
+           else urllib.request.urlopen(src, timeout=15).read())
+except Exception as exc:
+    print(f"fp-verify: cannot read {src} -- {exc}", file=sys.stderr)
+    sys.exit(2)
+got = hashlib.sha256(raw).hexdigest()
+if got != entry["digest"]:
+    print(f"fp-verify: DIGEST MISMATCH for {wanted}\n  manifest {entry['digest']}\n"
+          f"  fetched  {got}\n  source   {src}\nRefusing.", file=sys.stderr)
+    sys.exit(1)
+print(f"authorized: {wanted} v{entry['version']} digest {got[:12]} "
+      f"contexts [{entry['contexts']}] source {src}")
+PY

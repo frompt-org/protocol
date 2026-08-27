@@ -10,6 +10,7 @@ that is the agent's job, and it happens only after this exits 0.
     fp-resolve pr-review --base ./prompts     # resolve from a local checkout
     fp-resolve --list                         # what the index offers
     fp-resolve pr-review --record             # the adoption record, without the body
+    fp-resolve pr-review --lock               # refuse anything not matching fpa.lock
 
 Exit: 0 verified · 1 digest mismatch or unknown id · 2 unreachable.
 
@@ -93,6 +94,31 @@ def main(argv):
         return 2
 
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    # --lock is the registered context: consent was given once, to a pin, so the
+    # pin is what bounds it. A prompt that moved since it was pinned is refused
+    # here rather than adopted quietly and noticed later.
+    if "--lock" in flags:
+        lock = ROOT / "fpa.lock"
+        if not lock.exists():
+            print("fp-resolve: --lock given but there is no fpa.lock", file=sys.stderr)
+            return 2
+        pins = {}
+        for line in lock.read_text().splitlines():
+            if line.strip() and not line.startswith("#"):
+                pid, version, dg, url = line.split()
+                pins[pid] = (version, dg.removeprefix("sha256:"), url)
+        if wanted not in pins:
+            print(f"fp-resolve: {wanted!r} is not pinned in fpa.lock -- refusing", file=sys.stderr)
+            return 1
+        if pins[wanted][1] != digest:
+            print(f"fp-resolve: {wanted} has moved since it was pinned\n"
+                  f"  pinned  {pins[wanted][0]} {pins[wanted][1]}\n"
+                  f"  fetched {digest}\n"
+                  "Re-pin deliberately with 'bin/fp-lock --update' if that is what you want.",
+                  file=sys.stderr)
+            return 1
+
     if entry and digest != entry["digest"]:
         print(f"fp-resolve: DIGEST MISMATCH for {wanted}\n"
               f"  index published {entry['digest']}\n"
@@ -102,8 +128,9 @@ def main(argv):
               "the bytes the index vouched for.", file=sys.stderr)
         return 1
 
+    how = "pinned" if "--lock" in flags else ("indexed" if entry else "unindexed")
     record = (f"resolved={wanted} version={entry['version'] if entry else '?'} "
-              f"digest={digest[:12]} source={source} verified={'yes' if entry else 'unindexed'}")
+              f"digest={digest[:12]} source={source} verified={how}")
     if "--record" in flags:
         print(record)
         return 0

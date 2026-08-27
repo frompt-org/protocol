@@ -181,6 +181,45 @@ rm -rf "$tamper"
 
 probe "unknown adoption context" 's|^ceremony: .*|ceremony: standard\ncontexts: unattended|'
 
+# --- registered: a pin bounds a consent given once ---------------------------
+"$here/bin/fp-lock" --check >/dev/null 2>&1
+check "fpa.lock is in sync with the prompts" 0 $?
+"$here/bin/fp-resolve" pr-review --base "$here/prompts" --lock --record >/dev/null 2>&1
+check "fp-resolve --lock accepts a prompt at its pin" 0 $?
+
+moved=$(mktemp -d 2>/dev/null || echo "/tmp/fp-moved-$$"); mkdir -p "$moved"
+cp "$here"/prompts/*.prompt.md "$moved/"
+printf '\n<!-- moved since it was pinned -->\n' >> "$moved/pr-review.prompt.md"
+"$here/bin/fp-resolve" pr-review --base "$moved" --lock --record >/dev/null 2>&1
+check "fp-resolve --lock refuses a prompt that moved" 1 $?
+rm -rf "$moved"
+
+# --- managed: a signature authorizes a publisher, not a document -------------
+if [ -f "$here/index.json.sig" ] && [ -f "$here/allowed_signers" ]; then
+  "$here/bin/fp-verify" >/dev/null 2>&1 </dev/null
+  check "the signed manifest verifies against allowed_signers" 0 $?
+  "$here/bin/fp-verify" pr-review --base "$here/prompts" >/dev/null 2>&1 </dev/null
+  check "fp-verify authorizes a prompt present in the signed manifest" 0 $?
+  "$here/bin/fp-verify" no-such-prompt --base "$here/prompts" >/dev/null 2>&1 </dev/null
+  check "fp-verify refuses a prompt absent from the manifest" 1 $?
+
+  tampered=$(mktemp -d 2>/dev/null || echo "/tmp/fp-tamper2-$$"); mkdir -p "$tampered/bin"
+  cp "$here"/index.json "$here"/index.json.sig "$here"/allowed_signers "$tampered/"
+  cp "$here"/bin/fp-verify "$tampered/bin/"
+  python3 - "$tampered/index.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+m = json.load(open(p))
+m["prompts"][0]["digest"] = "0" * 64
+json.dump(m, open(p, "w"), indent=2, sort_keys=True)
+PY
+  (cd "$tampered" && ./bin/fp-verify >/dev/null 2>&1 </dev/null)
+  check "a manifest edited after signing fails verification" 1 $?
+  rm -rf "$tampered"
+else
+  echo "skip -- no signature present; run bin/fp-sign to enable the managed checks"
+fi
+
 # --- docs integrity ----------------------------------------------------------
 "$here/bin/fp-docscheck" "$here" >/dev/null 2>&1
 check "repo docs: references resolve, links exist" 0 $?
