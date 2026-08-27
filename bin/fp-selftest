@@ -69,16 +69,30 @@ check "probe: empty body is a finding" 1 $?
 
 # --- the scaffolder ----------------------------------------------------------
 for flow in linear loop state-machine rubric interpreter interview; do
-  "$new" "demo-$flow" -c "phrase-$flow" -f "$flow" --author ci 2>/dev/null | "$lint" -q - >/dev/null 2>&1
+  "$new" "demo-$flow" -c "i-have-read-the-$flow-demo-and-accept-what-it-does" -f "$flow" \
+    --author ci 2>/dev/null | "$lint" -q - >/dev/null 2>&1
   check "fp-new -f $flow scaffolds a valid prompt" 0 $?
 done
-"$new" demo -c demo-phrase --author 'A/B & Co\' >/dev/null 2>&1
+"$new" demo -c i-have-read-this-and-accept-what-it-does --author 'A/B & Co\' >/dev/null 2>&1
 check "fp-new survives an author containing / & and backslash" 0 $?
-"$new" demo -c demo-phrase --version 1x.2y.3z >/dev/null 2>&1
+"$new" demo -c i-have-read-this-and-accept-what-it-does --version 1x.2y.3z >/dev/null 2>&1
 check "fp-new rejects malformed semver" 2 $?
-"$new" demo -c run >/dev/null 2>&1
-check "fp-new rejects a generic confirmation phrase" 2 $?
-TMPDIR=/nonexistent-on-purpose "$new" demo-loop -c quiet-anvil -f loop --author ci 2>/dev/null \
+"$new" demo -c zebra >/dev/null 2>&1
+check "fp-new rejects a bare word as a consent sentence" 2 $?
+
+# -c was silently a no-op once, because it substituted a literal the template no
+# longer contained. The scaffolder now reads the sentence to replace out of the
+# template, and this check is what would have caught it.
+# Capture first: piping straight into `grep -q` kills the writer with SIGPIPE and
+# reports 141, which is neither pass nor fail but looked like both.
+scaffolded=$("$new" demo -c i-have-read-this-and-want-my-work-picked-apart --author ci 2>/dev/null)
+printf '%s' "$scaffolded" | grep -q "^consent: i-have-read-this-and-want-my-work-picked-apart$"
+check "fp-new -c actually replaces the template's consent sentence" 0 $?
+default_sentence=$(sed -n 's/^consent: //p' "$tmpl" | head -1)
+printf '%s' "$scaffolded" | grep -q "$default_sentence" && keep=1 || keep=0
+check "fp-new output does not keep the template's default sentence" 0 "$keep"
+TMPDIR=/nonexistent-on-purpose "$new" demo-loop -c i-have-read-this-and-accept-what-it-does \
+  -f loop --author ci 2>/dev/null \
   | "$lint" -q - >/dev/null 2>&1
 check "fp-new works without a writable temp dir" 0 $?
 
@@ -107,12 +121,15 @@ check "probe: unknown ceremony level" 1 $?
 check "INDEX.md digests match the prompts" 0 $?
 
 # --- the pilot-side adopt tool composes a phrase per ceremony ----------------
-"$here/bin/fp-adopt" "$here/prompts/repo-recon.prompt.md" --quiet 2>/dev/null | grep -q "repo-recon-[0-9a-f]\{7\} "
+adopt_std=$("$here/bin/fp-adopt" "$here/prompts/repo-recon.prompt.md" --quiet 2>/dev/null)
+printf '%s' "$adopt_std" | grep -q "repo-recon-[0-9a-f]\{7\} "
 check "fp-adopt composes a standard-ceremony phrase" 0 $?
-"$here/bin/fp-adopt" "$here/prompts/ticket-intake.prompt.md" --quiet 2>/dev/null | grep -q "ticket-intake-[0-9a-f]\{64\} "
+adopt_strict=$("$here/bin/fp-adopt" "$here/prompts/ticket-intake.prompt.md" --quiet 2>/dev/null)
+printf '%s' "$adopt_strict" | grep -q "ticket-intake-[0-9a-f]\{64\} "
 check "fp-adopt composes a strict-ceremony phrase" 0 $?
-"$here/bin/fp-adopt" "$here/prompts/grill-me.prompt.md" --quiet 2>/dev/null | grep -qv "grill-me-"
-check "fp-adopt omits the digest at ceremony light" 0 $?
+adopt_light=$("$here/bin/fp-adopt" "$here/prompts/grill-me.prompt.md" --quiet 2>/dev/null)
+printf '%s' "$adopt_light" | grep -q "grill-me-" && light_has_id=1 || light_has_id=0
+check "fp-adopt omits id and digest at ceremony light" 0 "$light_has_id"
 
 # A body hidden inside an HTML comment is invisible to every reader except a
 # line-oriented regex.
@@ -144,7 +161,8 @@ check "claimcheck catches a protection claim, a stale version, a cut key and Eng
 # scripted rename.
 "$lint" -q "$tmpl" >/dev/null 2>&1
 check "the template is a valid prompt" 0 $?
-"$here/bin/fp-adopt" "$tmpl" --quiet 2>/dev/null | grep -q "my-prompt-[0-9a-f]\{7\} "
+adopt_tmpl=$("$here/bin/fp-adopt" "$tmpl" --quiet 2>/dev/null)
+printf '%s' "$adopt_tmpl" | grep -q "my-prompt-[0-9a-f]\{7\} "
 check "the template composes a phrase at its declared ceremony" 0 $?
 rm -rf "$claimscratch"
 

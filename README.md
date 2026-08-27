@@ -206,7 +206,7 @@ Not built. The seam is reserved so it can plug in without a protocol change.
 ## Write one
 
 ```bash
-bin/fp-new my-prompt -c stripeless-zebra -f rubric -o prompts/   # scaffold
+bin/fp-new my-prompt -c i-have-read-this-and-want-my-diff-torn-apart -f rubric -o prompts/
 bin/fp-lint prompts/my-prompt.prompt.md                          # structure only — it does not judge intent
 bin/fp-index                                                     # publish its digest
 make test                                                        # conformance suite
