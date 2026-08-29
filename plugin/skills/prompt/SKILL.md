@@ -2,7 +2,7 @@
 name: prompt
 description: Adopt a foreign prompt by id or URL, with its digest verified. Use when the user types /f:prompt, asks to adopt or run a named foreign prompt, or picks one from a /f:find result.
 user-invocable: true
-allowed-tools: Bash(fp-resolve:*), Bash(bin/fp-resolve:*), Bash(fp-verify:*), Bash(bin/fp-verify:*), Bash(fp-record:*), Bash(bin/fp-record:*), Bash(fp-agent:*), Bash(bin/fp-agent:*), Read
+allowed-tools: Bash(fp-resolve:*), Bash(${FP_HOME:-.}/bin/fp-resolve:*), Bash(fp-verify:*), Bash(${FP_HOME:-.}/bin/fp-verify:*), Bash(fp-record:*), Bash(${FP_HOME:-.}/bin/fp-record:*), Bash(fp-agent:*), Bash(${FP_HOME:-.}/bin/fp-agent:*), Read
 ---
 
 # /f:prompt — adopt one, verified
@@ -12,15 +12,15 @@ allowed-tools: Bash(fp-resolve:*), Bash(bin/fp-resolve:*), Bash(fp-verify:*), Ba
 1. **Make sure this agent has an identity**, so the adoption can be attributed:
 
    ```bash
-   bin/fp-agent --ensure >/dev/null
+   ${FP_HOME:-.}/bin/fp-agent --ensure >/dev/null
    ```
 
 2. **Resolve and verify.** Pick the strictest check the house supports:
 
    ```bash
-   bin/fp-verify <id>            # managed: signature over the manifest, then digest
-   bin/fp-resolve <id> --lock    # registered: digest must match fpa.lock
-   bin/fp-resolve <id>           # otherwise: digest must match the published index
+   ${FP_HOME:-.}/bin/fp-verify <id>            # managed: signature over the manifest, then digest
+   ${FP_HOME:-.}/bin/fp-resolve <id> --lock    # registered: digest must match fpa.lock
+   ${FP_HOME:-.}/bin/fp-resolve <id>           # otherwise: digest must match the published index
    ```
 
 3. **If any of them exits non-zero, stop and report it.** A mismatch is not a
@@ -43,7 +43,7 @@ allowed-tools: Bash(fp-resolve:*), Bash(bin/fp-resolve:*), Bash(fp-verify:*), Ba
 6. **Record it**, then say in one line what changed about your behaviour:
 
    ```bash
-   bin/fp-record <id> <version> <digest> <how> <source>
+   ${FP_HOME:-.}/bin/fp-record <id> <version> <digest> <how> <source>
    ```
 
    `<how>` is `managed`, `registered` or `interactive` — whichever check

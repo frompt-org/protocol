@@ -41,14 +41,22 @@ def entries():
         for key, pat in (("url", r"\*\*URL\*\* `(\S+)`"),
                          ("digest", r"\*\*sha256\*\* `([0-9a-f]{64})`"),
                          ("ceremony", r"\*\*Ceremony\*\* `(\w+)`"),
-                         ("flow", r"\*\*flow\*\* `([a-z-]+)`")):
+                         ("flow", r"\*\*flow\*\* `([a-z-]+)`"),
+                         ("contexts", r"\*\*Contexts\*\* `([a-z, ]+)`")):
             hit = re.search(pat, line)
             if hit:
                 current[key] = hit.group(1)
     return out
 
 
+def tokens_of(value):
+    return [t.strip() for t in value.split(",") if t.strip()]
+
+
 def read(source):
+    """Return exact bytes. read_text() translates newlines, so a CRLF variant of a
+    document hashed to the same digest as its LF original and passed verification
+    -- the integrity check was checking a normalization, not the document."""
     if source.startswith(("http://", "https://")):
         import importlib.machinery
         import importlib.util
@@ -56,8 +64,8 @@ def read(source):
         spec = importlib.util.spec_from_loader("fp_lint", loader)
         fp = importlib.util.module_from_spec(spec)
         loader.exec_module(fp)
-        return fp.fetch(source)
-    return pathlib.Path(source).read_text(encoding="utf-8")
+        return fp.fetch(source).encode("utf-8")
+    return pathlib.Path(source).read_bytes()
 
 
 def main(argv):
@@ -82,18 +90,25 @@ def main(argv):
         entry = known[wanted]
         source = f"{base.rstrip('/')}/{wanted}.prompt.md" if base else entry["url"]
     elif wanted.startswith(("http://", "https://")) or pathlib.Path(wanted).exists():
-        entry, source = None, wanted
+        # Nothing vouched for these bytes, so there is nothing to verify against.
+        # Exiting 0 here meant a skill told "adopt what it printed" adopted a
+        # document no index had ever seen.
+        print(f"fp-resolve: {wanted} is not in the index, so no digest was ever published "
+              "for it. Refusing: there is nothing to verify against.\n"
+              "  Use bin/fp-adopt to read an unindexed document as a pilot, with its phrase.",
+              file=sys.stderr)
+        return 1
     else:
         print(f"fp-resolve: no prompt {wanted!r} in the index. Try --list.", file=sys.stderr)
         return 1
 
     try:
-        text = read(source)
+        raw = read(source)
     except Exception as exc:  # noqa: BLE001
         print(f"fp-resolve: cannot read {source} -- {exc}", file=sys.stderr)
         return 2
 
-    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(raw).hexdigest()
 
     # --lock is the registered context: consent was given once, to a pin, so the
     # pin is what bounds it. A prompt that moved since it was pinned is refused
@@ -110,6 +125,11 @@ def main(argv):
                 pins[pid] = (version, dg.removeprefix("sha256:"), url)
         if wanted not in pins:
             print(f"fp-resolve: {wanted!r} is not pinned in fpa.lock -- refusing", file=sys.stderr)
+            return 1
+        if "registered" not in tokens_of(entry.get("contexts", "interactive")):
+            print(f"fp-resolve: {wanted} declares contexts "
+                  f"[{entry.get('contexts', 'interactive')}] -- it is not fit for the registered "
+                  "context, so a pin does not authorize it (FPA.md AC1).", file=sys.stderr)
             return 1
         if pins[wanted][1] != digest:
             print(f"fp-resolve: {wanted} has moved since it was pinned\n"
@@ -135,7 +155,7 @@ def main(argv):
         print(record)
         return 0
     print(f"<!-- fp-resolve: {record} -->")
-    print(text)
+    sys.stdout.write(raw.decode("utf-8", "replace"))
     return 0
 
 

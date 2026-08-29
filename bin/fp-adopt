@@ -61,7 +61,19 @@ def main(argv):
             k, v = line.split(":", 1)
             fm[k.strip()] = v.strip().strip('"').strip("'")
 
-    missing = [k for k in ("id", "version", "consent", "ceremony") if k not in fm]
+    # The sentence is not in front matter by design (FPA.md C2): it is only in the
+    # final section, so composing a phrase means having read that far.
+    tail = re.split(r"^## Consent\s*$", text, maxsplit=1, flags=re.M)
+    sentence = ""
+    if len(tail) > 1:
+        fence = re.search(r"^```\s*$\n([^\n]+)\n```", tail[1], re.M)
+        if fence:
+            sentence = re.sub(rf"-{re.escape(fm.get('id', ''))}-.*$", "", fence.group(1).strip())
+    fm["consent"] = sentence
+
+    missing = [k for k in ("id", "version", "ceremony") if k not in fm]
+    if not sentence:
+        missing.append("## Consent section")
     if not text.startswith("<!-- FOREIGN-PROMPT v2 -->") or missing:
         print(f"fp-adopt: not a valid v2 foreign prompt (missing {missing or 'marker'}). "
               f"Run bin/fp-lint on it.", file=sys.stderr)

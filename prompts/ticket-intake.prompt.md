@@ -2,8 +2,8 @@
 ---
 id: ticket-intake
 version: 1.0.0
-consent: i-have-read-this-prompt-and-let-it-interview-me-and-draft-one-ticket
 ceremony: strict
+contexts: interactive
 flow: interview
 adoption: awaiting
 persistence: artifact

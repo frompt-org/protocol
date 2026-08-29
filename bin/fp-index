@@ -53,6 +53,7 @@ def rows():
             "id": fm["id"], "version": fm["version"], "ceremony": fm["ceremony"],
             "flow": fm["flow"], "allow": fm["allow"], "deny": fm["deny"],
             "contexts": fm.get("contexts", "interactive"),
+            "persistence": fm.get("persistence", "none"),
             "digest": hashlib.sha256(raw).hexdigest(), "file": path.name,
         })
     out.sort(key=lambda r: ORDER.index(r["id"]) if r["id"] in ORDER else 99)
@@ -61,13 +62,32 @@ def rows():
 
 def manifest():
     """The machine-readable half. Deterministic: no timestamps, sorted keys, so a
-    signature over it stays valid until the prompts themselves change."""
-    return json.dumps({
+    signature over it stays valid until the prompts themselves change.
+
+    `serial` is monotonic and bumps only when the prompt set changes, which gives
+    a client something to compare against. Without it, an attacker who controls
+    the serving host can replay an older bundle forever: every signature on it is
+    still perfectly valid, which is exactly what makes rollback attacks quiet.
+    """
+    body = {
         "manifest_version": 1,
         "protocol": "FOREIGN-PROMPT v2",
         "base": RAW,
         "prompts": [{k: r[k] for k in sorted(r)} for r in rows()],
-    }, indent=2, sort_keys=True) + "\n"
+    }
+    previous, serial = None, 1
+    js = ROOT / "index.json"
+    if js.exists():
+        try:
+            previous = json.loads(js.read_text())
+            serial = int(previous.get("serial", 0))
+            stale = {k: v for k, v in previous.items() if k != "serial"}
+            if stale != body or serial < 1:
+                serial += 1
+        except (json.JSONDecodeError, ValueError):
+            serial = 1
+    body["serial"] = serial
+    return json.dumps(body, indent=2, sort_keys=True) + "\n"
 
 
 def build():
@@ -91,6 +111,7 @@ def build():
                 SUMMARY.get(r["id"], ""), "",
                 f"- **URL** `{RAW}/{r['file']}`",
                 f"- **Ceremony** `{r['ceremony']}` · **flow** `{r['flow']}`",
+                f"- **Contexts** `{r['contexts']}` · **persistence** `{r['persistence']}`",
                 f"- **Capabilities** `{r['allow']}`",
                 f"- **sha256** `{r['digest']}`",
                 f"- **Phrase** `<consent-sentence>-{r['id']}-"

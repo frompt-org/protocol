@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 # fp-verify -- the managed path: verify the manifest, then a prompt against it.
 #
-#   fp-verify                       # is index.json signed by a known publisher?
-#   fp-verify <id> [--base DIR]     # ...and are these the bytes it vouched for?
+#   fp-verify                          # is the local index.json signed by a known publisher?
+#   fp-verify <id> [--base DIR]        # ...and are these the bytes it vouched for?
+#   fp-verify <id> --from <dir-or-url> # fetch the publisher's manifest, then check
+#
+# --from is what makes late binding real. Without it this reads a manifest from
+# your own checkout, so a publisher updating a prompt reaches nobody until they
+# pull -- and signing a file you already had is close to pointless. With it, the
+# manifest and the document both come from the publisher and only the trust root
+# (allowed_signers) is local, which is the one thing that must never be fetched
+# from the host it is used to check.
 #
 # Exit: 0 verified · 1 not verified · 2 cannot check (missing signature, key, tool).
 #
@@ -12,6 +20,29 @@
 set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$here"
+
+from=""
+for i in "$@"; do
+  [ "${prev:-}" = "--from" ] && from="$i"
+  prev="$i"
+done
+
+work="$here"
+if [ -n "$from" ]; then
+  [ -f allowed_signers ] || { echo "fp-verify: no local allowed_signers -- the trust root must be
+  pinned locally, never taken from the host it checks. Failing closed." >&2; exit 2; }
+  work=$(mktemp -d 2>/dev/null || echo "/tmp/fp-from-$$") || exit 2
+  mkdir -p "$work" || exit 2
+  cp allowed_signers "$work/" || exit 2
+  for f in index.json index.json.sig; do
+    if [ -f "$from/$f" ]; then
+      cp "$from/$f" "$work/$f" || { echo "fp-verify: cannot read $from/$f" >&2; exit 2; }
+    elif ! curl -fsS --max-time 20 "$from/$f" -o "$work/$f" 2>/dev/null; then
+      echo "fp-verify: cannot fetch $from/$f -- cannot verify, failing closed" >&2; exit 2
+    fi
+  done
+  cd "$work" || exit 2
+fi
 
 for f in index.json index.json.sig allowed_signers; do
   [ -f "$f" ] || { echo "fp-verify: missing $f -- cannot verify, failing closed" >&2; exit 2; }
@@ -30,17 +61,47 @@ echo "manifest verified: index.json signed by $signer"
 [ $# -gt 0 ] && [ "${1#-}" = "$1" ] || exit 0
 id="$1"; shift
 base=""
-[ "${1:-}" = "--base" ] && base="$2"
+if [ "${1:-}" = "--base" ]; then
+  # ${2:-} not $2: with set -u a missing value crashed the script and exited 1,
+  # which on the managed path reads as "not verified" rather than "cannot check".
+  base="${2:-}"
+  if [ -z "$base" ]; then
+    echo "fp-verify: --base given without a directory -- cannot check, failing closed" >&2
+    exit 2
+  fi
+fi
 
-python3 - "$id" "$base" <<'PY'
+python3 - "$id" "$base" "$here" "$from" <<'PY'
 import hashlib, json, pathlib, sys, urllib.request
-wanted, base = sys.argv[1], sys.argv[2]
+wanted, base, root, origin = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3]), sys.argv[4]
 manifest = json.load(open("index.json"))
+# Freshness: a signed manifest older than the last one seen is a replay, and every
+# signature on it verifies. The floor is what makes that detectable.
+seen = root / ".fpa" / "manifest-serial"
+serial = int(manifest.get("serial", 0))
+if seen.exists():
+    try:
+        floor = int(seen.read_text().strip())
+    except ValueError:
+        floor = 0
+    if serial < floor:
+        print(f"fp-verify: manifest serial {serial} is older than {floor}, already seen here.\n"
+              "  A validly signed but stale manifest is a rollback. Refusing.", file=sys.stderr)
+        sys.exit(1)
+seen.parent.mkdir(parents=True, exist_ok=True)
+seen.write_text(str(serial) + "\n")
 entry = next((p for p in manifest["prompts"] if p["id"] == wanted), None)
 if entry is None:
     print(f"fp-verify: {wanted!r} is not in the signed manifest -- refusing", file=sys.stderr)
     sys.exit(1)
-src = f"{base.rstrip('/')}/{entry['file']}" if base else f"{manifest['base']}/{entry['file']}"
+# A fetched manifest names where its own documents live; prefer that over the
+# base baked into whatever copy happened to be on disk.
+if base:
+    src = f"{base.rstrip('/')}/{entry['file']}"
+elif origin:
+    src = f"{origin.rstrip('/')}/prompts/{entry['file']}"
+else:
+    src = f"{manifest['base']}/{entry['file']}"
 try:
     raw = (pathlib.Path(src).read_bytes() if not src.startswith("http")
            else urllib.request.urlopen(src, timeout=15).read())
@@ -52,6 +113,10 @@ if got != entry["digest"]:
     print(f"fp-verify: DIGEST MISMATCH for {wanted}\n  manifest {entry['digest']}\n"
           f"  fetched  {got}\n  source   {src}\nRefusing.", file=sys.stderr)
     sys.exit(1)
+if "managed" not in [c.strip() for c in entry["contexts"].split(",")]:
+    print(f"fp-verify: {wanted} declares contexts [{entry['contexts']}] -- it is not fit for the "
+          "managed context, so a signature does not authorize it (FPA.md AC1).", file=sys.stderr)
+    sys.exit(1)
 print(f"authorized: {wanted} v{entry['version']} digest {got[:12]} "
-      f"contexts [{entry['contexts']}] source {src}")
+      f"contexts [{entry['contexts']}] serial {serial} source {src}")
 PY

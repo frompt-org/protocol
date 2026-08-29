@@ -213,7 +213,7 @@ A skill that *contains* instructions is a copy: installed, versioned by whoever 
    Refusing.
 ```
 
-Step 3 is the promise: one prompt at one URL, every agent current, **nothing deployed to anyone**. Step 4 is what keeps "always current" from meaning "whatever anyone put there this morning" — the resolver checks the fetched bytes against the digest the index published, and a mismatch is a refusal, not a warning.
+Step 3 is the promise: one prompt at one URL, every agent current, **nothing deployed to anyone** — and it only holds because the manifest is fetched too. A client reading digests out of its own checkout is not late-bound at all; it is pinned to whenever it last pulled. Step 4 is what keeps "always current" from meaning "whatever anyone put there this morning" — the resolver checks the fetched bytes against the digest the index published, and a mismatch is a refusal, not a warning.
 
 The ceremony is gone in this mode, deliberately: the pilot consented once, by installing the skill. What replaces it is the **adoption record** — id, version, digest, source — because the pilot never read the document and that line is the only account of what is steering them.
 
@@ -233,13 +233,19 @@ Re-pin deliberately with 'bin/fp-lock --update' if that is what you want.
 
 Pinning is not safer than floating by itself. It makes the choice **a line somebody reviews** instead of an event nobody sees.
 
-**`managed`** — no human at all. `index.json` is a deterministic manifest, signed with `ssh-keygen -Y`; `allowed_signers` and `index.json.sig` ship beside it. `fp-verify` checks the signature, then checks the fetched bytes against the digest the signed manifest carries:
+**`managed`** — no human at all. `index.json` is a deterministic manifest carrying a monotonic serial, signed with `ssh-keygen -Y`. `fp-verify --from <publisher>` **fetches the manifest and the document from the publisher** and checks both against a trust root held locally:
 
 ```
-$ bin/fp-verify pr-review
+$ bin/fp-verify repo-recon --from https://prompts.example.org
 manifest verified: index.json signed by foreign-prompts-publisher
-authorized: pr-review v1.2.0 digest 7f364c1f8cd4 contexts [interactive, registered, managed]
+authorized: repo-recon v1.0.0 digest 1f79578951aa contexts [interactive, registered, managed] serial 6
 ```
+
+Three things have to hold, and each one closes an attack that the others do not:
+
+- **The trust root is local.** `allowed_signers` is never fetched from the host it is used to check — a signer list taken from the same place as the signature proves only that the two agree with each other.
+- **The serial is monotonic.** Every signature on last month's manifest is still perfectly valid, so replaying one is a rollback that needs no key. A client refuses a serial below the highest it has accepted.
+- **Digests cover bytes.** Reading a document as text first normalizes line endings, and a CRLF copy then hashes identical to its LF original while differing byte for byte.
 
 **A digest proves the bytes are the bytes you expected; only a signature proves who expected them.** That is why the manifest is signed and the documents are not — one signature covers the set, and revocation is dropping an entry rather than reaching every agent.
 

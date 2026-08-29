@@ -94,7 +94,9 @@ render() {
   author_esc=$(printf '%s' "$author" | sed 's/[&/\\]/\\&/g')
   # Read the sentence to replace out of the template itself. Hard-coding it meant
   # that when the template's default changed, -c became a silent no-op.
-  default_consent=$(sed -n 's/^consent: //p' "$template" | head -1)
+  # The template carries its sentence only in its ## Consent section now.
+  default_consent=$(awk '/^## Consent/{f=1} f && /^i-/{print; exit}' "$template" \
+                    | sed 's/-my-prompt-.*$//')
   if [ -z "$default_consent" ]; then
     echo "fp-new: template has no 'consent:' line to substitute" >&2; return 1
   fi

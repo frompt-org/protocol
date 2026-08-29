@@ -2,8 +2,8 @@
 ---
 id: help-me
 version: 1.0.0
-consent: i-have-read-this-prompt-and-let-it-question-my-agent-and-propose-a-route
 ceremony: standard
+contexts: interactive
 flow: interview
 adoption: immediate
 persistence: none

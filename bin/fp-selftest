@@ -45,7 +45,7 @@ probe() { # probe <name> [expected-exit] <sed program applied to the template>
 }
 probe "unknown capability token"        's|^allow: .*|allow: read:everything|'
 probe "capability in both allow and deny" 's|^allow: .*|allow: read:files, write:files|'
-probe "consent that is a bare verb"     's|^consent: .*|consent: run|'
+probe "consent sentence still in front matter" 's|^ceremony: .*|ceremony: standard\nconsent: i-have-read-this-and-accept-it|'
 probe "malformed semver"                's|^version: .*|version: 1x.2y.3z|'
 probe "missing marker"                  '1d'
 probe "unknown flow"                    's|^flow: .*|flow: freestyle|'
@@ -86,9 +86,9 @@ check "fp-new rejects a bare word as a consent sentence" 2 $?
 # Capture first: piping straight into `grep -q` kills the writer with SIGPIPE and
 # reports 141, which is neither pass nor fail but looked like both.
 scaffolded=$("$new" demo -c i-have-read-this-and-want-my-work-picked-apart --author ci 2>/dev/null)
-printf '%s' "$scaffolded" | grep -q "^consent: i-have-read-this-and-want-my-work-picked-apart$"
+printf '%s' "$scaffolded" | grep -q "^i-have-read-this-and-want-my-work-picked-apart"
 check "fp-new -c actually replaces the template's consent sentence" 0 $?
-default_sentence=$(sed -n 's/^consent: //p' "$tmpl" | head -1)
+default_sentence=$(awk '/^## Consent/{f=1} f && /^i-/{print; exit}' "$tmpl")
 printf '%s' "$scaffolded" | grep -q "$default_sentence" && keep=1 || keep=0
 check "fp-new output does not keep the template's default sentence" 0 "$keep"
 TMPDIR=/nonexistent-on-purpose "$new" demo-loop -c i-have-read-this-and-accept-what-it-does \
@@ -106,10 +106,12 @@ sed 's|^allow: .*|allow: none|' "$tmpl" | "$lint" -q - >/dev/null 2>&1
 check "a prompt needing no capability can say 'none'" 0 $?
 awk '{if ($0=="## Envelope") print "~~~"; print}' "$tmpl" | "$lint" -q - >/dev/null 2>&1
 check "probe: an unclosed code fence is a finding" 1 $?
-sed 's|^consent: .*|consent: adopt-this-now-without-thinking-about-it|' "$tmpl" | "$lint" -q - >/dev/null 2>&1
+awk '/^## Consent/{c=1} c && /^i-/{sub(/^i-/, "adopt-"); } {print}' "$tmpl" | "$lint" -q - >/dev/null 2>&1
 check "probe: a consent sentence opening with a forbidden verb" 1 $?
-sed 's|^consent: .*|consent: i-have-read-this-and-accept-what-it-does-to-my-agent|' "$tmpl" | "$lint" -q - >/dev/null 2>&1
-check "a first-person consent sentence is accepted" 0 $?
+awk '{print} END{}' "$tmpl" | "$lint" -q - >/dev/null 2>&1
+check "the template's own consent section is accepted" 0 $?
+awk '/^## Consent/{exit} {print}' "$tmpl" | "$lint" -q - >/dev/null 2>&1
+check "probe: a prompt with no Consent section at all" 1 $?
 sed -e 's|^ceremony: .*|ceremony: light|' -e 's|^allow: .*|allow: read:files, write:files|' \
     -e 's|^deny: write:files, |deny: |' "$tmpl" | "$lint" -q - >/dev/null 2>&1
 check "probe: ceremony light on a prompt that writes (CE1)" 1 $?
@@ -248,6 +250,75 @@ PY
 check "the plugin manifest and its three skills are well formed" 0 $?
 bash "$here/plugin/hooks/session-start.sh" >/dev/null 2>&1 </dev/null
 check "the session-start hook runs and reports context" 0 $?
+
+# --- integrity: the digest must cover bytes, not a normalization --------------
+crlf=$(mktemp -d 2>/dev/null || echo "/tmp/fp-crlf-$$"); mkdir -p "$crlf"
+python3 - "$here" "$crlf" <<'PY'
+import pathlib, sys
+raw = (pathlib.Path(sys.argv[1]) / "prompts" / "pr-review.prompt.md").read_bytes()
+(pathlib.Path(sys.argv[2]) / "pr-review.prompt.md").write_bytes(raw.replace(b"\n", b"\r\n"))
+PY
+"$here/bin/fp-resolve" pr-review --base "$crlf" --record >/dev/null 2>&1
+check "a CRLF variant does not pass as its LF original" 1 $?
+rm -rf "$crlf"
+
+"$here/bin/fp-resolve" "$here/README.md" --record >/dev/null 2>&1
+check "fp-resolve refuses bytes nothing ever vouched for" 1 $?
+
+# --- context fitness: a pin and a signature only authorize what fits ----------
+"$here/bin/fp-resolve" help-me --base "$here/prompts" --lock --record >/dev/null 2>&1
+check "a pin does not authorize an interactive-only prompt" 1 $?
+"$here/bin/fp-verify" help-me --base "$here/prompts" >/dev/null 2>&1 </dev/null
+check "a signature does not authorize an interactive-only prompt" 1 $?
+"$here/bin/fp-verify" pr-review --base >/dev/null 2>&1 </dev/null
+check "fp-verify exits 2 when it cannot check, not 1" 2 $?
+
+# --- late binding: the manifest comes from the publisher ---------------------
+pub=$(mktemp -d 2>/dev/null || echo "/tmp/fp-pub-$$"); mkdir -p "$pub/prompts"
+cp "$here"/index.json "$here"/index.json.sig "$pub/"
+cp "$here"/prompts/*.prompt.md "$pub/prompts/"
+"$here/bin/fp-verify" repo-recon --from "$pub" >/dev/null 2>&1 </dev/null
+check "fp-verify --from fetches a publisher manifest and authorizes against it" 0 $?
+printf '\n<!-- unsigned change -->\n' >> "$pub/prompts/repo-recon.prompt.md"
+"$here/bin/fp-verify" repo-recon --from "$pub" >/dev/null 2>&1 </dev/null
+check "fp-verify --from refuses a document the fetched manifest did not vouch for" 1 $?
+rm -rf "$pub"
+
+# --- freshness: a validly signed but older manifest is a replay --------------
+if [ -f "$here/.fpa/signing_key" ]; then
+  old=$(mktemp -d 2>/dev/null || echo "/tmp/fp-old-$$"); mkdir -p "$old/prompts"
+  cp "$here"/index.json "$old/index.json"; cp "$here"/index.json.sig "$old/index.json.sig"
+  cp "$here"/prompts/*.prompt.md "$old/prompts/"
+  "$here/bin/fp-verify" repo-recon --from "$old" >/dev/null 2>&1 </dev/null
+  # Advance the serial with a scratch prompt of our own, never by editing a
+  # tracked one. An earlier version bumped a real prompt and restored it with
+  # git checkout, which discarded uncommitted work -- the same footgun fp-demo
+  # had, in a new place. A check that damages the tree is not a check.
+  scratch="$here/prompts/zz-selftest-scratch.prompt.md"
+  "$new" zz-selftest-scratch -c i-exist-only-to-advance-the-manifest-serial --author selftest \
+    > "$scratch" 2>/dev/null
+  (cd "$here" && bin/fp-index >/dev/null && bin/fp-sign </dev/null >/dev/null && \
+     bin/fp-verify repo-recon --base ./prompts >/dev/null 2>&1 </dev/null)
+  "$here/bin/fp-verify" repo-recon --from "$old" >/dev/null 2>&1 </dev/null
+  check "a validly signed but older manifest is refused as a rollback" 1 $?
+  rm -f "$scratch"
+  (cd "$here" && bin/fp-index >/dev/null && bin/fp-lock >/dev/null && bin/fp-sign </dev/null >/dev/null)
+  rm -rf "$old"
+else
+  echo "skip -- no signing key; rollback check needs one"
+fi
+
+# --- the lock pins only what declares the registered context -----------------
+python3 - "$here" <<'PY' >/dev/null 2>&1
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+pinned = {l.split()[0] for l in (root / "fpa.lock").read_text().splitlines()
+          if l.strip() and not l.startswith("#")}
+fit = {p["id"] for p in json.loads((root / "index.json").read_text())["prompts"]
+       if "registered" in [c.strip() for c in p["contexts"].split(",")]}
+assert pinned == fit, f"{pinned ^ fit} differ"
+PY
+check "fpa.lock pins exactly the prompts fit for the registered context" 0 $?
 
 # --- docs integrity ----------------------------------------------------------
 "$here/bin/fp-docscheck" "$here" >/dev/null 2>&1

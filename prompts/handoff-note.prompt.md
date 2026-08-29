@@ -2,8 +2,8 @@
 ---
 id: handoff-note
 version: 1.1.0
-consent: i-have-read-this-prompt-and-authorise-it-to-write-one-handoff-file
 ceremony: strict
+contexts: interactive
 flow: linear
 adoption: one-shot
 persistence: artifact

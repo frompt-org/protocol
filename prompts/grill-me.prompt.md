@@ -2,8 +2,8 @@
 ---
 id: grill-me
 version: 1.0.0
-consent: i-have-read-this-prompt-and-want-my-idea-attacked-not-encouraged
 ceremony: light
+contexts: interactive, registered
 flow: rubric
 adoption: awaiting
 persistence: none

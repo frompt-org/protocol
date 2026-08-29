@@ -2,7 +2,7 @@
 name: find
 description: Find a foreign prompt to adopt. Use when the user asks what prompts are available, wants one for a task ("something for security review", "a prompt that maps a repo"), types /f:find, or names a capability rather than an id.
 user-invocable: true
-allowed-tools: Bash(fp-resolve:*), Bash(bin/fp-resolve:*), Bash(fp-verify:*), Bash(bin/fp-verify:*), Read
+allowed-tools: Bash(fp-resolve:*), Bash(${FP_HOME:-.}/bin/fp-resolve:*), Bash(fp-verify:*), Bash(${FP_HOME:-.}/bin/fp-verify:*), Read
 ---
 
 # /f:find — what this house publishes
@@ -15,7 +15,7 @@ anything; it reads the manifest and reports candidates.
 1. List what is published:
 
    ```bash
-   bin/fp-resolve --list
+   ${FP_HOME:-.}/bin/fp-resolve --list
    ```
 
 2. Match the user's words against the ids and the one-line descriptions in

@@ -41,14 +41,14 @@ A URL proves nothing; anyone can put one in front of an agent. A **confirmation 
 
 | Part | Source | Proves |
 |---|---|---|
-| **1. consent sentence** | chosen by the author, published in the document | the pilot reached the document and read a sentence stating what they are about to do |
+| **1. consent sentence** | chosen by the author, published **only in the document's final section** | the pilot reached the end of the document |
 | **2. prompt id** | the document's `id` | which prompt, distinct from every other |
 | **3. digest** | **computed, never published in the document** | the pilot possessed these exact bytes |
 
 The third part cannot be embedded: adding a hash to a document changes its hash. It is computed by the pilot, or conveyed out of band — which is the point, because computing it is work that copy-paste does not do.
 
-- **C1.** Every prompt **MUST** declare `consent`, a sentence in `[a-z][a-z0-9-]{15,119}` form.
-- **C2.** The consent sentence **MUST** be specific to this prompt, and **SHOULD** differ between versions. A protocol-wide standard sentence would become muscle memory, and muscle memory is the thing ceremony exists to prevent.
+- **C1.** Every prompt **MUST** carry a consent sentence, `[a-z][a-z0-9-]{15,119}`, in a final `## Consent` section.
+- **C2.** The sentence **MUST NOT** appear in front matter or anywhere before that section. A sentence published at the top is reachable without reading anything, and reaching it is the only thing it proves. It **MUST** be specific to this prompt and **SHOULD** differ between versions: a protocol-wide standard sentence becomes muscle memory, which is what ceremony exists to prevent.
 - **C3.** The sentence **SHOULD** state, in the first person, what the pilot is agreeing to, so that pasting it without reading feels wrong to a sane pilot. It is a speech act, not a token.
 - **C4.** TART **MUST NOT** adopt a document unless the pilot supplied that document's phrase, at the ceremony the document declares, in this conversation.
 - **C5.** **When a digest part is present, TART MUST recompute SHA-256 over the exact bytes it fetched and refuse on mismatch.** This is the only rule in this spec that needs no goodwill, and it is the one that catches a server showing the pilot one document and the agent another.
@@ -66,7 +66,7 @@ How much proof a prompt demands of its own pilot is **the author's choice**, dec
 | `standard` | consent + id + 7-hex digest | anything that acts |
 | `strict` | consent + id + full 64-hex digest | writes, network, anything irreversible |
 
-- **CE1.** A prompt whose `allow` contains `write:files`, `vcs:push`, `net:post` or `pkg:install` **MUST NOT** declare `ceremony: light`.
+- **CE1.** A prompt whose `allow` contains `write:files`, `write:artifact`, `vcs:commit`, `vcs:push`, `net:get`, `net:post` or `pkg:install` **MUST NOT** declare `ceremony: light`. `net:get` is on that list because a prompt that fetches is a prompt that can hand your agent something nobody vouched for.
 - **CE2.** How the pilot obtains the digest is **not specified**. Compute it by hand, use tooling you trust, take it out of band. An author **MAY** ship a command that composes the whole phrase; that trades friction for convenience, and it is their prompt.
 - **CE3.** TART **MUST** verify what is present (C5). It **MUST NOT** invent ceremony the document did not ask for, nor accept less.
 
@@ -82,8 +82,9 @@ A phrase is the mode-1 instrument: a human, at a keyboard, adopting one document
 
 - **AC1.** A prompt **MAY** declare `contexts` — a comma-separated subset of `interactive`, `registered`, `managed`. Default: `interactive` only. A prompt that acts irreversibly has no business defaulting into unattended use.
 - **AC2.** In `registered`, consent is given once and covers future fetches, so the pin is what bounds it. `float` (URL only) accepts whatever is served next; `version` accepts a bump; `digest` freezes. An implementation **SHOULD** record which pin a registration used, because that is the entire content of what the pilot agreed to.
-- **AC3.** In `managed`, no per-adoption human act exists at all. Authorization comes from a **signed manifest** — id, version, digest, URL, and any role scoping — and the runtime agent **MUST** verify that the digest of what it fetched appears in that manifest. A digest proves the bytes are the expected bytes; only a signature proves who expected them, which is why a manifest is signed and a document is not.
+- **AC3.** In `managed`, no per-adoption human act exists at all. The manifest is **fetched from the publisher and verified against a locally held trust root**; reading a manifest out of one's own checkout means a publisher's update reaches nobody, and signing a file one already possessed proves little. Authorization comes from a **signed manifest** — id, version, digest, URL, and any role scoping — and the runtime agent **MUST** verify that the digest of what it fetched appears in that manifest. A digest proves the bytes are the expected bytes; only a signature proves who expected them, which is why a manifest is signed and a document is not.
 - **AC4.** In `managed`, an agent that cannot reach or verify the manifest **MUST** fail closed. Falling back to an unsigned fetch converts a policy boundary into a suggestion at exactly the moment it matters.
+- **AC4b.** A pin or a signature authorizes only a prompt whose `contexts` includes that context. A prompt that never offered itself for unattended use does not acquire it by being listed in a lock file or a manifest.
 - **AC5.** Whatever the context, the runtime agent **MUST** be able to report an **adoption record**: id, version, source, digest, and how it was authorized. In `interactive` the pilot read the document; in the other two they did not, so the record is the only account of what is steering them.
 
 ### The manifest
@@ -94,7 +95,10 @@ A phrase is the mode-1 instrument: a human, at a keyboard, adopting one document
 - **M2.** It carries, per prompt: `id`, `version`, `digest`, `file`, `ceremony`, `contexts`, `allow`, `deny`. Enough to decide whether to adopt without fetching, and enough to verify after.
 - **M3.** A **lock file** pins a subset of it: id, version, digest, URL. An agent resolving a pinned prompt **MUST** refuse bytes whose digest is not the pinned one, and re-pinning **SHOULD** be a reviewed change rather than an automatic one. Pinning is not safer than floating in itself — it makes the choice a line somebody reviews instead of an event nobody sees.
 - **M4.** In `managed`, the manifest is **signed** and the documents are not. Each document's digest lives inside the signed manifest, so one signature covers the whole set, and revocation is dropping an entry rather than reaching every agent.
-- **M5.** A lock check **MUST** compare against the prompt bytes, not against the manifest. A manifest can be stale, and a check that trusts a stale manifest reports agreement about a document that has already moved.
+- **M5.** A lock check **MUST** compare against the prompt bytes, not against the manifest, and **MUST** compare version and origin as well as digest. A manifest can be stale, and a check that trusts a stale manifest reports agreement about a document that has already moved.
+- **M6.** A manifest **MUST** carry a monotonic `serial`, and a client **MUST** refuse one lower than the highest it has already accepted. Every signature on an old bundle is still perfectly valid, so replaying one is a rollback that needs no key — freshness is the only thing that makes it visible.
+- **M7.** The trust root — the public key or `allowed_signers` file — **MUST** be held locally and **MUST NOT** be fetched from the host it is used to check. A signer list taken from the same place as the signature proves only that they agree with each other.
+- **M8.** Digests **MUST** be computed over the exact bytes fetched. Reading a document as text first normalizes line endings, and a CRLF copy of a document then hashes identical to its LF original while differing byte for byte.
 
 The manifest is also the deployment unit. Rollback is serving the previous manifest; staged rollout is different manifests for different rings; revocation is dropping an entry. None of that is in this spec — it belongs to whoever operates the fleet — but it is why §15 keys attestations by digest rather than by URL.
 
@@ -112,7 +116,6 @@ Lines 2..N **MUST** be a `---`-fenced block of flat `key: value` pairs. No nesti
 |---|---|---|
 | `id` | yes | Stable slug, `[a-z0-9-]+`. Part 2 of the phrase. |
 | `version` | yes | Semver. |
-| `consent` | yes | Part 1 of the phrase (§1). |
 | `ceremony` | yes | `light`, `standard` or `strict`. |
 | `flow` | yes | The shape of its work (§3). |
 | `expiry` | yes | When it ends (§7). |
@@ -135,7 +138,7 @@ Four sections, in this order, with at least one section of the prompt's own betw
 3. `## Handshake` — the computed line.
 4. `## Expiry` — when TART stops.
 
-A prompt **SHOULD** close with a `## Consent` section carrying its consent sentence and whatever the author wants to say about obtaining the digest. Putting it last is the point: a phrase you can only reach by traversing the document.
+A prompt **MUST** close with a `## Consent` section carrying its consent sentence, and whatever the author wants to say about obtaining the digest. Last, and nowhere else: a phrase you can only reach by traversing the document. The sentence is the first fenced line of that section; anything the pilot composes onto it — the id, the digest — is not part of what the document declares.
 
 Headings inside code fences or HTML comments are not structure.
 
@@ -284,7 +287,6 @@ The marker carries the protocol version; front matter carries the prompt version
 ---
 id: my-prompt
 version: 1.0.0
-consent: i-have-read-this-prompt-and-accept-that-it-will-steer-my-agent
 ceremony: standard
 flow: linear
 adoption: awaiting
@@ -294,4 +296,16 @@ envelope: strict
 allow: read:files, run:shell-ro
 deny: write:files, vcs:push, net:post, secrets:read, pkg:install
 ---
+```
+
+…and closes with:
+
+```markdown
+## Consent
+
+Adopt this prompt by sending this phrase with the URL:
+
+​```
+i-have-read-this-prompt-and-accept-that-it-will-steer-my-agent-my-prompt-<digest>
+​```
 ```

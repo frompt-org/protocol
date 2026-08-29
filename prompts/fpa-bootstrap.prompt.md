@@ -2,8 +2,8 @@
 ---
 id: fpa-bootstrap
 version: 2.0.0
-consent: i-have-read-this-prompt-and-let-it-teach-my-agent-the-adoption-protocol
 ceremony: standard
+contexts: interactive, registered, managed
 flow: linear
 adoption: awaiting
 persistence: none

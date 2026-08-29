@@ -2,8 +2,8 @@
 ---
 id: welcome-tour
 version: 1.0.0
-consent: i-have-read-this-prompt-and-let-a-company-guide-my-agent-through-its-services
 ceremony: standard
+contexts: interactive
 flow: state-machine
 adoption: immediate
 persistence: none

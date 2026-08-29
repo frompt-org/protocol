@@ -28,8 +28,12 @@ import sys
 MARKER = "<!-- FOREIGN-PROMPT v2 -->"
 MAX_BYTES = 256 * 1024
 
-REQUIRED_KEYS = ["id", "version", "consent", "ceremony", "flow", "expiry", "envelope", "allow", "deny"]
+REQUIRED_KEYS = ["id", "version", "ceremony", "flow", "expiry", "envelope", "allow", "deny"]
 OPTIONAL_KEYS = ["adoption", "persistence", "contexts", "requires", "author"]
+
+# The consent sentence lives ONLY in the final "## Consent" section, never in front
+# matter. It was in both, and the spec claimed a phrase "you can only reach by
+# traversing the document" while every prompt published it on line 5.
 
 # FPA.md AC1. Unattended use is opt-in: a prompt that acts has no business
 # defaulting into a context where nobody is watching it start.
@@ -60,7 +64,8 @@ CAPABILITIES = {
 SHOULD_DENY = ["secrets:read", "net:post"]
 
 # Capabilities whose consequences outrun a consent sentence on its own (FPA.md CE1).
-ACTS = {"write:files", "vcs:push", "vcs:commit", "net:post", "pkg:install"}
+ACTS = {"write:files", "write:artifact", "vcs:commit", "vcs:push",
+        "net:get", "net:post", "pkg:install"}
 
 AXES = {
     "ceremony": {"light", "standard", "strict"},
@@ -186,6 +191,24 @@ def parse_front_matter(lines):
     return fm, errors
 
 
+def consent_sentence(text, pid):
+    """The sentence, read out of the '## Consent' section's first fenced line.
+
+    Everything after it in the phrase -- the id, the digest -- is composed by the
+    pilot, so it is stripped here: what the document declares is the sentence.
+    """
+    tail = re.split(r"^## Consent\s*$", text, maxsplit=1, flags=re.M)
+    if len(tail) < 2:
+        return ""
+    fence = re.search(r"^```\s*$\n([^\n]+)\n```", tail[1], re.M)
+    if not fence:
+        return ""
+    line = fence.group(1).strip()
+    if pid:
+        line = re.sub(rf"-{re.escape(pid)}-.*$", "", line)
+    return line
+
+
 def tokens(value):
     return [t.strip() for t in value.split(",") if t.strip()]
 
@@ -236,7 +259,14 @@ def lint(text, name):
         if axis in fm and fm[axis] not in allowed:
             err(f"front matter: {axis} must be one of {sorted(allowed)}, got {fm[axis]!r}")
 
-    phrase = fm.get("consent", "")
+    if "consent" in fm:
+        err("front matter: 'consent' does not belong here -- the sentence lives only in the "
+            "final '## Consent' section, or reaching the end of the document proves nothing "
+            "(FPA.md C2)")
+
+    phrase = consent_sentence(text, fm.get("id", ""))
+    if not phrase:
+        err("body: no consent sentence found in a '## Consent' section (FPA.md C1)")
     if phrase:
         if not re.fullmatch(r"[a-z][a-z0-9-]{15,119}", phrase):
             err(f"front matter: consent {phrase!r} must match [a-z][a-z0-9-]{{15,119}} (FPA.md C1) -- "
@@ -345,16 +375,16 @@ def lint(text, name):
 
     heads = [h for h, _ in seen]
     if "## Consent" not in heads:
-        warn("body: no '## Consent' section; a prompt should close with the sentence its pilot must "
-             "type, and closing with it is what makes reaching it mean something (FPA.md 2.3)")
+        err("body: no '## Consent' section -- a prompt MUST close with the sentence its pilot "
+            "types, because reaching it is what the sentence proves (FPA.md 2.3)")
     elif heads[-1] != "## Consent":
-        warn(f"body: '## Consent' is not the last section ({heads[-1]!r} follows it); a phrase reachable "
-             "without traversing the document proves less (FPA.md 2.3)")
+        err(f"body: '## Consent' is not the last section ({heads[-1]!r} follows it); a phrase "
+            "reachable without traversing the document proves nothing (FPA.md 2.3)")
     # Front matter declares the sentence; that is not the body advertising it early.
     body_only = text.split("\n---\n", 2)[-1]
     if phrase and phrase in body_only.split("## Consent", 1)[0]:
-        warn("body: the consent sentence appears before the '## Consent' section, so a reader can "
-             "take it without reaching the end")
+        err("body: the consent sentence appears before the '## Consent' section, so a reader can "
+            "take it without reaching the end -- which is the only thing it proves")
 
     if "TART" not in text:
         warn("body: never addresses TART; a foreign prompt should speak to the runtime agent directly")

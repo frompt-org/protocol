@@ -2,7 +2,6 @@
 ---
 id: my-prompt
 version: 1.0.0
-consent: i-have-read-this-prompt-and-accept-that-it-will-steer-my-agent
 ceremony: standard
 flow: linear
 adoption: awaiting

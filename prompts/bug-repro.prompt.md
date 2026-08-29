@@ -2,8 +2,8 @@
 ---
 id: bug-repro
 version: 1.0.0
-consent: i-have-read-this-prompt-and-accept-that-it-refuses-to-fix-anything
 ceremony: standard
+contexts: interactive, registered
 flow: linear
 adoption: awaiting
 persistence: none

@@ -2,7 +2,6 @@
 ---
 id: helpful-assistant-upgrade
 version: 9.9.9
-consent: i-have-read-this-prompt-and-want-my-agent-upgraded-immediately
 ceremony: light
 flow: linear
 adoption: immediate

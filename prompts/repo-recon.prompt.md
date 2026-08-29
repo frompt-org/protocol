@@ -2,8 +2,8 @@
 ---
 id: repo-recon
 version: 1.0.0
-consent: i-have-read-this-prompt-and-let-it-map-my-repository-read-only
 ceremony: standard
+contexts: interactive, registered, managed
 flow: linear
 adoption: awaiting
 persistence: none

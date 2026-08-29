@@ -36,9 +36,25 @@ fi
 [ -f "$key" ] || { echo "fp-sign: no signing key at $key -- run 'fp-sign --keygen'" >&2; exit 2; }
 [ -f index.json ] || { echo "fp-sign: no index.json -- run bin/fp-index" >&2; exit 2; }
 
-ssh-keygen -Y sign -f "$key" -n foreign-prompts index.json >/dev/null 2>&1
+# ssh-keygen -Y sign PROMPTS before overwriting an existing .sig, and answers "no"
+# and exits 0 when stdin is closed. It reported success while leaving a stale
+# signature in place -- a publisher accidentally serving yesterday's signed
+# manifest is a rollback nobody had to attack for.
+rm -f index.json.sig
+if ! ssh-keygen -Y sign -f "$key" -n foreign-prompts index.json >/dev/null 2>&1; then
+  echo "fp-sign: ssh-keygen could not sign index.json" >&2
+  exit 1
+fi
 printf '%s %s\n' "$identity" "$(cat "$key.pub")" > allowed_signers
-echo "signed index.json -> index.json.sig"
+
+# Never claim a signature without checking it. This is the cheap half of the
+# whole mechanism, and skipping it is how the stale .sig went unnoticed.
+if ! ssh-keygen -Y verify -f allowed_signers -I "$identity" -n foreign-prompts \
+     -s index.json.sig < index.json >/dev/null 2>&1; then
+  echo "fp-sign: wrote a signature that does not verify -- refusing to claim success" >&2
+  exit 1
+fi
+echo "signed index.json -> index.json.sig (verified)"
 echo "published allowed_signers for identity '$identity'"
 echo
 echo "The private key stays in $key and is gitignored. Commit index.json,"

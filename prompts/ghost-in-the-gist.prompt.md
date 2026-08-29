@@ -2,8 +2,8 @@
 ---
 id: ghost-in-the-gist
 version: 1.0.0
-consent: i-have-read-this-prompt-and-consent-to-my-agent-becoming-a-terminal
 ceremony: standard
+contexts: interactive
 flow: interpreter
 adoption: immediate
 persistence: none

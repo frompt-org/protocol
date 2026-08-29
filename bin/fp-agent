@@ -35,11 +35,19 @@ def mint():
 
 
 def load():
+    """Return the stored identity only if it belongs to this session.
+
+    One identity reused forever makes an audit trail that cannot distinguish
+    today's adoptions from last month's, which is most of what an audit trail is
+    for.
+    """
     if STORE.exists():
         try:
-            return json.loads(STORE.read_text())
+            stored = json.loads(STORE.read_text())
         except json.JSONDecodeError:
-            pass
+            return None
+        if stored.get("session") == mint()["session"]:
+            return stored
     return None
 
 

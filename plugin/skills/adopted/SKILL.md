@@ -2,7 +2,7 @@
 name: adopted
 description: Show what this agent has adopted — id, version, digest, how it was authorized, and when. Use when the user asks what is adopted, what is steering the agent, what was run, or types /f:adopted.
 user-invocable: true
-allowed-tools: Bash(fp-record:*), Bash(bin/fp-record:*), Bash(fp-agent:*), Bash(bin/fp-agent:*)
+allowed-tools: Bash(fp-record:*), Bash(${FP_HOME:-.}/bin/fp-record:*), Bash(fp-agent:*), Bash(${FP_HOME:-.}/bin/fp-agent:*)
 ---
 
 # /f:adopted — the record
@@ -13,8 +13,8 @@ did, so this is the whole account of what is running.
 ## Steps
 
 ```bash
-bin/fp-agent          # who this agent is
-bin/fp-record --list  # what it has adopted; add --all for every agent here
+${FP_HOME:-.}/bin/fp-agent          # who this agent is
+${FP_HOME:-.}/bin/fp-record --list  # what it has adopted; add --all for every agent here
 ```
 
 Report, in a short table: id and version, the first 12 of the digest, how it was

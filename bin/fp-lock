@@ -65,6 +65,14 @@ def current():
     return out
 
 
+def registered_ids():
+    """Only prompts declaring `registered` may be pinned. A pin is consent given
+    once for unattended reuse, and a prompt that never offered itself for that
+    should not acquire it by being listed."""
+    return {p["id"] for p in manifest()["prompts"]
+            if "registered" in [c.strip() for c in p.get("contexts", "").split(",")]}
+
+
 def parse():
     if not LOCK.exists():
         return {}
@@ -111,12 +119,19 @@ def main(argv):
             print("fp-lock: no fpa.lock -- nothing is pinned", file=sys.stderr)
             return 1
         drift = []
-        for pid, (version, digest, _url) in sorted(pins.items()):
+        for pid, (version, digest, url) in sorted(pins.items()):
             if pid not in now:
                 drift.append(f"  {pid}: pinned, but no longer published")
-            elif now[pid][1] != digest:
+                continue
+            pub_version, pub_digest, pub_url = now[pid]
+            if pub_digest != digest:
                 drift.append(f"  {pid}: pinned {version} {digest[:12]}, "
-                             f"published {now[pid][0]} {now[pid][1][:12]}")
+                             f"published {pub_version} {pub_digest[:12]}")
+            elif pub_version != version:
+                drift.append(f"  {pid}: same bytes, but pinned as {version} and published as "
+                             f"{pub_version} -- one of the two is lying about what changed")
+            elif pub_url != url:
+                drift.append(f"  {pid}: pinned at {url}, now published at {pub_url}")
         if drift:
             print("fp-lock: prompts have moved since they were pinned:\n" + "\n".join(drift)
                   + "\nRe-pin deliberately with 'fp-lock --update <id>'.", file=sys.stderr)
@@ -124,8 +139,14 @@ def main(argv):
         print(f"fpa.lock is in sync ({len(pins)} pinned)")
         return 0
 
-    LOCK.write_text(render(current()))
-    print(f"wrote fpa.lock ({len(current())} pinned)")
+    now = current()
+    fit = {pid: v for pid, v in now.items() if pid in registered_ids()}
+    skipped = sorted(set(now) - set(fit))
+    LOCK.write_text(render(fit))
+    print(f"wrote fpa.lock ({len(fit)} pinned)")
+    if skipped:
+        print("not pinned -- these do not declare the registered context (FPA.md AC1): "
+              + ", ".join(skipped))
     return 0
 
 

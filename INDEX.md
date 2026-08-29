@@ -25,9 +25,10 @@ Stuck? It interviews your agent about this session, then proposes a route throug
 
 - **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/help-me.prompt.md`
 - **Ceremony** `standard` · **flow** `interview`
+- **Contexts** `interactive` · **persistence** `none`
 - **Capabilities** `read:conversation, read:files, read:git, read:logs`
-- **sha256** `c990f2ce90906e25dc76ae3997ea3b25e6a46231eae4c382e08966444f0652c4`
-- **Phrase** `<consent-sentence>-help-me-c990f2c`  ← the sentence is in the document
+- **sha256** `7d12fffee3cee9ebef783e18907b0b4ac3391f1fd588e411d59a15d778aed046`
+- **Phrase** `<consent-sentence>-help-me-7d12fff`  ← the sentence is in the document
 
 ## `repo-recon` v1.0.0
 
@@ -35,9 +36,10 @@ Maps an unfamiliar codebase from entry points, seams and git churn. Twelve reads
 
 - **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon.prompt.md`
 - **Ceremony** `standard` · **flow** `linear`
+- **Contexts** `interactive, registered, managed` · **persistence** `none`
 - **Capabilities** `read:files, read:git, run:shell-ro`
-- **sha256** `9d7accf11b879bff0f176ab5225f0fb2d4e86344037927dac1ca4d3cab8279f2`
-- **Phrase** `<consent-sentence>-repo-recon-9d7accf`  ← the sentence is in the document
+- **sha256** `0ee1331bb6d7ea6c626c79a6aace0f419c58137cdd3c563f9f795cdc3133f2af`
+- **Phrase** `<consent-sentence>-repo-recon-0ee1331`  ← the sentence is in the document
 
 ## `pr-review` v1.2.0
 
@@ -45,8 +47,9 @@ Judges a diff by tiers — correctness, blast radius, failure mode, reversibilit
 
 - **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/pr-review.prompt.md`
 - **Ceremony** `light` · **flow** `rubric`
+- **Contexts** `interactive, registered, managed` · **persistence** `none`
 - **Capabilities** `read:files, read:git`
-- **sha256** `7f364c1f8cd45ae8924b2732ced253951ea2c5af10831517e75373269c675b00`
+- **sha256** `2add881744b4b205c2ba6bc5b6beff106951cf629e832b1dc1d0c7f3cc439634`
 - **Phrase** `<consent-sentence>-pr-review-`  ← ceremony `light`: the sentence alone is the phrase
 
 ## `bug-repro` v1.0.0
@@ -55,9 +58,10 @@ Reproduces before fixing, then stops. Falsifiable claim, shortest repro, failing
 
 - **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/bug-repro.prompt.md`
 - **Ceremony** `standard` · **flow** `linear`
+- **Contexts** `interactive, registered` · **persistence** `none`
 - **Capabilities** `read:files, read:logs, run:shell-ro, run:tests`
-- **sha256** `6fab555a1486cc92e8bab4ce1641925b0f9599ddd24dd3f1d8e1ccb0be8d1537`
-- **Phrase** `<consent-sentence>-bug-repro-6fab555`  ← the sentence is in the document
+- **sha256** `a1470b3cf3d5b8eaf24f526e71fd8f99fe9998b1927338090dae91d2a9b33247`
+- **Phrase** `<consent-sentence>-bug-repro-a1470b3`  ← the sentence is in the document
 
 ## `grill-me` v1.0.0
 
@@ -65,8 +69,9 @@ Attacks your idea instead of encouraging it. Finds the weakest load-bearing assu
 
 - **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/grill-me.prompt.md`
 - **Ceremony** `light` · **flow** `rubric`
+- **Contexts** `interactive, registered` · **persistence** `none`
 - **Capabilities** `read:conversation, read:files`
-- **sha256** `f437677c449ebda4b4e2a093e01905aaeb1adb198f4d55b8266b95fd95974abc`
+- **sha256** `d05f1aece953acf0b0ad173e1352129e4fdc76981732c6e62bafae3651f6fcf9`
 - **Phrase** `<consent-sentence>-grill-me-`  ← ceremony `light`: the sentence alone is the phrase
 
 ## `ticket-intake` v1.0.0
@@ -75,9 +80,10 @@ Takes a support intake like a good first-line engineer, then drafts one ticket a
 
 - **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/ticket-intake.prompt.md`
 - **Ceremony** `strict` · **flow** `interview`
+- **Contexts** `interactive` · **persistence** `artifact`
 - **Capabilities** `read:conversation, read:files, read:logs, write:artifact`
-- **sha256** `39f138092f087eb2c95e7704352553e799dc620b766b7cb3d8124a09edbbf9f7`
-- **Phrase** `<consent-sentence>-ticket-intake-39f138092f087eb2c95e7704352553e799dc620b766b7cb3d8124a09edbbf9f7`  ← the sentence is in the document
+- **sha256** `85841d8994c51d861e3858cab7408ed3716642487cc4c264b05adcc3d0cbe492`
+- **Phrase** `<consent-sentence>-ticket-intake-85841d8994c51d861e3858cab7408ed3716642487cc4c264b05adcc3d0cbe492`  ← the sentence is in the document
 
 ## `welcome-tour` v1.0.0
 
@@ -85,9 +91,10 @@ A host prompt: a company guiding a visiting agent through its services. Reads no
 
 - **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/welcome-tour.prompt.md`
 - **Ceremony** `standard` · **flow** `state-machine`
+- **Contexts** `interactive` · **persistence** `none`
 - **Capabilities** `read:conversation`
-- **sha256** `531894a1e44d8c092c354178a85afcef69fede922d27fd1bc9113e5b772ca233`
-- **Phrase** `<consent-sentence>-welcome-tour-531894a`  ← the sentence is in the document
+- **sha256** `e74c7278104654a7659b90ad4cc5ad8cc2f1cc36f9cbd6a40e04c7d26d91be14`
+- **Phrase** `<consent-sentence>-welcome-tour-e74c727`  ← the sentence is in the document
 
 ## `ghost-in-the-gist` v1.0.0
 
@@ -95,9 +102,10 @@ A three-move ASCII terminal game. No engine — the document is the interpreter 
 
 - **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/ghost-in-the-gist.prompt.md`
 - **Ceremony** `standard` · **flow** `interpreter`
+- **Contexts** `interactive` · **persistence** `none`
 - **Capabilities** `read:conversation`
-- **sha256** `459e58d5684fa69983bbb5c0d5d68dee892f2112b141cce4d33940d7ec022812`
-- **Phrase** `<consent-sentence>-ghost-in-the-gist-459e58d`  ← the sentence is in the document
+- **sha256** `e7558c8b26c93fa3019c24e433ec645619a2efb793a649dbbfda465eaabda5ce`
+- **Phrase** `<consent-sentence>-ghost-in-the-gist-e7558c8`  ← the sentence is in the document
 
 ## `handoff-note` v1.1.0
 
@@ -105,9 +113,10 @@ Writes the note that lets a cold reader resume your work: state, next action, de
 
 - **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/handoff-note.prompt.md`
 - **Ceremony** `strict` · **flow** `linear`
+- **Contexts** `interactive` · **persistence** `artifact`
 - **Capabilities** `read:files, read:git, read:conversation, write:artifact`
-- **sha256** `d0aa2f3526411a4f7c989bc663e81d6078b7ea82ed56aaf49d75bda42218c67e`
-- **Phrase** `<consent-sentence>-handoff-note-d0aa2f3526411a4f7c989bc663e81d6078b7ea82ed56aaf49d75bda42218c67e`  ← the sentence is in the document
+- **sha256** `7dfb58372543dd20ec5fad68a12089ff162107b771bef6d419ac7929f8c387f3`
+- **Phrase** `<consent-sentence>-handoff-note-7dfb58372543dd20ec5fad68a12089ff162107b771bef6d419ac7929f8c387f3`  ← the sentence is in the document
 
 ## `fpa-bootstrap` v2.0.0
 
@@ -115,9 +124,10 @@ Teaches the protocol itself to an agent that has never heard of it, refusals inc
 
 - **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/fpa-bootstrap.prompt.md`
 - **Ceremony** `standard` · **flow** `linear`
+- **Contexts** `interactive, registered, managed` · **persistence** `none`
 - **Capabilities** `net:get, read:files`
-- **sha256** `5fc90f082eaa1a3d3862da2ad6f2e53c59d38153933e6590427900f7dde9619b`
-- **Phrase** `<consent-sentence>-fpa-bootstrap-5fc90f0`  ← the sentence is in the document
+- **sha256** `13e520128c3a2be9e4e669022a4546aa2a78a1b89b0ae6fc4f0712019b2aa32f`
+- **Phrase** `<consent-sentence>-fpa-bootstrap-13e5201`  ← the sentence is in the document
 
 ---
 

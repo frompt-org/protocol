@@ -7,21 +7,23 @@
       "ceremony": "standard",
       "contexts": "interactive",
       "deny": "net:get, net:post, write:files, vcs:commit, vcs:push, secrets:read, pkg:install",
-      "digest": "c990f2ce90906e25dc76ae3997ea3b25e6a46231eae4c382e08966444f0652c4",
+      "digest": "7d12fffee3cee9ebef783e18907b0b4ac3391f1fd588e411d59a15d778aed046",
       "file": "help-me.prompt.md",
       "flow": "interview",
       "id": "help-me",
+      "persistence": "none",
       "version": "1.0.0"
     },
     {
       "allow": "read:files, read:git, run:shell-ro",
       "ceremony": "standard",
-      "contexts": "interactive",
+      "contexts": "interactive, registered, managed",
       "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read, pkg:install, run:tests",
-      "digest": "9d7accf11b879bff0f176ab5225f0fb2d4e86344037927dac1ca4d3cab8279f2",
+      "digest": "0ee1331bb6d7ea6c626c79a6aace0f419c58137cdd3c563f9f795cdc3133f2af",
       "file": "repo-recon.prompt.md",
       "flow": "linear",
       "id": "repo-recon",
+      "persistence": "none",
       "version": "1.0.0"
     },
     {
@@ -29,32 +31,35 @@
       "ceremony": "light",
       "contexts": "interactive, registered, managed",
       "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read",
-      "digest": "7f364c1f8cd45ae8924b2732ced253951ea2c5af10831517e75373269c675b00",
+      "digest": "2add881744b4b205c2ba6bc5b6beff106951cf629e832b1dc1d0c7f3cc439634",
       "file": "pr-review.prompt.md",
       "flow": "rubric",
       "id": "pr-review",
+      "persistence": "none",
       "version": "1.2.0"
     },
     {
       "allow": "read:files, read:logs, run:shell-ro, run:tests",
       "ceremony": "standard",
-      "contexts": "interactive",
+      "contexts": "interactive, registered",
       "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read",
-      "digest": "6fab555a1486cc92e8bab4ce1641925b0f9599ddd24dd3f1d8e1ccb0be8d1537",
+      "digest": "a1470b3cf3d5b8eaf24f526e71fd8f99fe9998b1927338090dae91d2a9b33247",
       "file": "bug-repro.prompt.md",
       "flow": "linear",
       "id": "bug-repro",
+      "persistence": "none",
       "version": "1.0.0"
     },
     {
       "allow": "read:conversation, read:files",
       "ceremony": "light",
-      "contexts": "interactive",
+      "contexts": "interactive, registered",
       "deny": "write:files, vcs:push, net:post, secrets:read, pkg:install",
-      "digest": "f437677c449ebda4b4e2a093e01905aaeb1adb198f4d55b8266b95fd95974abc",
+      "digest": "d05f1aece953acf0b0ad173e1352129e4fdc76981732c6e62bafae3651f6fcf9",
       "file": "grill-me.prompt.md",
       "flow": "rubric",
       "id": "grill-me",
+      "persistence": "none",
       "version": "1.0.0"
     },
     {
@@ -62,10 +67,11 @@
       "ceremony": "strict",
       "contexts": "interactive",
       "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read, pkg:install",
-      "digest": "39f138092f087eb2c95e7704352553e799dc620b766b7cb3d8124a09edbbf9f7",
+      "digest": "85841d8994c51d861e3858cab7408ed3716642487cc4c264b05adcc3d0cbe492",
       "file": "ticket-intake.prompt.md",
       "flow": "interview",
       "id": "ticket-intake",
+      "persistence": "artifact",
       "version": "1.0.0"
     },
     {
@@ -73,10 +79,11 @@
       "ceremony": "standard",
       "contexts": "interactive",
       "deny": "read:files, read:git, write:files, net:get, net:post, secrets:read, pkg:install",
-      "digest": "531894a1e44d8c092c354178a85afcef69fede922d27fd1bc9113e5b772ca233",
+      "digest": "e74c7278104654a7659b90ad4cc5ad8cc2f1cc36f9cbd6a40e04c7d26d91be14",
       "file": "welcome-tour.prompt.md",
       "flow": "state-machine",
       "id": "welcome-tour",
+      "persistence": "none",
       "version": "1.0.0"
     },
     {
@@ -84,10 +91,11 @@
       "ceremony": "standard",
       "contexts": "interactive",
       "deny": "write:files, run:shell-ro, net:get, net:post, secrets:read, pkg:install",
-      "digest": "459e58d5684fa69983bbb5c0d5d68dee892f2112b141cce4d33940d7ec022812",
+      "digest": "e7558c8b26c93fa3019c24e433ec645619a2efb793a649dbbfda465eaabda5ce",
       "file": "ghost-in-the-gist.prompt.md",
       "flow": "interpreter",
       "id": "ghost-in-the-gist",
+      "persistence": "none",
       "version": "1.0.0"
     },
     {
@@ -95,23 +103,26 @@
       "ceremony": "strict",
       "contexts": "interactive",
       "deny": "write:files, vcs:push, net:post, secrets:read",
-      "digest": "d0aa2f3526411a4f7c989bc663e81d6078b7ea82ed56aaf49d75bda42218c67e",
+      "digest": "7dfb58372543dd20ec5fad68a12089ff162107b771bef6d419ac7929f8c387f3",
       "file": "handoff-note.prompt.md",
       "flow": "linear",
       "id": "handoff-note",
+      "persistence": "artifact",
       "version": "1.1.0"
     },
     {
       "allow": "net:get, read:files",
       "ceremony": "standard",
-      "contexts": "interactive",
+      "contexts": "interactive, registered, managed",
       "deny": "write:files, net:post, secrets:read, pkg:install",
-      "digest": "5fc90f082eaa1a3d3862da2ad6f2e53c59d38153933e6590427900f7dde9619b",
+      "digest": "13e520128c3a2be9e4e669022a4546aa2a78a1b89b0ae6fc4f0712019b2aa32f",
       "file": "fpa-bootstrap.prompt.md",
       "flow": "linear",
       "id": "fpa-bootstrap",
+      "persistence": "none",
       "version": "2.0.0"
     }
   ],
-  "protocol": "FOREIGN-PROMPT v2"
+  "protocol": "FOREIGN-PROMPT v2",
+  "serial": 28
 }
