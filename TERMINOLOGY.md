@@ -19,6 +19,8 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 | **digest** | Part three. SHA-256 of the document as fetched. It cannot live inside the document — adding it would change it — so the pilot computes it or takes it out of band, and **the agent recomputes it over what it fetched**. The one rule in FPA that needs no goodwill. |
 | **ceremony** | How much of the phrase a prompt demands: `light` (sentence only), `standard` (+ id + 7 hex), `strict` (+ full 64 hex). The author's choice, scaled to what the prompt asks for. |
 | **fan-out** | A prompt sending the agent to read further documents, each a fresh injection surface the pilot did not choose. Why `net:get` is the highest-consequence capability, and why `help-me` denies it. |
+| **catalog** | A published set of foreign prompts: a signed manifest plus the documents it lists, served as static files. A catalog is a **shape, not a privilege** — `index.json`, `index.json.sig`, `prompts/<id>/<version>.prompt.md` — so anyone who can serve files can publish one, and no catalog is more official than another. |
+| **publisher** | Whoever owns a catalog and holds the key that signs its manifest. A role, not a place: a company, a team, or one person with a repo. |
 | **authority** | A service that runs submitted prompts in isolation and publishes what it observed, keyed by digest. The intended layer above FPA; a reserved seam, not a built thing. |
 | **envelope** | The allow/deny capabilities a prompt declares for itself, as tokens from the fixed §4 vocabulary. Deny always wins. It is a **declaration the agent honours**, and a boundary only where a host maps it onto real permissions. |
 | **handshake** | The one exact line — `ADOPTED: <id> v<version>` — the runtime agent emits on adoption, so adoption is never silent. |
@@ -27,6 +29,10 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 | **preview** | Reporting what a URL contains without adopting it. Needs no phrase, because reading is not running. |
 | **adoption record** | What the runtime agent can report about what it has adopted: id, version, source, phrase, flow, persistence, expiry, files written. |
 | **disown** | The pilot's command to end an adoption immediately. `disown <id>`, or *disown everything*, which no prompt may disable. |
+
+## Borrowed carefully
+
+- **house** — in this constellation a *house* is a ClickHouse database (memhouse, filehouse, keyhouse). A published set of prompts is a **catalog**, never a house, however tempting the metaphor.
 
 ## Not our words
 

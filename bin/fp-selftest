@@ -324,6 +324,32 @@ assert pinned == fit, f"{pinned ^ fit} differ"
 PY
 check "fpa.lock pins exactly the prompts fit for the registered context" 0 $?
 
+# --- freshness is per catalog, not per client --------------------------------
+# Two catalogs, two serial lines. One global floor meant a brand new catalog
+# starting at 1 read as a rollback of an unrelated one already at 45.
+two=$(mktemp -d 2>/dev/null || echo "/tmp/fp-two-$$"); mkdir -p "$two/a" "$two/b/prompts"
+cp "$here"/index.json "$here"/index.json.sig "$two/a/"
+cp -R "$here"/prompts "$two/a/"
+python3 - "$two" <<'PY'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1])
+m = json.loads((d / "a" / "index.json").read_text())
+m["base"] = "https://example.invalid/other-catalog/prompts"
+m["serial"] = 1
+(d / "b" / "index.json").write_text(json.dumps(m, indent=2, sort_keys=True) + "\n")
+PY
+cp -R "$here"/prompts/. "$two/b/prompts/"
+"$here/bin/fp-verify" repo-recon --from "$two/a" >/dev/null 2>&1 </dev/null
+check "a catalog at a high serial is accepted" 0 $?
+python3 - "$here" "$two" <<'PY' >/dev/null 2>&1
+import json, pathlib, sys
+floors = pathlib.Path(sys.argv[1]) / ".fpa" / "manifest-serials.json"
+data = json.loads(floors.read_text()) if floors.exists() else {}
+assert any(v > 1 for v in data.values()), "expected a high floor recorded for some catalog"
+PY
+check "the floor it recorded is keyed by that catalog" 0 $?
+rm -rf "$two"
+
 # --- versions: choosing is exact or latest, and nothing else -----------------
 "$here/bin/fp-resolve" pr-review@1.2.0 --base "$here/prompts" --record >/dev/null 2>&1
 check "fp-resolve picks an exact version" 0 $?

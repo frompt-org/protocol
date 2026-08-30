@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""fp-publish — copy this repo's prompts into a catalog checkout, and sign it there.
+
+A catalog is a shape, not a privilege: index.json, its signature, and
+prompts/<id>/<version>.prompt.md served as static files. This makes publishing a
+command rather than a copy-paste, so the protocol repo and the catalog cannot
+drift into disagreeing about what was published.
+
+    fp-publish ~/f-prompts/prompts              # sync, reindex, report
+    fp-publish ~/f-prompts/prompts --base URL   # set where the catalog is served from
+    fp-publish ~/f-prompts/prompts --check      # would anything change?
+
+It never commits and never signs on your behalf — it stages files and tells you
+what to run. Publishing is an act someone should perform deliberately, and a tool
+that quietly pushed signed bytes would be the wrong kind of convenient.
+
+Exit: 0 done (or nothing to do) · 1 drift found under --check · 2 unusable target.
+"""
+import filecmp
+import pathlib
+import shutil
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+
+def main(argv):
+    args = [a for a in argv[1:] if not a.startswith("-")]
+    if not args or "-h" in argv or "--help" in argv:
+        print(__doc__)
+        return 0 if args else 2
+    target = pathlib.Path(args[0]).expanduser()
+    if not target.is_dir():
+        print(f"fp-publish: {target} is not a directory -- clone the catalog first", file=sys.stderr)
+        return 2
+
+    check = "--check" in argv
+    base = None
+    if "--base" in argv:
+        base = argv[argv.index("--base") + 1]
+
+    changed, added = [], []
+    for src in sorted(ROOT.glob("prompts/*/*.prompt.md")):
+        rel = src.relative_to(ROOT)
+        dst = target / rel
+        if not dst.exists():
+            added.append(str(rel))
+        elif not filecmp.cmp(src, dst, shallow=False):
+            changed.append(str(rel))
+        if not check:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+
+    # A published version's bytes never change (FPA.md V1). If one differs, that is
+    # either an edit-in-place or a stale catalog, and both need a human.
+    if changed:
+        print("fp-publish: these already exist in the catalog with different bytes:\n  "
+              + "\n  ".join(changed)
+              + "\n  A published version is immutable -- publish a new version instead.",
+              file=sys.stderr)
+        return 1
+    if check:
+        print(f"{len(added)} new, 0 changed" if added else "catalog is up to date")
+        return 1 if added else 0
+
+    for extra in ("TEMPLATE.prompt.md",):
+        if (ROOT / extra).exists():
+            shutil.copy2(ROOT / extra, target / extra)
+
+    print(f"staged {len(added)} new prompt file(s) into {target}")
+    print("\nNow, in the catalog:")
+    print(f"  cd {target}")
+    print("  fp-index" + (f"   # after setting base to {base}" if base else ""))
+    print("  fp-sign          # with the publisher key, which lives outside the repo")
+    print("  git add -A && git commit && git push")
+    print("\nThe signature covers index.json. Commit it, its .sig, and the prompts together,")
+    print("or a client will fetch a manifest that does not match what is served.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

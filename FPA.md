@@ -96,7 +96,7 @@ A phrase is the mode-1 instrument: a human, at a keyboard, adopting one document
 - **M3.** A **lock file** pins a subset of it: id, version, digest, URL. An agent resolving a pinned prompt **MUST** refuse bytes whose digest is not the pinned one, and re-pinning **SHOULD** be a reviewed change rather than an automatic one. Pinning is not safer than floating in itself — it makes the choice a line somebody reviews instead of an event nobody sees.
 - **M4.** In `managed`, the manifest is **signed** and the documents are not. Each document's digest lives inside the signed manifest, so one signature covers the whole set, and revocation is dropping an entry rather than reaching every agent.
 - **M5.** A lock check **MUST** compare against the prompt bytes, not against the manifest, and **MUST** compare version and origin as well as digest. A manifest can be stale, and a check that trusts a stale manifest reports agreement about a document that has already moved.
-- **M6.** A manifest **MUST** carry a monotonic `serial`, and a client **MUST** refuse one lower than the highest it has already accepted. Every signature on an old bundle is still perfectly valid, so replaying one is a rollback that needs no key — freshness is the only thing that makes it visible.
+- **M6.** A manifest **MUST** carry a monotonic `serial`, and a client **MUST** refuse one lower than the highest it has already accepted **from that catalog**. The floor is per catalog, keyed by the manifest's own `base`: one floor per client would make a new catalog starting at 1 look like a rollback of an unrelated one already at 45. `base` is inside the signed bytes, so it cannot be edited to reset a floor. Every signature on an old bundle is still perfectly valid, so replaying one is a rollback that needs no key — freshness is the only thing that makes it visible.
 - **M7.** The trust root — the public key or `allowed_signers` file — **MUST** be held locally and **MUST NOT** be fetched from the host it is used to check. A signer list taken from the same place as the signature proves only that they agree with each other.
 - **M8.** Digests **MUST** be computed over the exact bytes fetched. Reading a document as text first normalizes line endings, and a CRLF copy of a document then hashes identical to its LF original while differing byte for byte.
 
@@ -274,6 +274,12 @@ A published version is **immutable**: its bytes never change. Everything else he
 - **V5.** A selector **MUST NOT** appear in a confirmation phrase. A phrase binds a digest and `latest` has none until it resolves, so selectors belong to `registered` and `managed`, where a pin or a signature does the authorizing. You cannot consent to whichever document turns up next.
 - **V6.** A lock pins one version per id. Pinning several would be a range wearing a different hat.
 - **V7.** Versions of the same prompt **SHOULD** carry different consent sentences. They are different documents making different asks, and a pilot who read 1.2.0 has not read 2.0.0.
+
+### Catalogs
+
+A **catalog** is a published set of prompts: a signed manifest and the documents it lists, served as static files at `<base>/index.json` and `<base>/prompts/<id>/<version>.prompt.md`. It is a **shape, not a privilege** — anyone who can serve files can publish one, and no catalog is more official than another.
+
+A client may adopt from several. Each keeps its own freshness floor (M6) and each is trusted through its own publisher key, held locally (M7).
 
 ## 15. Attestations (reserved)
 

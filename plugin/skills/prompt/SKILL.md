@@ -15,7 +15,7 @@ allowed-tools: Bash(fp-resolve:*), Bash(${FP_HOME:-.}/bin/fp-resolve:*), Bash(fp
    ${FP_HOME:-.}/bin/fp-agent --ensure >/dev/null
    ```
 
-2. **Resolve and verify.** Pick the strictest check the house supports:
+2. **Resolve and verify.** Pick the strictest check the catalog supports:
 
    ```bash
    ${FP_HOME:-.}/bin/fp-verify <id>            # managed: signature over the manifest, then digest

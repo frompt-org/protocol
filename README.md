@@ -295,6 +295,21 @@ One rule underneath: **published bytes never change.** A change is a new version
 
 Selectors never appear in a confirmation phrase — a phrase binds a digest, and `latest` has none until it resolves. So `@latest` belongs to the pinned and signed contexts, where something other than a human is doing the authorizing.
 
+## Catalogs
+
+A **catalog** is a published set of prompts — a signed manifest and the documents it lists, served as static files:
+
+```
+<base>/index.json
+<base>/prompts/<id>/<version>.prompt.md
+```
+
+That is the whole standard, and it is a **shape rather than a privilege**: anyone who can serve files can publish one, and no catalog is more official than another. The reference catalog lives at [`f-prompts/prompts`](https://github.com/f-prompts/prompts); a company publishes `acme/prompts` and serves it wherever they already serve static files.
+
+A client may adopt from several. Each carries its own freshness floor and is trusted through its own publisher key — held locally, never fetched from the catalog it validates.
+
+`bin/fp-publish <catalog>` stages this repo's prompts into a catalog checkout and tells you what to run there. It refuses to overwrite a published version with different bytes, because that is the one rule everything else rests on.
+
 ## The index, and what it deliberately withholds
 
 [`INDEX.md`](INDEX.md) publishes every prompt's **digest** — legitimate out-of-band conveyance of the one part a document cannot contain. It does **not** publish consent sentences.

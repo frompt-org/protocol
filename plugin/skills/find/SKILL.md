@@ -5,7 +5,7 @@ user-invocable: true
 allowed-tools: Bash(fp-resolve:*), Bash(${FP_HOME:-.}/bin/fp-resolve:*), Bash(fp-verify:*), Bash(${FP_HOME:-.}/bin/fp-verify:*), Read
 ---
 
-# /f:find — what this house publishes
+# /f:find — what this catalog publishes
 
 Discovery, not adoption. This never fetches a prompt's body and never adopts
 anything; it reads the manifest and reports candidates.

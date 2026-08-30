@@ -77,19 +77,31 @@ wanted, base, root, origin = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3])
 manifest = json.load(open("index.json"))
 # Freshness: a signed manifest older than the last one seen is a replay, and every
 # signature on it verifies. The floor is what makes that detectable.
-seen = root / ".fpa" / "manifest-serial"
+#
+# Kept PER CATALOG, keyed by the manifest's own `base`. One global floor meant
+# that adopting from a second publisher refused whichever catalog had the lower
+# serial -- a brand new catalog starting at 1 read as a rollback of an unrelated
+# one at 45. `base` is inside the signed bytes, so it cannot be forged to reset
+# a floor without breaking the signature.
+seen = root / ".fpa" / "manifest-serials.json"
+catalog = manifest.get("base", "")
 serial = int(manifest.get("serial", 0))
+floors = {}
 if seen.exists():
     try:
-        floor = int(seen.read_text().strip())
-    except ValueError:
-        floor = 0
+        floors = json.loads(seen.read_text())
+    except json.JSONDecodeError:
+        floors = {}
+if catalog in floors:
+    floor = int(floors[catalog])
     if serial < floor:
-        print(f"fp-verify: manifest serial {serial} is older than {floor}, already seen here.\n"
+        print(f"fp-verify: manifest serial {serial} from {catalog} is older than {floor}, "
+              "already seen from that catalog.\n"
               "  A validly signed but stale manifest is a rollback. Refusing.", file=sys.stderr)
         sys.exit(1)
+floors[catalog] = serial
 seen.parent.mkdir(parents=True, exist_ok=True)
-seen.write_text(str(serial) + "\n")
+seen.write_text(json.dumps(floors, indent=2, sort_keys=True) + "\n")
 wanted, _, selector = wanted.partition("@")
 group = next((p for p in manifest["prompts"] if p["id"] == wanted), None)
 if group is None:
