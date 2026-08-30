@@ -280,10 +280,10 @@ check "fp-verify exits 2 when it cannot check, not 1" 2 $?
 pub=$(mktemp -d 2>/dev/null || echo "/tmp/fp-pub-$$"); mkdir -p "$pub/prompts"
 cp "$here"/index.json "$here"/index.json.sig "$pub/"
 cp -R "$here"/prompts/. "$pub/prompts/"
-"$here/bin/fp-verify" repo-recon --from "$pub" >/dev/null 2>&1 </dev/null
+"$here/bin/fp-verify" repo-recon --from "$pub" --registering >/dev/null 2>&1 </dev/null
 check "fp-verify --from fetches a publisher manifest and authorizes against it" 0 $?
 printf '\n<!-- unsigned change -->\n' >> "$pub/prompts/repo-recon/1.0.0.prompt.md"
-"$here/bin/fp-verify" repo-recon --from "$pub" >/dev/null 2>&1 </dev/null
+"$here/bin/fp-verify" repo-recon --from "$pub" --registering >/dev/null 2>&1 </dev/null
 check "fp-verify --from refuses a document the fetched manifest did not vouch for" 1 $?
 rm -rf "$pub"
 
@@ -303,7 +303,7 @@ if [ -f "$here/.fpa/signing_key" ]; then
     > "$scratch" 2>/dev/null
   (cd "$here" && bin/fp-index >/dev/null && bin/fp-sign </dev/null >/dev/null && \
      bin/fp-verify repo-recon --base ./prompts >/dev/null 2>&1 </dev/null)
-  "$here/bin/fp-verify" repo-recon --from "$old" >/dev/null 2>&1 </dev/null
+  "$here/bin/fp-verify" repo-recon --from "$old" --registering >/dev/null 2>&1 </dev/null
   check "a validly signed but older manifest is refused as a rollback" 1 $?
   rm -rf "$here/prompts/zz-selftest-scratch"
   (cd "$here" && bin/fp-index >/dev/null && bin/fp-lock >/dev/null && bin/fp-sign </dev/null >/dev/null)
@@ -339,7 +339,7 @@ m["serial"] = 1
 (d / "b" / "index.json").write_text(json.dumps(m, indent=2, sort_keys=True) + "\n")
 PY
 cp -R "$here"/prompts/. "$two/b/prompts/"
-"$here/bin/fp-verify" repo-recon --from "$two/a" >/dev/null 2>&1 </dev/null
+"$here/bin/fp-verify" repo-recon --from "$two/a" --registering >/dev/null 2>&1 </dev/null
 check "a catalog at a high serial is accepted" 0 $?
 python3 - "$here" "$two" <<'PY' >/dev/null 2>&1
 import json, pathlib, sys
@@ -349,6 +349,32 @@ assert any(v > 1 for v in data.values()), "expected a high floor recorded for so
 PY
 check "the floor it recorded is keyed by that catalog" 0 $?
 rm -rf "$two"
+
+# --- expiry: the half of freshness that needs no memory ----------------------
+if [ -f "$here/.fpa/signing_key" ]; then
+  (cd "$here" && FPA_VALIDITY_DAYS=-1 bin/fp-index --renew >/dev/null && bin/fp-sign </dev/null >/dev/null)
+  "$here/bin/fp-verify" repo-recon --base "$here/prompts" >/dev/null 2>&1 </dev/null
+  check "a validly signed but expired manifest is refused" 1 $?
+  (cd "$here" && bin/fp-index --renew >/dev/null && bin/fp-sign </dev/null >/dev/null)
+  "$here/bin/fp-verify" repo-recon --base "$here/prompts" >/dev/null 2>&1 </dev/null
+  check "a manifest inside its validity window is accepted" 0 $?
+else
+  echo "skip -- no signing key; expiry checks need one"
+fi
+
+# --- registration: the record that someone agreed once -----------------------
+reg=$(mktemp -d 2>/dev/null || echo "/tmp/fp-reg-$$"); mkdir -p "$reg/prompts"
+cp "$here"/index.json "$here"/index.json.sig "$reg/"
+cp -R "$here"/prompts/. "$reg/prompts/"
+if [ -f "$here/fpa.registered" ]; then
+  "$here/bin/fp-verify" repo-recon --from "$reg" >/dev/null 2>&1 </dev/null
+  check "an unregistered catalog is refused once the workspace keeps a register" 1 $?
+  "$here/bin/fp-verify" repo-recon --from "$reg" --registering >/dev/null 2>&1 </dev/null
+  check "--registering checks the catalog without requiring it to be registered" 0 $?
+else
+  echo "skip -- no fpa.registered in this workspace"
+fi
+rm -rf "$reg"
 
 # --- versions: choosing is exact or latest, and nothing else -----------------
 "$here/bin/fp-resolve" pr-review@1.2.0 --base "$here/prompts" --record >/dev/null 2>&1

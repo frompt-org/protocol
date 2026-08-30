@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""fp-register — record that this workspace accepted a catalog. Like sources.list.
+
+The `registered` context is defined as consent given once, and until now nothing
+represented that moment: fpa.lock said what was pinned, never that anyone had
+agreed to it. This is the missing artifact — one line per catalog, the shape apt
+has used for thirty years.
+
+    fp-register <base> [--pin latest|version|digest] [--as who]
+    fp-register --list
+    fp-unregister <base>            (same tool, invoked by that name)
+
+Registering verifies the catalog first: a catalog you cannot verify is not one you
+can meaningfully accept. It records the signer's fingerprint, so a later key
+substitution is visible even if the new key is also in allowed_signers.
+
+Once fpa.registered exists, fp-verify refuses catalogs absent from it. Opting into
+the model is what makes the model mean anything; a workspace with no such file is
+simply not using it.
+
+Exit: 0 done · 1 refused · 2 unusable input.
+"""
+import datetime
+import json
+import os
+import pathlib
+import subprocess
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+FILE = ROOT / "fpa.registered"
+HEADER = [
+    "# fpa.registered -- catalogs this workspace has accepted, and on what terms.",
+    "#",
+    "# <base> <signer-fingerprint> <pin-mode> <registered-on> <who>",
+    "#",
+    "# A line here is a record that someone agreed once, which is the whole content",
+    "# of the registered context. Remove a line with fp-unregister; nothing else",
+    "# revokes it, because nothing else agreed to it.",
+]
+
+
+def parse():
+    if not FILE.exists():
+        return {}
+    out = {}
+    for line in FILE.read_text().splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        base, fp, pin, when, who = line.split(None, 4)
+        out[base] = {"fingerprint": fp, "pin": pin, "when": when, "who": who}
+    return out
+
+
+def render(entries):
+    lines = list(HEADER) + [""]
+    for base in sorted(entries):
+        e = entries[base]
+        lines.append(f"{base} {e['fingerprint']} {e['pin']} {e['when']} {e['who']}")
+    return "\n".join(lines) + "\n"
+
+
+def fingerprint():
+    """The signer we would actually verify against, from the local trust root."""
+    signers = ROOT / "allowed_signers"
+    if not signers.exists():
+        return None
+    key = signers.read_text().split(None, 1)[1].strip() if signers.read_text().strip() else ""
+    proc = subprocess.run(["ssh-keygen", "-lf", "-"], input=key, capture_output=True, text=True)
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.split()[1]
+
+
+def main(argv):
+    invoked_as = pathlib.Path(argv[0]).name
+    args = [a for a in argv[1:] if not a.startswith("-")]
+    if "-h" in argv or "--help" in argv:
+        print(__doc__)
+        return 0
+
+    entries = parse()
+
+    if "--list" in argv:
+        if not entries:
+            print("no catalogs registered -- this workspace has not opted into the registered "
+                  "context, so fp-verify accepts any catalog it can verify")
+            return 0
+        for base, e in sorted(entries.items()):
+            print(f"{base}\n  key {e['fingerprint']}  pin {e['pin']}  since {e['when']}  by {e['who']}")
+        return 0
+
+    if not args:
+        print(__doc__)
+        return 2
+    base = args[0].rstrip("/")
+
+    if invoked_as == "fp-unregister" or "--remove" in argv:
+        if base not in entries:
+            print(f"fp-unregister: {base} is not registered", file=sys.stderr)
+            return 1
+        del entries[base]
+        FILE.write_text(render(entries))
+        print(f"unregistered {base}\n  Nothing else revoked it, because nothing else agreed to it.")
+        if not entries:
+            print("  fpa.registered is now empty. It still opts this workspace into the model, so\n"
+                  "  every catalog is refused until one is registered. Delete the file to opt out.")
+        return 0
+
+    verify = ROOT / "bin" / "fp-verify"
+    # --registering: check the catalog itself, but not whether it is already
+    # registered. Otherwise the first check forbids the act it is checking for.
+    proc = subprocess.run([str(verify), "--from", base, "--registering"],
+                          capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    if proc.returncode != 0:
+        print(f"fp-register: cannot verify {base} -- refusing to record consent to a catalog "
+              f"this workspace cannot check.\n  {proc.stderr.strip().splitlines()[0] if proc.stderr.strip() else ''}",
+              file=sys.stderr)
+        return 1
+
+    fp = fingerprint()
+    if not fp:
+        print("fp-register: no local allowed_signers to pin a fingerprint against", file=sys.stderr)
+        return 1
+
+    pin = "latest"
+    if "--pin" in argv:
+        pin = argv[argv.index("--pin") + 1]
+    if pin not in ("latest", "version", "digest"):
+        print(f"fp-register: --pin must be latest, version or digest", file=sys.stderr)
+        return 2
+    who = argv[argv.index("--as") + 1] if "--as" in argv else os.environ.get("USER", "unknown")
+
+    was = entries.get(base)
+    if was and was["fingerprint"] != fp:
+        print(f"fp-register: {base} was registered against key {was['fingerprint']}, and now signs "
+              f"with {fp}.\n  A publisher may have rotated a key, or someone may have swapped one. "
+              "Unregister first, deliberately, if this is expected.", file=sys.stderr)
+        return 1
+
+    entries[base] = {"fingerprint": fp, "pin": pin,
+                     "when": datetime.datetime.now().strftime("%Y-%m-%d"), "who": who}
+    FILE.write_text(render(entries))
+    print(f"registered {base}\n  key {fp}\n  pin {pin}, by {who}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

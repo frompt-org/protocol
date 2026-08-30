@@ -1,0 +1,9 @@
+# fpa.registered -- catalogs this workspace has accepted, and on what terms.
+#
+# <base> <signer-fingerprint> <pin-mode> <registered-on> <who>
+#
+# A line here is a record that someone agreed once, which is the whole content
+# of the registered context. Remove a line with fp-unregister; nothing else
+# revokes it, because nothing else agreed to it.
+
+/Users/polat/f-prompts/prompts SHA256:ues54f1PBtfrDybvre4iDG/P+UnKlM0N8CVNORpiKCs version 2026-08-31 ramazanpolat

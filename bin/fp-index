@@ -10,8 +10,10 @@ ceremony this protocol exists to create.
     fp-index            # rewrite INDEX.md
     fp-index --check    # exit 1 if INDEX.md is stale (used by fp-selftest)
 """
+import datetime
 import hashlib
 import json
+import os
 import pathlib
 import sys
 
@@ -108,18 +110,37 @@ def manifest():
             for pid, versions in grouped().items()
         ],
     }
+    # Expiry, not only monotonicity. A serial floor is a memory, and a client that
+    # has never seen a newer manifest has no floor -- a fresh agent, a wiped .fpa, a
+    # container starting clean. All of them accept an arbitrarily old signed bundle.
+    # `not_after` needs no memory: a replayed manifest dies on its own. apt calls it
+    # Valid-Until and WebPKI shortened certificate lifetimes for the same reason.
+    days = int(os.environ.get("FPA_VALIDITY_DAYS", "30"))
     previous, serial = None, 1
     js = ROOT / "index.json"
     if js.exists():
         try:
             previous = json.loads(js.read_text())
             serial = int(previous.get("serial", 0))
-            stale = {k: v for k, v in previous.items() if k != "serial"}
+            stale = {k: v for k, v in previous.items() if k not in ("serial", "not_after")}
             if stale != body or serial < 1:
                 serial += 1
         except (json.JSONDecodeError, ValueError):
             serial = 1
     body["serial"] = serial
+
+    # Keep the existing window unless the content changed or it has run out, so
+    # `--check` stays deterministic and a re-run is not a re-publication.
+    keep = None
+    if previous:
+        keep = previous.get("not_after")
+        stale = {k: v for k, v in previous.items() if k not in ("serial", "not_after")}
+        expired = keep and keep < datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        if stale != {k: v for k, v in body.items() if k != "serial"} or expired or "--renew" in sys.argv:
+            keep = None
+    body["not_after"] = keep or (
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=days)
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
     return json.dumps(body, indent=2, sort_keys=True) + "\n"
 
 

@@ -233,6 +233,14 @@ Re-pin deliberately with 'bin/fp-lock --update' if that is what you want.
 
 Pinning is not safer than floating by itself. It makes the choice **a line somebody reviews** instead of an event nobody sees.
 
+And the registration itself is recorded, in `fpa.registered` — one line per catalog, the shape `sources.list` has had for thirty years:
+
+```
+<base> <signer-fingerprint> <pin-mode> <registered-on> <who>
+```
+
+That file is the consent. A lock says what is pinned; it never says anybody agreed to it. Once the file exists, this workspace has opted into the model and `fp-verify` refuses a catalog absent from it — and refuses one whose signing key has changed since it was recorded, which catches a substitution even when the new key is in `allowed_signers`.
+
 **`managed`** — no human at all. `index.json` is a deterministic manifest carrying a monotonic serial, signed with `ssh-keygen -Y`. `fp-verify --from <publisher>` **fetches the manifest and the document from the publisher** and checks both against a trust root held locally:
 
 ```
@@ -241,7 +249,9 @@ manifest verified: index.json signed by foreign-prompts-publisher
 authorized: repo-recon v1.0.0 digest 1f79578951aa contexts [interactive, registered, managed] serial 6
 ```
 
-Three things have to hold, and each one closes an attack that the others do not:
+Four things have to hold, and each one closes an attack that the others do not:
+
+- **The manifest expires.** A serial floor is a memory, and a client that has never seen a newer manifest has none — a fresh agent, a wiped store, a clean container. All of them would accept an arbitrarily old signed bundle, and every signature on it verifies. `not_after` needs no memory: a replay dies on its own. This is apt's `Valid-Until`, and the reason WebPKI shortened certificate lifetimes instead of trusting revocation.
 
 - **The trust root is local.** `allowed_signers` is never fetched from the host it is used to check — a signer list taken from the same place as the signature proves only that the two agree with each other.
 - **The serial is monotonic.** Every signature on last month's manifest is still perfectly valid, so replaying one is a rollback that needs no key. A client refuses a serial below the highest it has accepted.
