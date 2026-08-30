@@ -263,6 +263,18 @@ Denies accumulate. On a conflict of method the most recent wins, and TART says w
 
 Serve raw and immutable — a commit-pinned URL beats a branch URL. Publish the prompt's `id` and consent sentence next to the link; publish the digest **separately** from the document, or tell pilots how to compute it. Version it. Change the consent sentence when the content changes materially.
 
+## 14b. Versions
+
+A published version is **immutable**: its bytes never change. Everything else here rests on that, and it costs nothing — a change is a new version.
+
+- **V1.** Documents live at `prompts/<id>/<version>.prompt.md`. The directory removes the ambiguity a flat name has, since ids contain hyphens.
+- **V2.** The manifest lists **every** published version of an id, newest first, each with its own digest, plus the id's `latest`.
+- **V3.** A selector is either an **exact version** or **`latest`**. There is no range grammar. Ranges exist to reconcile transitive dependencies, and a foreign prompt has none: a pilot adopts one document, and a chained one needs a fresh decision. Choosing is a human act; the digest is what binds.
+- **V4.** `latest` is the highest version that is not a prerelease. A prerelease is published like any other version and simply never becomes `latest` until it is one.
+- **V5.** A selector **MUST NOT** appear in a confirmation phrase. A phrase binds a digest and `latest` has none until it resolves, so selectors belong to `registered` and `managed`, where a pin or a signature does the authorizing. You cannot consent to whichever document turns up next.
+- **V6.** A lock pins one version per id. Pinning several would be a range wearing a different hat.
+- **V7.** Versions of the same prompt **SHOULD** carry different consent sentences. They are different documents making different asks, and a pilot who read 1.2.0 has not read 2.0.0.
+
 ## 15. Attestations (reserved)
 
 An **authority** — a service that runs submitted prompts in isolation and publishes what it observed — is the intended layer above this protocol, and this section reserves the seam rather than defining the service.

@@ -1,6 +1,6 @@
 # Example 4 -- a foreign prompt that is an experience, not a rubric
 
-Every other prompt in this repo changes how the agent *works*. This one changes what the agent *is* for a few minutes: [`ghost-in-the-gist`](../prompts/ghost-in-the-gist.prompt.md) turns the chat window into a tiny ASCII terminal running a three-move text game.
+Every other prompt in this repo changes how the agent *works*. This one changes what the agent *is* for a few minutes: [`ghost-in-the-gist`](../prompts/ghost-in-the-gist/1.0.0.prompt.md) turns the chat window into a tiny ASCII terminal running a three-move text game.
 
 Nothing is installed. No engine, no binary, no runtime. The game is made entirely of instructions the agent read once from a URL -- the agent is the interpreter. That is the proof: **if a URL can deliver this, a URL can deliver anything an agent can do.**
 

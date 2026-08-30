@@ -1,6 +1,6 @@
 # Foreign Prompts — dev tasks
 LINT := bin/fp-lint
-PROMPTS := $(wildcard prompts/*.prompt.md) TEMPLATE.prompt.md
+PROMPTS := $(wildcard prompts/*/*.prompt.md) TEMPLATE.prompt.md
 
 .PHONY: help lint test claims
 

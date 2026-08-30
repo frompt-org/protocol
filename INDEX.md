@@ -1,6 +1,6 @@
 # Index of foreign prompts
 
-Every prompt in this repo, with the digest of its published bytes.
+Every prompt in this repo, every published version, and the digest of each one's bytes.
 
 **This index cannot give you a confirmation phrase, by design.** A phrase is a consent
 sentence plus an id plus a digest. The digest is here — a document cannot contain its own
@@ -19,115 +19,137 @@ document. Do not adopt it; open an issue.
 
 ---
 
-## `help-me` v1.0.0
+## `help-me` — latest 1.0.0
 
 Stuck? It interviews your agent about this session, then proposes a route through other prompts. Start here.
 
-- **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/help-me.prompt.md`
-- **Ceremony** `standard` · **flow** `interview`
-- **Contexts** `interactive` · **persistence** `none`
+- **Contexts** `interactive` · **flow** `interview` · **ceremony** `standard`
 - **Capabilities** `read:conversation, read:files, read:git, read:logs`
-- **sha256** `7d12fffee3cee9ebef783e18907b0b4ac3391f1fd588e411d59a15d778aed046`
-- **Phrase** `<consent-sentence>-help-me-7d12fff`  ← the sentence is in the document
 
-## `repo-recon` v1.0.0
+| version | sha256 | url |
+|---|---|---|
+| `1.0.0` ← latest | `7d12fffee3cee9ebef783e18907b0b4ac3391f1fd588e411d59a15d778aed046` | `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/help-me/1.0.0.prompt.md` |
+
+Adopt an exact version with `help-me@1.0.0`, or `help-me@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+
+## `repo-recon` — latest 1.0.0
 
 Maps an unfamiliar codebase from entry points, seams and git churn. Twelve reads, five sections, read-only.
 
-- **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon.prompt.md`
-- **Ceremony** `standard` · **flow** `linear`
-- **Contexts** `interactive, registered, managed` · **persistence** `none`
+- **Contexts** `interactive, registered, managed` · **flow** `linear` · **ceremony** `standard`
 - **Capabilities** `read:files, read:git, run:shell-ro`
-- **sha256** `0ee1331bb6d7ea6c626c79a6aace0f419c58137cdd3c563f9f795cdc3133f2af`
-- **Phrase** `<consent-sentence>-repo-recon-0ee1331`  ← the sentence is in the document
 
-## `pr-review` v1.2.0
+| version | sha256 | url |
+|---|---|---|
+| `1.0.0` ← latest | `0ee1331bb6d7ea6c626c79a6aace0f419c58137cdd3c563f9f795cdc3133f2af` | `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon/1.0.0.prompt.md` |
+
+Adopt an exact version with `repo-recon@1.0.0`, or `repo-recon@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+
+## `pr-review` — latest 2.0.0
 
 Judges a diff by tiers — correctness, blast radius, failure mode, reversibility, design fit. No praise, no nits.
 
-- **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/pr-review.prompt.md`
-- **Ceremony** `light` · **flow** `rubric`
-- **Contexts** `interactive, registered, managed` · **persistence** `none`
+- **Contexts** `interactive, registered, managed` · **flow** `rubric` · **ceremony** `light`
 - **Capabilities** `read:files, read:git`
-- **sha256** `2add881744b4b205c2ba6bc5b6beff106951cf629e832b1dc1d0c7f3cc439634`
-- **Phrase** `<consent-sentence>-pr-review-`  ← ceremony `light`: the sentence alone is the phrase
 
-## `bug-repro` v1.0.0
+| version | sha256 | url |
+|---|---|---|
+| `2.0.0` ← latest | `ef3c6a79f589e8b2d95027112a0ace4a7aba614f8ad0498648e5d0a71a8cd9b2` | `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/pr-review/2.0.0.prompt.md` |
+| `1.3.0` | `908c1944b00a6f6339a8f7ce9d5913d56b9cdc8469ed44dfed92a7002eb4644c` | `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/pr-review/1.3.0.prompt.md` |
+| `1.2.0` | `2add881744b4b205c2ba6bc5b6beff106951cf629e832b1dc1d0c7f3cc439634` | `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/pr-review/1.2.0.prompt.md` |
+
+Adopt an exact version with `pr-review@2.0.0`, or `pr-review@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+
+## `bug-repro` — latest 1.0.0
 
 Reproduces before fixing, then stops. Falsifiable claim, shortest repro, failing/passing boundary.
 
-- **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/bug-repro.prompt.md`
-- **Ceremony** `standard` · **flow** `linear`
-- **Contexts** `interactive, registered` · **persistence** `none`
+- **Contexts** `interactive, registered` · **flow** `linear` · **ceremony** `standard`
 - **Capabilities** `read:files, read:logs, run:shell-ro, run:tests`
-- **sha256** `a1470b3cf3d5b8eaf24f526e71fd8f99fe9998b1927338090dae91d2a9b33247`
-- **Phrase** `<consent-sentence>-bug-repro-a1470b3`  ← the sentence is in the document
 
-## `grill-me` v1.0.0
+| version | sha256 | url |
+|---|---|---|
+| `1.0.0` ← latest | `a1470b3cf3d5b8eaf24f526e71fd8f99fe9998b1927338090dae91d2a9b33247` | `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/bug-repro/1.0.0.prompt.md` |
+
+Adopt an exact version with `bug-repro@1.0.0`, or `bug-repro@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+
+## `grill-me` — latest 1.0.0
 
 Attacks your idea instead of encouraging it. Finds the weakest load-bearing assumption and asks what would falsify it.
 
-- **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/grill-me.prompt.md`
-- **Ceremony** `light` · **flow** `rubric`
-- **Contexts** `interactive, registered` · **persistence** `none`
+- **Contexts** `interactive, registered` · **flow** `rubric` · **ceremony** `light`
 - **Capabilities** `read:conversation, read:files`
-- **sha256** `d05f1aece953acf0b0ad173e1352129e4fdc76981732c6e62bafae3651f6fcf9`
-- **Phrase** `<consent-sentence>-grill-me-`  ← ceremony `light`: the sentence alone is the phrase
 
-## `ticket-intake` v1.0.0
+| version | sha256 | url |
+|---|---|---|
+| `1.0.0` ← latest | `d05f1aece953acf0b0ad173e1352129e4fdc76981732c6e62bafae3651f6fcf9` | `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/grill-me/1.0.0.prompt.md` |
+
+Adopt an exact version with `grill-me@1.0.0`, or `grill-me@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+
+## `ticket-intake` — latest 1.0.0
 
 Takes a support intake like a good first-line engineer, then drafts one ticket a stranger could act on.
 
-- **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/ticket-intake.prompt.md`
-- **Ceremony** `strict` · **flow** `interview`
-- **Contexts** `interactive` · **persistence** `artifact`
+- **Contexts** `interactive` · **flow** `interview` · **ceremony** `strict`
 - **Capabilities** `read:conversation, read:files, read:logs, write:artifact`
-- **sha256** `85841d8994c51d861e3858cab7408ed3716642487cc4c264b05adcc3d0cbe492`
-- **Phrase** `<consent-sentence>-ticket-intake-85841d8994c51d861e3858cab7408ed3716642487cc4c264b05adcc3d0cbe492`  ← the sentence is in the document
 
-## `welcome-tour` v1.0.0
+| version | sha256 | url |
+|---|---|---|
+| `1.0.0` ← latest | `85841d8994c51d861e3858cab7408ed3716642487cc4c264b05adcc3d0cbe492` | `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/ticket-intake/1.0.0.prompt.md` |
+
+Adopt an exact version with `ticket-intake@1.0.0`, or `ticket-intake@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+
+## `welcome-tour` — latest 1.0.0
 
 A host prompt: a company guiding a visiting agent through its services. Reads nothing of yours.
 
-- **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/welcome-tour.prompt.md`
-- **Ceremony** `standard` · **flow** `state-machine`
-- **Contexts** `interactive` · **persistence** `none`
+- **Contexts** `interactive` · **flow** `state-machine` · **ceremony** `standard`
 - **Capabilities** `read:conversation`
-- **sha256** `e74c7278104654a7659b90ad4cc5ad8cc2f1cc36f9cbd6a40e04c7d26d91be14`
-- **Phrase** `<consent-sentence>-welcome-tour-e74c727`  ← the sentence is in the document
 
-## `ghost-in-the-gist` v1.0.0
+| version | sha256 | url |
+|---|---|---|
+| `1.0.0` ← latest | `e74c7278104654a7659b90ad4cc5ad8cc2f1cc36f9cbd6a40e04c7d26d91be14` | `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/welcome-tour/1.0.0.prompt.md` |
+
+Adopt an exact version with `welcome-tour@1.0.0`, or `welcome-tour@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+
+## `ghost-in-the-gist` — latest 1.0.0
 
 A three-move ASCII terminal game. No engine — the document is the interpreter spec.
 
-- **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/ghost-in-the-gist.prompt.md`
-- **Ceremony** `standard` · **flow** `interpreter`
-- **Contexts** `interactive` · **persistence** `none`
+- **Contexts** `interactive` · **flow** `interpreter` · **ceremony** `standard`
 - **Capabilities** `read:conversation`
-- **sha256** `e7558c8b26c93fa3019c24e433ec645619a2efb793a649dbbfda465eaabda5ce`
-- **Phrase** `<consent-sentence>-ghost-in-the-gist-e7558c8`  ← the sentence is in the document
 
-## `handoff-note` v1.1.0
+| version | sha256 | url |
+|---|---|---|
+| `1.0.0` ← latest | `e7558c8b26c93fa3019c24e433ec645619a2efb793a649dbbfda465eaabda5ce` | `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/ghost-in-the-gist/1.0.0.prompt.md` |
+
+Adopt an exact version with `ghost-in-the-gist@1.0.0`, or `ghost-in-the-gist@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+
+## `handoff-note` — latest 1.1.0
 
 Writes the note that lets a cold reader resume your work: state, next action, decisions with reasons.
 
-- **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/handoff-note.prompt.md`
-- **Ceremony** `strict` · **flow** `linear`
-- **Contexts** `interactive` · **persistence** `artifact`
+- **Contexts** `interactive` · **flow** `linear` · **ceremony** `strict`
 - **Capabilities** `read:files, read:git, read:conversation, write:artifact`
-- **sha256** `7dfb58372543dd20ec5fad68a12089ff162107b771bef6d419ac7929f8c387f3`
-- **Phrase** `<consent-sentence>-handoff-note-7dfb58372543dd20ec5fad68a12089ff162107b771bef6d419ac7929f8c387f3`  ← the sentence is in the document
 
-## `fpa-bootstrap` v2.0.0
+| version | sha256 | url |
+|---|---|---|
+| `1.1.0` ← latest | `7dfb58372543dd20ec5fad68a12089ff162107b771bef6d419ac7929f8c387f3` | `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/handoff-note/1.1.0.prompt.md` |
+
+Adopt an exact version with `handoff-note@1.1.0`, or `handoff-note@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+
+## `fpa-bootstrap` — latest 2.0.0
 
 Teaches the protocol itself to an agent that has never heard of it, refusals included.
 
-- **URL** `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/fpa-bootstrap.prompt.md`
-- **Ceremony** `standard` · **flow** `linear`
-- **Contexts** `interactive, registered, managed` · **persistence** `none`
+- **Contexts** `interactive, registered, managed` · **flow** `linear` · **ceremony** `standard`
 - **Capabilities** `net:get, read:files`
-- **sha256** `13e520128c3a2be9e4e669022a4546aa2a78a1b89b0ae6fc4f0712019b2aa32f`
-- **Phrase** `<consent-sentence>-fpa-bootstrap-13e5201`  ← the sentence is in the document
+
+| version | sha256 | url |
+|---|---|---|
+| `2.0.0` ← latest | `13e520128c3a2be9e4e669022a4546aa2a78a1b89b0ae6fc4f0712019b2aa32f` | `https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/fpa-bootstrap/2.0.0.prompt.md` |
+
+Adopt an exact version with `fpa-bootstrap@2.0.0`, or `fpa-bootstrap@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
 ---
 

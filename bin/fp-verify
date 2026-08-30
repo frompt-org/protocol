@@ -90,10 +90,20 @@ if seen.exists():
         sys.exit(1)
 seen.parent.mkdir(parents=True, exist_ok=True)
 seen.write_text(str(serial) + "\n")
-entry = next((p for p in manifest["prompts"] if p["id"] == wanted), None)
-if entry is None:
+wanted, _, selector = wanted.partition("@")
+group = next((p for p in manifest["prompts"] if p["id"] == wanted), None)
+if group is None:
     print(f"fp-verify: {wanted!r} is not in the signed manifest -- refusing", file=sys.stderr)
     sys.exit(1)
+asked = selector or "latest"
+target = group["latest"] if asked == "latest" else asked
+entry = next((v for v in group["versions"] if v["version"] == target), None)
+if entry is None:
+    have = ", ".join(v["version"] for v in group["versions"])
+    print(f"fp-verify: {wanted} has no version {target!r} in the signed manifest. "
+          f"Published: {have}", file=sys.stderr)
+    sys.exit(1)
+entry = dict(entry, id=wanted)
 # A fetched manifest names where its own documents live; prefer that over the
 # base baked into whatever copy happened to be on disk.
 if base:

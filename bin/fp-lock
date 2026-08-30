@@ -49,9 +49,12 @@ def current():
     compares.
     """
     m = manifest()
-    urls = {p["id"]: f"{m['base']}/{p['file']}" for p in m["prompts"]}
+    urls = {}
+    for entry in m["prompts"]:
+        for v in entry["versions"]:
+            urls[(entry["id"], v["version"])] = f"{m['base']}/{v['file']}"
     out = {}
-    for path in sorted(ROOT.glob("prompts/*.prompt.md")):
+    for path in sorted(ROOT.glob("prompts/*/*.prompt.md")):
         raw = path.read_bytes()
         fm = {}
         for line in raw.decode("utf-8").splitlines()[2:]:
@@ -60,17 +63,31 @@ def current():
             if ":" in line:
                 k, v = line.split(":", 1)
                 fm[k.strip()] = v.strip()
-        out[fm["id"]] = (fm["version"], hashlib.sha256(raw).hexdigest(),
-                         urls.get(fm["id"], f"{m['base']}/{path.name}"))
-    return out
+        key = (fm["id"], fm["version"])
+        out.setdefault(fm["id"], []).append(
+            (fm["version"], hashlib.sha256(raw).hexdigest(),
+             urls.get(key, f"{m['base']}/{path.parent.name}/{path.name}")))
+    # A lock pins one version per id: the newest published, unless --update says
+    # otherwise. Pinning several would be a range by another name.
+    return {pid: max(vs, key=lambda v: semver_key(v[0])) for pid, vs in out.items()}
+
+
+def semver_key(v):
+    core, _, pre = v.partition("-")
+    nums = tuple(int(x) if x.isdigit() else 0 for x in core.split("."))
+    return nums + ((0, pre) if pre else (1, ""))
 
 
 def registered_ids():
     """Only prompts declaring `registered` may be pinned. A pin is consent given
     once for unattended reuse, and a prompt that never offered itself for that
     should not acquire it by being listed."""
-    return {p["id"] for p in manifest()["prompts"]
-            if "registered" in [c.strip() for c in p.get("contexts", "").split(",")]}
+    fit = set()
+    for entry in manifest()["prompts"]:
+        newest = entry["versions"][0]
+        if "registered" in [c.strip() for c in newest.get("contexts", "").split(",")]:
+            fit.add(entry["id"])
+    return fit
 
 
 def parse():

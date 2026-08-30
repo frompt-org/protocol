@@ -23,7 +23,7 @@ A foreign prompt is injection you chose. The pilot names one specific document w
 That is **agency, not security** — you know what got in, you chose it, you can end it. The trust model is `curl example.com | bash`: you are trusting the publisher, deliberately rather than unknowingly. What the protocol explicitly does **not** attempt is in [`FPA.md` §0](FPA.md) — those are non-goals, not a roadmap.
 
 ```
-recon https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon.prompt.md
+recon https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon/1.0.0.prompt.md
 ```
 ```
 ADOPTED: repo-recon v1.0.0
@@ -34,7 +34,7 @@ twelve file reads, and report in five fixed sections. Read-only.
 No install, no plugin, no config, no restart. When the session ends, so does the prompt — nothing was written anywhere.
 
 Those URLs are live: every prompt in this repo is fetchable as raw text, which is the entire distribution mechanism. Pin to a commit when you care what you are adopting —
-`https://raw.githubusercontent.com/agent-realm/foreign-prompts/8f20b7c…/prompts/repo-recon.prompt.md` — because `main` can change under you and a commit cannot.
+`https://raw.githubusercontent.com/agent-realm/foreign-prompts/8f20b7c…/prompts/repo-recon/1.0.0.prompt.md` — because `main` can change under you and a commit cannot.
 
 ## What it is
 
@@ -133,7 +133,7 @@ None of this makes an untrusted URL safe — nothing does. It makes a trusted on
 
 Prompts differ in what they make an agent *be*, not just what they make it do.
 
-**Stuck, and not sure what you need** — [`help-me`](prompts/help-me.prompt.md) is the front door. It interviews *your own agent* about this session — what was attempted, how many restarts, what it has been assuming — then draws a route through other prompts and lets you pick:
+**Stuck, and not sure what you need** — [`help-me`](prompts/help-me/1.0.0.prompt.md) is the front door. It interviews *your own agent* about this session — what was attempted, how many restarts, what it has been assuming — then draws a route through other prompts and lets you pick:
 
 ```
 you are here ─→ bug-repro ─→ reproduced? ─┬─ yes ─→ fix ─→ pr-review
@@ -142,7 +142,7 @@ you are here ─→ bug-repro ─→ reproduced? ─┬─ yes ─→ fix ─→
 
 It denies `net:get` on purpose: it names prompts and URLs, and never fetches one. A root prompt that pulled its own recommendations would turn one adoption into an unbounded chain.
 
-**A method** — [`grill-me`](prompts/grill-me.prompt.md) attacks your idea instead of encouraging it, finds the weakest load-bearing assumption, and is forbidden from closing on reassurance:
+**A method** — [`grill-me`](prompts/grill-me/1.0.0.prompt.md) attacks your idea instead of encouraging it, finds the weakest load-bearing assumption, and is forbidden from closing on reassurance:
 
 ```
 The load-bearing assumption is that teams will switch tools for a 20% speedup.
@@ -150,11 +150,11 @@ Nothing you have shown suggests they switch for less than 2x.
 What I would need: one team that switched for a smaller gain, and why.
 ```
 
-**A front door for a company** — [`welcome-tour`](prompts/welcome-tour.prompt.md) is a *host prompt*: an organization publishes it so a visiting agent can be shown its services on behalf of its pilot. Its `deny` list is longer than its `allow` — it cannot read your files, fetch anything, or send anything outward. A guide that reads your workspace is not a guide.
+**A front door for a company** — [`welcome-tour`](prompts/welcome-tour/1.0.0.prompt.md) is a *host prompt*: an organization publishes it so a visiting agent can be shown its services on behalf of its pilot. Its `deny` list is longer than its `allow` — it cannot read your files, fetch anything, or send anything outward. A guide that reads your workspace is not a guide.
 
-**A colleague** — [`ticket-intake`](prompts/ticket-intake.prompt.md) takes a support intake the way a good first-line engineer does, then drafts one ticket a stranger could act on. `ceremony: strict`, because it writes a file: sixty-four hex characters is deliberately annoying, and a prompt touching your disk should cost more than one that only talks.
+**A colleague** — [`ticket-intake`](prompts/ticket-intake/1.0.0.prompt.md) takes a support intake the way a good first-line engineer does, then drafts one ticket a stranger could act on. `ceremony: strict`, because it writes a file: sixty-four hex characters is deliberately annoying, and a prompt touching your disk should cost more than one that only talks.
 
-**An experience** — [`ghost-in-the-gist`](prompts/ghost-in-the-gist.prompt.md) turns the chat window into a three-move ASCII terminal game. No engine exists; the document *is* the interpreter spec:
+**An experience** — [`ghost-in-the-gist`](prompts/ghost-in-the-gist/1.0.0.prompt.md) turns the chat window into a three-move ASCII terminal game. No engine exists; the document *is* the interpreter spec:
 
 ```
 ┌───────────────────────────────────────────────┐
@@ -178,16 +178,16 @@ Full list with digests: [`INDEX.md`](INDEX.md). Annotated transcripts: [`example
 
 | Prompt | Ceremony | Flow | Does |
 |---|---|---|---|
-| [`help-me`](prompts/help-me.prompt.md) | standard | interview | Interviews your agent about this session, proposes a route through other prompts. **Start here.** |
-| [`repo-recon`](prompts/repo-recon.prompt.md) | standard | linear | Maps an unfamiliar codebase from entry points, seams and churn. |
-| [`pr-review`](prompts/pr-review.prompt.md) | light | rubric | Judges a diff by tiers, with a stated blind spot and a verdict. |
-| [`bug-repro`](prompts/bug-repro.prompt.md) | standard | linear | Reproduces before fixing, then stops. |
-| [`grill-me`](prompts/grill-me.prompt.md) | light | rubric | Attacks your idea. Never closes on encouragement. |
-| [`ticket-intake`](prompts/ticket-intake.prompt.md) | strict | interview | Support intake, then one ticket a stranger could act on. |
-| [`welcome-tour`](prompts/welcome-tour.prompt.md) | standard | state-machine | A company guiding a visiting agent. Reads nothing of yours. |
-| [`ghost-in-the-gist`](prompts/ghost-in-the-gist.prompt.md) | standard | interpreter | The terminal above. |
-| [`handoff-note`](prompts/handoff-note.prompt.md) | strict | linear | The note that lets a cold reader resume your work. |
-| [`fpa-bootstrap`](prompts/fpa-bootstrap.prompt.md) | standard | linear | Teaches the protocol itself, refusals included. |
+| [`help-me`](prompts/help-me/1.0.0.prompt.md) | standard | interview | Interviews your agent about this session, proposes a route through other prompts. **Start here.** |
+| [`repo-recon`](prompts/repo-recon/1.0.0.prompt.md) | standard | linear | Maps an unfamiliar codebase from entry points, seams and churn. |
+| [`pr-review`](prompts/pr-review/2.0.0.prompt.md) | light | rubric | Judges a diff by tiers, with a stated blind spot and a verdict. |
+| [`bug-repro`](prompts/bug-repro/1.0.0.prompt.md) | standard | linear | Reproduces before fixing, then stops. |
+| [`grill-me`](prompts/grill-me/1.0.0.prompt.md) | light | rubric | Attacks your idea. Never closes on encouragement. |
+| [`ticket-intake`](prompts/ticket-intake/1.0.0.prompt.md) | strict | interview | Support intake, then one ticket a stranger could act on. |
+| [`welcome-tour`](prompts/welcome-tour/1.0.0.prompt.md) | standard | state-machine | A company guiding a visiting agent. Reads nothing of yours. |
+| [`ghost-in-the-gist`](prompts/ghost-in-the-gist/1.0.0.prompt.md) | standard | interpreter | The terminal above. |
+| [`handoff-note`](prompts/handoff-note/1.1.0.prompt.md) | strict | linear | The note that lets a cold reader resume your work. |
+| [`fpa-bootstrap`](prompts/fpa-bootstrap/2.0.0.prompt.md) | standard | linear | Teaches the protocol itself, refusals included. |
 
 ## Late binding — the point of wrapping one in a skill
 
@@ -269,6 +269,31 @@ Nothing above is adopted. Adoption is an act, not a listing.
 The hook **prints context and never instructions**. A hook that adopted prompts on startup would be adopting on nobody's authority — the exact thing the protocol exists to prevent, wearing the badge of the platform.
 
 `bin/fp-agent` mints the identity; `bin/fp-record` keeps the append-only log of what was adopted, at which digest, on whose authorization. It is local and unsigned: it names an actor for an audit trail, it does not authenticate one. A managed deployment issues identities from the platform that starts the agent — this is what a laptop gets.
+
+## Versions
+
+A prompt's versions are separate immutable documents:
+
+```
+prompts/pr-review/1.2.0.prompt.md     three verdicts, verdict last
+prompts/pr-review/1.3.0.prompt.md     adds `second-reader` for what it cannot settle
+prompts/pr-review/2.0.0.prompt.md     verdict first — a breaking change to the output contract
+```
+
+Two selectors, and no more:
+
+```bash
+bin/fp-resolve pr-review@1.2.0     # exactly that one
+bin/fp-resolve pr-review@latest    # newest non-prerelease
+```
+
+**No range grammar, deliberately.** `^1.2` exists to reconcile transitive dependencies, and a foreign prompt has none — a pilot adopts one document, and a chained one needs a fresh decision. There is no diamond to resolve, so the machinery that resolves diamonds is weight without a load.
+
+And the digest is doing the real work anyway: a version number helps a human *choose*, while the digest *binds*. Choose wrong and you still provably got the bytes the manifest named.
+
+One rule underneath: **published bytes never change.** A change is a new version. Without that, a lock file is a lie.
+
+Selectors never appear in a confirmation phrase — a phrase binds a digest, and `latest` has none until it resolves. So `@latest` belongs to the pinned and signed contexts, where something other than a human is doing the authorizing.
 
 ## The index, and what it deliberately withholds
 

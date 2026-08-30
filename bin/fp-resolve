@@ -6,7 +6,9 @@ an id up in the index, fetches it, recomputes the digest, and refuses if that
 digest is not the one the index published. Nothing here interprets the document;
 that is the agent's job, and it happens only after this exits 0.
 
-    fp-resolve pr-review                      # resolve from the published URL
+    fp-resolve pr-review@1.2.0                # a version, exactly
+    fp-resolve pr-review@latest               # whatever is newest now
+    fp-resolve pr-review                      # same as @latest
     fp-resolve pr-review --base ./prompts     # resolve from a local checkout
     fp-resolve --list                         # what the index offers
     fp-resolve pr-review --record             # the adoption record, without the body
@@ -20,6 +22,7 @@ nothing to discuss.
 """
 import hashlib
 import pathlib
+import json
 import re
 import sys
 
@@ -27,26 +30,41 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 INDEX = ROOT / "INDEX.md"
 
 
+def semver_key(v):
+    core, _, pre = v.partition("-")
+    nums = tuple(int(x) if x.isdigit() else 0 for x in core.split("."))
+    return nums + ((0, pre) if pre else (1, ""))
+
+
 def entries():
-    """id -> {url, digest, ceremony, flow} parsed out of the published index."""
-    out, current = {}, None
-    for line in INDEX.read_text().splitlines():
-        m = re.match(r"^## `([a-z0-9-]+)` v(\S+)", line)
-        if m:
-            current = {"id": m.group(1), "version": m.group(2)}
-            out[m.group(1)] = current
-            continue
-        if not current:
-            continue
-        for key, pat in (("url", r"\*\*URL\*\* `(\S+)`"),
-                         ("digest", r"\*\*sha256\*\* `([0-9a-f]{64})`"),
-                         ("ceremony", r"\*\*Ceremony\*\* `(\w+)`"),
-                         ("flow", r"\*\*flow\*\* `([a-z-]+)`"),
-                         ("contexts", r"\*\*Contexts\*\* `([a-z, ]+)`")):
-            hit = re.search(pat, line)
-            if hit:
-                current[key] = hit.group(1)
-    return out
+    """id -> {latest, versions[]} from the signed manifest.
+
+    Read from index.json rather than INDEX.md: the machine-readable copy is the
+    one a signature covers, and prose is not a data structure.
+    """
+    try:
+        manifest = json.loads((ROOT / "index.json").read_text())
+    except OSError:
+        return {}
+    return {p["id"]: p for p in manifest.get("prompts", [])}
+
+
+def select(entry, selector):
+    """Pick one version. Exactly two selectors exist: a version, or `latest`.
+
+    No range grammar, deliberately. Ranges reconcile transitive dependencies and
+    there are none here -- a pilot adopts one document, and chains need a fresh
+    decision. Choosing is a human act; the digest is what binds.
+    """
+    versions = entry["versions"]
+    if selector in (None, "", "latest"):
+        wanted = entry["latest"]
+    else:
+        wanted = selector
+    for v in versions:
+        if v["version"] == wanted:
+            return v, wanted
+    return None, wanted
 
 
 def tokens_of(value):
@@ -78,17 +96,27 @@ def main(argv):
     known = entries()
     if "--list" in flags:
         for e in known.values():
-            print(f"{e['id']:<20} v{e['version']:<8} {e.get('ceremony','?'):<9} {e.get('flow','?')}")
+            newest = e["versions"][0]
+            others = ", ".join(v["version"] for v in e["versions"][1:])
+            print(f"{e['id']:<20} latest {e['latest']:<8} {newest.get('ceremony','?'):<9} "
+                  f"{newest.get('flow','?'):<14}" + (f"also {others}" if others else ""))
         return 0
 
-    wanted = args[0]
+    wanted, _, selector = args[0].partition("@")
     base = None
     if "--base" in argv:
         base = argv[argv.index("--base") + 1]
 
     if wanted in known:
-        entry = known[wanted]
-        source = f"{base.rstrip('/')}/{wanted}.prompt.md" if base else entry["url"]
+        version, asked = select(known[wanted], selector)
+        if version is None:
+            have = ", ".join(v["version"] for v in known[wanted]["versions"])
+            print(f"fp-resolve: {wanted} has no version {asked!r}. Published: {have}",
+                  file=sys.stderr)
+            return 1
+        entry = dict(version, id=wanted)
+        source = (f"{base.rstrip('/')}/{entry['file']}" if base
+                  else f"{json.loads((ROOT / 'index.json').read_text())['base']}/{entry['file']}")
     elif wanted.startswith(("http://", "https://")) or pathlib.Path(wanted).exists():
         # Nothing vouched for these bytes, so there is nothing to verify against.
         # Exiting 0 here meant a skill told "adopt what it printed" adopted a
@@ -148,8 +176,9 @@ def main(argv):
               "the bytes the index vouched for.", file=sys.stderr)
         return 1
 
-    how = "pinned" if "--lock" in flags else ("indexed" if entry else "unindexed")
-    record = (f"resolved={wanted} version={entry['version'] if entry else '?'} "
+    how = "pinned" if "--lock" in flags else "indexed"
+    asked = selector or "latest"
+    record = (f"resolved={wanted}@{asked} version={entry['version']} "
               f"digest={digest[:12]} source={source} verified={how}")
     if "--record" in flags:
         print(record)

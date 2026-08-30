@@ -46,7 +46,7 @@ def front_matter(text):
 
 def rows():
     out = []
-    for path in sorted(ROOT.glob("prompts/*.prompt.md")):
+    for path in sorted(ROOT.glob("prompts/*/*.prompt.md")):
         raw = path.read_bytes()
         fm = front_matter(raw.decode("utf-8"))
         out.append({
@@ -54,10 +54,36 @@ def rows():
             "flow": fm["flow"], "allow": fm["allow"], "deny": fm["deny"],
             "contexts": fm.get("contexts", "interactive"),
             "persistence": fm.get("persistence", "none"),
-            "digest": hashlib.sha256(raw).hexdigest(), "file": path.name,
+            "digest": hashlib.sha256(raw).hexdigest(),
+            "file": f"{path.parent.name}/{path.name}",
         })
-    out.sort(key=lambda r: ORDER.index(r["id"]) if r["id"] in ORDER else 99)
+    out.sort(key=lambda r: (ORDER.index(r["id"]) if r["id"] in ORDER else 99,
+                            semver_key(r["version"])))
     return out
+
+
+def semver_key(v):
+    """Sort key. A prerelease sorts below the release it precedes, so `latest`
+    never lands on 2.0.0-rc.1 when 1.3.0 is the newest finished version."""
+    core, _, pre = v.partition("-")
+    nums = tuple(int(x) if x.isdigit() else 0 for x in core.split("."))
+    return nums + ((0, pre) if pre else (1, ""))
+
+
+def grouped():
+    """id -> versions, newest first, with the id's channels resolved."""
+    by_id = {}
+    for r in rows():
+        by_id.setdefault(r["id"], []).append(r)
+    for versions in by_id.values():
+        versions.sort(key=lambda r: semver_key(r["version"]), reverse=True)
+    return by_id
+
+
+def latest_of(versions):
+    """Newest release, ignoring prereleases unless there is nothing else."""
+    releases = [v for v in versions if "-" not in v["version"]]
+    return (releases or versions)[0]["version"]
 
 
 def manifest():
@@ -70,10 +96,17 @@ def manifest():
     still perfectly valid, which is exactly what makes rollback attacks quiet.
     """
     body = {
-        "manifest_version": 1,
+        "manifest_version": 2,
         "protocol": "FOREIGN-PROMPT v2",
         "base": RAW,
-        "prompts": [{k: r[k] for k in sorted(r)} for r in rows()],
+        "prompts": [
+            {
+                "id": pid,
+                "latest": latest_of(versions),
+                "versions": [{k: v[k] for k in sorted(v) if k != "id"} for v in versions],
+            }
+            for pid, versions in grouped().items()
+        ],
     }
     previous, serial = None, 1
     js = ROOT / "index.json"
@@ -91,10 +124,10 @@ def manifest():
 
 
 def build():
-    rows_ = rows()
 
     out = ["# Index of foreign prompts", "",
-           "Every prompt in this repo, with the digest of its published bytes.", "",
+           "Every prompt in this repo, every published version, and the digest of each one's "
+           "bytes.", "",
            "**This index cannot give you a confirmation phrase, by design.** A phrase is a consent",
            "sentence plus an id plus a digest. The digest is here — a document cannot contain its own",
            "hash, so publishing it out of band is the intended route. The consent sentence is *not*:",
@@ -106,19 +139,22 @@ def build():
            "", "If it disagrees with this table, you and this index are not looking at the same",
            "document. Do not adopt it; open an issue.", "", "---", ""]
 
-    for r in rows_:
-        out += [f"## `{r['id']}` v{r['version']}", "",
-                SUMMARY.get(r["id"], ""), "",
-                f"- **URL** `{RAW}/{r['file']}`",
-                f"- **Ceremony** `{r['ceremony']}` · **flow** `{r['flow']}`",
-                f"- **Contexts** `{r['contexts']}` · **persistence** `{r['persistence']}`",
-                f"- **Capabilities** `{r['allow']}`",
-                f"- **sha256** `{r['digest']}`",
-                f"- **Phrase** `<consent-sentence>-{r['id']}-"
-                + (r["digest"] if r["ceremony"] == "strict" else r["digest"][:7] if r["ceremony"] != "light" else "")
-                + "`" + ("  ← the sentence is in the document" if r["ceremony"] != "light"
-                         else "  ← ceremony `light`: the sentence alone is the phrase"),
-                ""]
+    for pid, versions in grouped().items():
+        newest = versions[0]
+        latest = latest_of(versions)
+        out += [f"## `{pid}` — latest {latest}", "",
+                SUMMARY.get(pid, ""), "",
+                f"- **Contexts** `{newest['contexts']}` · **flow** `{newest['flow']}` · "
+                f"**ceremony** `{newest['ceremony']}`",
+                f"- **Capabilities** `{newest['allow']}`",
+                "", "| version | sha256 | url |", "|---|---|---|"]
+        for v in versions:
+            out.append(f"| `{v['version']}`{' ← latest' if v['version'] == latest else ''} | "
+                       f"`{v['digest']}` | `{RAW}/{v['file']}` |")
+        out += ["",
+                f"Adopt an exact version with `{pid}@{latest}`, or `{pid}@latest` to take whatever "
+                "is newest at the time. The consent sentence is in each version's own final "
+                "section — versions differ, and so do their sentences.", ""]
     out += ["---", "",
             "Regenerate with `bin/fp-index`, which also writes `index.json` — the same data, "
             "machine-readable, and the thing a signature covers. `make test` fails if either "

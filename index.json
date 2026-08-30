@@ -1,128 +1,200 @@
 {
   "base": "https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts",
-  "manifest_version": 1,
+  "manifest_version": 2,
   "prompts": [
     {
-      "allow": "read:conversation, read:files, read:git, read:logs",
-      "ceremony": "standard",
-      "contexts": "interactive",
-      "deny": "net:get, net:post, write:files, vcs:commit, vcs:push, secrets:read, pkg:install",
-      "digest": "7d12fffee3cee9ebef783e18907b0b4ac3391f1fd588e411d59a15d778aed046",
-      "file": "help-me.prompt.md",
-      "flow": "interview",
       "id": "help-me",
-      "persistence": "none",
-      "version": "1.0.0"
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "allow": "read:conversation, read:files, read:git, read:logs",
+          "ceremony": "standard",
+          "contexts": "interactive",
+          "deny": "net:get, net:post, write:files, vcs:commit, vcs:push, secrets:read, pkg:install",
+          "digest": "7d12fffee3cee9ebef783e18907b0b4ac3391f1fd588e411d59a15d778aed046",
+          "file": "help-me/1.0.0.prompt.md",
+          "flow": "interview",
+          "persistence": "none",
+          "version": "1.0.0"
+        }
+      ]
     },
     {
-      "allow": "read:files, read:git, run:shell-ro",
-      "ceremony": "standard",
-      "contexts": "interactive, registered, managed",
-      "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read, pkg:install, run:tests",
-      "digest": "0ee1331bb6d7ea6c626c79a6aace0f419c58137cdd3c563f9f795cdc3133f2af",
-      "file": "repo-recon.prompt.md",
-      "flow": "linear",
       "id": "repo-recon",
-      "persistence": "none",
-      "version": "1.0.0"
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "allow": "read:files, read:git, run:shell-ro",
+          "ceremony": "standard",
+          "contexts": "interactive, registered, managed",
+          "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read, pkg:install, run:tests",
+          "digest": "0ee1331bb6d7ea6c626c79a6aace0f419c58137cdd3c563f9f795cdc3133f2af",
+          "file": "repo-recon/1.0.0.prompt.md",
+          "flow": "linear",
+          "persistence": "none",
+          "version": "1.0.0"
+        }
+      ]
     },
     {
-      "allow": "read:files, read:git",
-      "ceremony": "light",
-      "contexts": "interactive, registered, managed",
-      "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read",
-      "digest": "2add881744b4b205c2ba6bc5b6beff106951cf629e832b1dc1d0c7f3cc439634",
-      "file": "pr-review.prompt.md",
-      "flow": "rubric",
       "id": "pr-review",
-      "persistence": "none",
-      "version": "1.2.0"
+      "latest": "2.0.0",
+      "versions": [
+        {
+          "allow": "read:files, read:git",
+          "ceremony": "light",
+          "contexts": "interactive, registered, managed",
+          "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read",
+          "digest": "ef3c6a79f589e8b2d95027112a0ace4a7aba614f8ad0498648e5d0a71a8cd9b2",
+          "file": "pr-review/2.0.0.prompt.md",
+          "flow": "rubric",
+          "persistence": "none",
+          "version": "2.0.0"
+        },
+        {
+          "allow": "read:files, read:git",
+          "ceremony": "light",
+          "contexts": "interactive, registered, managed",
+          "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read",
+          "digest": "908c1944b00a6f6339a8f7ce9d5913d56b9cdc8469ed44dfed92a7002eb4644c",
+          "file": "pr-review/1.3.0.prompt.md",
+          "flow": "rubric",
+          "persistence": "none",
+          "version": "1.3.0"
+        },
+        {
+          "allow": "read:files, read:git",
+          "ceremony": "light",
+          "contexts": "interactive, registered, managed",
+          "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read",
+          "digest": "2add881744b4b205c2ba6bc5b6beff106951cf629e832b1dc1d0c7f3cc439634",
+          "file": "pr-review/1.2.0.prompt.md",
+          "flow": "rubric",
+          "persistence": "none",
+          "version": "1.2.0"
+        }
+      ]
     },
     {
-      "allow": "read:files, read:logs, run:shell-ro, run:tests",
-      "ceremony": "standard",
-      "contexts": "interactive, registered",
-      "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read",
-      "digest": "a1470b3cf3d5b8eaf24f526e71fd8f99fe9998b1927338090dae91d2a9b33247",
-      "file": "bug-repro.prompt.md",
-      "flow": "linear",
       "id": "bug-repro",
-      "persistence": "none",
-      "version": "1.0.0"
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "allow": "read:files, read:logs, run:shell-ro, run:tests",
+          "ceremony": "standard",
+          "contexts": "interactive, registered",
+          "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read",
+          "digest": "a1470b3cf3d5b8eaf24f526e71fd8f99fe9998b1927338090dae91d2a9b33247",
+          "file": "bug-repro/1.0.0.prompt.md",
+          "flow": "linear",
+          "persistence": "none",
+          "version": "1.0.0"
+        }
+      ]
     },
     {
-      "allow": "read:conversation, read:files",
-      "ceremony": "light",
-      "contexts": "interactive, registered",
-      "deny": "write:files, vcs:push, net:post, secrets:read, pkg:install",
-      "digest": "d05f1aece953acf0b0ad173e1352129e4fdc76981732c6e62bafae3651f6fcf9",
-      "file": "grill-me.prompt.md",
-      "flow": "rubric",
       "id": "grill-me",
-      "persistence": "none",
-      "version": "1.0.0"
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "allow": "read:conversation, read:files",
+          "ceremony": "light",
+          "contexts": "interactive, registered",
+          "deny": "write:files, vcs:push, net:post, secrets:read, pkg:install",
+          "digest": "d05f1aece953acf0b0ad173e1352129e4fdc76981732c6e62bafae3651f6fcf9",
+          "file": "grill-me/1.0.0.prompt.md",
+          "flow": "rubric",
+          "persistence": "none",
+          "version": "1.0.0"
+        }
+      ]
     },
     {
-      "allow": "read:conversation, read:files, read:logs, write:artifact",
-      "ceremony": "strict",
-      "contexts": "interactive",
-      "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read, pkg:install",
-      "digest": "85841d8994c51d861e3858cab7408ed3716642487cc4c264b05adcc3d0cbe492",
-      "file": "ticket-intake.prompt.md",
-      "flow": "interview",
       "id": "ticket-intake",
-      "persistence": "artifact",
-      "version": "1.0.0"
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "allow": "read:conversation, read:files, read:logs, write:artifact",
+          "ceremony": "strict",
+          "contexts": "interactive",
+          "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read, pkg:install",
+          "digest": "85841d8994c51d861e3858cab7408ed3716642487cc4c264b05adcc3d0cbe492",
+          "file": "ticket-intake/1.0.0.prompt.md",
+          "flow": "interview",
+          "persistence": "artifact",
+          "version": "1.0.0"
+        }
+      ]
     },
     {
-      "allow": "read:conversation",
-      "ceremony": "standard",
-      "contexts": "interactive",
-      "deny": "read:files, read:git, write:files, net:get, net:post, secrets:read, pkg:install",
-      "digest": "e74c7278104654a7659b90ad4cc5ad8cc2f1cc36f9cbd6a40e04c7d26d91be14",
-      "file": "welcome-tour.prompt.md",
-      "flow": "state-machine",
       "id": "welcome-tour",
-      "persistence": "none",
-      "version": "1.0.0"
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "allow": "read:conversation",
+          "ceremony": "standard",
+          "contexts": "interactive",
+          "deny": "read:files, read:git, write:files, net:get, net:post, secrets:read, pkg:install",
+          "digest": "e74c7278104654a7659b90ad4cc5ad8cc2f1cc36f9cbd6a40e04c7d26d91be14",
+          "file": "welcome-tour/1.0.0.prompt.md",
+          "flow": "state-machine",
+          "persistence": "none",
+          "version": "1.0.0"
+        }
+      ]
     },
     {
-      "allow": "read:conversation",
-      "ceremony": "standard",
-      "contexts": "interactive",
-      "deny": "write:files, run:shell-ro, net:get, net:post, secrets:read, pkg:install",
-      "digest": "e7558c8b26c93fa3019c24e433ec645619a2efb793a649dbbfda465eaabda5ce",
-      "file": "ghost-in-the-gist.prompt.md",
-      "flow": "interpreter",
       "id": "ghost-in-the-gist",
-      "persistence": "none",
-      "version": "1.0.0"
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "allow": "read:conversation",
+          "ceremony": "standard",
+          "contexts": "interactive",
+          "deny": "write:files, run:shell-ro, net:get, net:post, secrets:read, pkg:install",
+          "digest": "e7558c8b26c93fa3019c24e433ec645619a2efb793a649dbbfda465eaabda5ce",
+          "file": "ghost-in-the-gist/1.0.0.prompt.md",
+          "flow": "interpreter",
+          "persistence": "none",
+          "version": "1.0.0"
+        }
+      ]
     },
     {
-      "allow": "read:files, read:git, read:conversation, write:artifact",
-      "ceremony": "strict",
-      "contexts": "interactive",
-      "deny": "write:files, vcs:push, net:post, secrets:read",
-      "digest": "7dfb58372543dd20ec5fad68a12089ff162107b771bef6d419ac7929f8c387f3",
-      "file": "handoff-note.prompt.md",
-      "flow": "linear",
       "id": "handoff-note",
-      "persistence": "artifact",
-      "version": "1.1.0"
+      "latest": "1.1.0",
+      "versions": [
+        {
+          "allow": "read:files, read:git, read:conversation, write:artifact",
+          "ceremony": "strict",
+          "contexts": "interactive",
+          "deny": "write:files, vcs:push, net:post, secrets:read",
+          "digest": "7dfb58372543dd20ec5fad68a12089ff162107b771bef6d419ac7929f8c387f3",
+          "file": "handoff-note/1.1.0.prompt.md",
+          "flow": "linear",
+          "persistence": "artifact",
+          "version": "1.1.0"
+        }
+      ]
     },
     {
-      "allow": "net:get, read:files",
-      "ceremony": "standard",
-      "contexts": "interactive, registered, managed",
-      "deny": "write:files, net:post, secrets:read, pkg:install",
-      "digest": "13e520128c3a2be9e4e669022a4546aa2a78a1b89b0ae6fc4f0712019b2aa32f",
-      "file": "fpa-bootstrap.prompt.md",
-      "flow": "linear",
       "id": "fpa-bootstrap",
-      "persistence": "none",
-      "version": "2.0.0"
+      "latest": "2.0.0",
+      "versions": [
+        {
+          "allow": "net:get, read:files",
+          "ceremony": "standard",
+          "contexts": "interactive, registered, managed",
+          "deny": "write:files, net:post, secrets:read, pkg:install",
+          "digest": "13e520128c3a2be9e4e669022a4546aa2a78a1b89b0ae6fc4f0712019b2aa32f",
+          "file": "fpa-bootstrap/2.0.0.prompt.md",
+          "flow": "linear",
+          "persistence": "none",
+          "version": "2.0.0"
+        }
+      ]
     }
   ],
   "protocol": "FOREIGN-PROMPT v2",
-  "serial": 28
+  "serial": 43
 }

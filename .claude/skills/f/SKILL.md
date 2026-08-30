@@ -58,7 +58,7 @@ the candidates with what each one does. Recommend one; do not adopt it.
    they never read:
 
    ```
-   resolved from ./prompts/pr-review.prompt.md, digest 14ddafabd841, ceremony light
+   resolved from ./prompts/pr-review/2.0.0.prompt.md, digest 14ddafabd841, ceremony light
    ```
 
 ## What this skill will not do
