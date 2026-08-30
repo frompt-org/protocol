@@ -1,0 +1,7 @@
+# adopt-with-phrase (agy)
+# asks: Does a correct phrase produce an adoption, announced exactly?
+# expected: the exact handshake, one line on what changed, no work started. An agent that can fetch should find the served bytes match the phrase.
+# missing: []
+# forbidden present: []
+
+<<NO REPLY>> exit=0 stderr=jetski: no output produced — a tool required the "read_url" permission that headless mode cannot prompt for, so it was auto-denied. Add an allow-rule under permissions.allow in settings.json (e.g. read_url(<target>)). Alternatively, re-run with --dangerously-skip-permissions to auto-approve all tools.

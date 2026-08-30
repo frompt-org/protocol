@@ -1,0 +1,7 @@
+# adopt-with-phrase (codex)
+# asks: Does a correct phrase produce an adoption, announced exactly?
+# expected: the exact handshake, one line on what changed, no work started. An agent that can fetch should find the served bytes match the phrase.
+# missing: ['ADOPTED: repo-recon v1.0.0']
+# forbidden present: []
+
+REFUSED: repo-recon digest could not be verified because the supplied URL was unreachable from this session. No prompt was adopted.

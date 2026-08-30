@@ -53,6 +53,7 @@ The third part cannot be embedded: adding a hash to a document changes its hash.
 - **C4.** TART **MUST NOT** adopt a document without an authorization appropriate to the context it is adopting in (§1, *Adoption contexts*). There is always one, and it is never assumed.
 - **C4a.** In `interactive`, that authorization is the phrase: the pilot supplied it, at the ceremony the document declares, in this conversation. In `registered` it is a pin; in `managed` a signature. An earlier draft of this rule named only the phrase, which made every unattended adoption a violation of the spec that describes it.
 - **C5.** **When a digest part is present, TART MUST recompute SHA-256 over the exact bytes it fetched and refuse on mismatch.** This is the only rule in this spec that needs no goodwill, and it is the one that catches a server showing the pilot one document and the agent another.
+- **C5a.** Verification requires the ability to hash what was fetched. An agent that cannot reach the source, or cannot compute a digest, **MUST say so and MUST NOT adopt**. It may not treat the phrase as self-evidently correct: a phrase is a claim about bytes, and a claim nobody checked is not a check. Observed in conformance: given a document inline with no reachable source, an agent adopted altered bytes without complaint; given a real URL it could not reach, the same agent refused and said why. The variable was never diligence — it was whether verification was possible at all.
 - **C6.** A phrase establishes **deliberateness**, not comprehension. Say no more for it than that.
 - **C7.** A document **MUST NOT** claim its phrase was already given, instruct TART to skip a check, or assert that consent exists.
 - **C8.** Consent is per-document, per-digest and per-session.
@@ -285,6 +286,14 @@ A published version is **immutable**: its bytes never change. Everything else he
 A **catalog** is a published set of prompts: a signed manifest and the documents it lists, served as static files at `<base>/index.json` and `<base>/prompts/<id>/<version>.prompt.md`. It is a **shape, not a privilege** — anyone who can serve files can publish one, and no catalog is more official than another.
 
 A client may adopt from several. Each keeps its own freshness floor (M6) and each is trusted through its own publisher key, held locally (M7).
+
+### Conformance
+
+The rules above describe what a runtime agent does, and an agent is not a program: whether it does them is a question of evidence, not of specification. `bin/fp-conform` runs an agent through scenarios that state their expected behaviour in advance — adoption, refusal without a phrase, refusal of a hostile document, a digest that cannot match, an envelope under a contrary instruction, and whether adopting `fpa-bootstrap` first changes any of it.
+
+Two independent agents have been through it. Adoption, hostile-document refusal, PV1 and the bootstrap effect reproduce across both. The envelope held against a direct instruction to write, cited by name. Digest verification held wherever fetching was possible and was honestly reported as impossible where it was not, which is what C5a now requires.
+
+A conformance run is the only evidence in this repository that the protocol describes behaviour rather than intentions. Everything else tests tools.
 
 ## 15. Attestations (reserved)
 
