@@ -1,7 +1,7 @@
 {
   "base": "https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts",
   "manifest_version": 2,
-  "not_after": "2026-09-29T23:23:07Z",
+  "not_after": "2026-09-30T07:19:50Z",
   "prompts": [
     {
       "id": "help-me",
@@ -197,5 +197,5 @@
     }
   ],
   "protocol": "FOREIGN-PROMPT v2",
-  "serial": 73
+  "serial": 75
 }

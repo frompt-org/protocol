@@ -281,6 +281,14 @@ A published version is **immutable**: its bytes never change. Everything else he
 - **V6.** A lock pins one version per id. Pinning several would be a range wearing a different hat.
 - **V7.** Versions of the same prompt **SHOULD** carry different consent sentences. They are different documents making different asks, and a pilot who read 1.2.0 has not read 2.0.0.
 
+### Transports
+
+A catalog is reached by some transport, and the protocol does not care which. `base` **MAY** be an https URL, a filesystem path, or a credentialed scheme such as `gh:owner/repo@ref`. What the protocol requires is unchanged in every case: hash the bytes that arrived and compare.
+
+- **T1.** A transport **MUST** deliver the document's exact bytes. One that renders, transcodes or normalizes is not a transport for this purpose — a rendered page hashes to something no manifest ever vouched for.
+- **T2.** A credentialed transport makes the fetcher's identity part of the trust story. Where a fleet fetches, each agent needs its own credential, and the read is logged by whoever holds the other end.
+- **T3.** A private catalog is a complete deployment. Publication is a choice about audience, not a condition of the protocol working.
+
 ### Catalogs
 
 A **catalog** is a published set of prompts: a signed manifest and the documents it lists, served as static files at `<base>/index.json` and `<base>/prompts/<id>/<version>.prompt.md`. It is a **shape, not a privilege** — anyone who can serve files can publish one, and no catalog is more official than another.

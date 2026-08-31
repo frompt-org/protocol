@@ -100,6 +100,8 @@ class Unreadable(Exception):
 def read_source(src):
     if src == "-":
         return sys.stdin.read()
+    if src.startswith("gh:"):
+        return fetch_gh(src)
     if src.startswith(("http://", "https://")):
         return fetch(src)
     try:
@@ -109,6 +111,33 @@ def read_source(src):
         raise Unreadable(f"not valid UTF-8 ({exc})") from exc
     except OSError as exc:
         raise Unreadable(str(exc)) from exc
+
+
+def fetch_gh(ref):
+    """gh:owner/repo@ref/path — fetch through the GitHub API with the caller's own
+    credential, so a private catalog needs no publication.
+
+    Byte-identical to the raw file: the API's raw media type returns the blob, not
+    a rendering of it. `gh` is doing nothing here that a token and curl could not;
+    it is simply the credential the pilot already has.
+    """
+    import subprocess
+    spec = ref[len("gh:"):]
+    repo, _, rest = spec.partition("@")
+    branch, _, path = rest.partition("/")
+    if not path:
+        raise Unreadable(f"gh reference needs a path: gh:owner/repo@branch/path -- got {ref!r}")
+    proc = subprocess.run(
+        ["gh", "api", f"repos/{repo}/contents/{path}", "-H", "Accept: application/vnd.github.raw",
+         "-X", "GET", "-f", f"ref={branch}"],
+        capture_output=True, timeout=30)
+    if proc.returncode != 0:
+        raise Unreadable(f"gh could not read {repo}@{branch}/{path}: "
+                         f"{proc.stderr.decode('utf-8', 'replace').strip()[:200]}")
+    raw = proc.stdout
+    if len(raw) > MAX_BYTES:
+        raise Unreadable(f"document exceeds {MAX_BYTES} bytes")
+    return raw.decode("utf-8")
 
 
 def fetch(url):

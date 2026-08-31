@@ -75,6 +75,14 @@ def read(source):
     """Return exact bytes. read_text() translates newlines, so a CRLF variant of a
     document hashed to the same digest as its LF original and passed verification
     -- the integrity check was checking a normalization, not the document."""
+    if source.startswith("gh:"):
+        import importlib.machinery
+        import importlib.util
+        loader = importlib.machinery.SourceFileLoader("fp_lint", str(ROOT / "bin" / "fp-lint"))
+        spec = importlib.util.spec_from_loader("fp_lint", loader)
+        fp = importlib.util.module_from_spec(spec)
+        loader.exec_module(fp)
+        return fp.fetch_gh(source).encode("utf-8")
     if source.startswith(("http://", "https://")):
         import importlib.machinery
         import importlib.util

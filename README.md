@@ -36,6 +36,16 @@ No install, no plugin, no config, no restart. When the session ends, so does the
 Those URLs are live: every prompt in this repo is fetchable as raw text, which is the entire distribution mechanism. Pin to a commit when you care what you are adopting —
 `https://raw.githubusercontent.com/agent-realm/foreign-prompts/8f20b7c…/prompts/repo-recon/1.0.0.prompt.md` — because `main` can change under you and a commit cannot.
 
+## Why this exists — one document, every agent
+
+A repository that several kinds of agent work in has a convention problem. `~/agent-realm/CLAUDE.md` is two hundred lines of rules every agent must follow: where worktrees live, how branches are named, which remotes are frozen, `git branch -d` and never `-D`, `docker rm -f -v` or you orphan a volume, contract before implementation on a cross-repo change.
+
+**Claude Code loads that file automatically. Codex, agy, opencode and antigravity do not.** Five of the six agents named in that very branch convention have no equivalent, or need their own copy — and changing a rule means editing every convention file in every checkout, then hoping.
+
+A foreign prompt is one document, addressed to `TART` rather than to any particular harness, adopted by whichever agent is working. Edit it once and the next agent picks up the new rule, in any repo, with nothing reinstalled anywhere.
+
+That is the case this protocol was built for, and it is not a demonstration: it is a problem that exists in this constellation today.
+
 ## What it is
 
 Every agent already fetches URLs on request, and what it reads steers it. A foreign prompt is what happens when the fetched document is **written for the reading agent instead of for a human**: it addresses the agent directly, declares what it may and may not do, states its flow, and asks for a handshake proving it started.
@@ -324,6 +334,29 @@ And the digest is doing the real work anyway: a version number helps a human *ch
 One rule underneath: **published bytes never change.** A change is a new version. Without that, a lock file is a lie.
 
 Selectors never appear in a confirmation phrase — a phrase binds a digest, and `latest` has none until it resolves. So `@latest` belongs to the pinned and signed contexts, where something other than a human is doing the authorizing.
+
+## Transports — a catalog need not be public
+
+How bytes arrive is not the protocol's business. The digest is the constant; the fetcher is pluggable, so `base` can be any of:
+
+```
+https://raw.githubusercontent.com/f-prompts/prompts/main   public, anonymous
+gh:f-prompts/prompts@main                                  private, the credential you already have
+https://prompts.acme.internal                              your own static server
+/opt/prompts                                               a path, airgapped
+```
+
+`gh:` is the one that matters for a private catalog. It fetches through the GitHub API with the caller's own credential and returns the blob, not a rendering of it — verified byte-identical to the raw file, which is what makes the digest still mean something:
+
+```
+$ bin/fp-verify repo-recon --from gh:f-prompts/prompts@main
+manifest verified: index.json signed by foreign-prompts-publisher
+authorized: repo-recon v1.0.0 digest 0ee1331bb6d7 serial 1 expires 2026-09-29T22:16:05Z
+```
+
+Signature, freshness and digest, against a repository nobody can read without permission. **Publishing is a decision about audience, not a prerequisite for the protocol working.**
+
+One caveat worth stating: a credentialed transport makes the *fetcher's* identity part of the story. For a fleet, that means a token per agent — a fine-grained PAT scoped to the catalog repo is the right granularity, and GitHub logs every read, which is an audit trail you get for free.
 
 ## Catalogs
 

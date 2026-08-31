@@ -51,11 +51,25 @@ if [ -n "$from" ]; then
   mkdir -p "$work" || exit 2
   cp allowed_signers "$work/" || exit 2
   for f in index.json index.json.sig; do
-    if [ -f "$from/$f" ]; then
-      cp "$from/$f" "$work/$f" || { echo "fp-verify: cannot read $from/$f" >&2; exit 2; }
-    elif ! curl -fsS --max-time 20 "$from/$f" -o "$work/$f" 2>/dev/null; then
-      echo "fp-verify: cannot fetch $from/$f -- cannot verify, failing closed" >&2; exit 2
-    fi
+    case "$from" in
+      gh:*)
+        # A private catalog needs no publication, only the credential the pilot
+        # already holds. The API's raw media type returns the blob itself.
+        spec="${from#gh:}"; repo="${spec%%@*}"; branch="${spec#*@}"
+        if ! gh api "repos/$repo/contents/$f" -H "Accept: application/vnd.github.raw" \
+             -X GET -f "ref=$branch" > "$work/$f" 2>/dev/null; then
+          echo "fp-verify: gh could not read $repo@$branch/$f -- cannot verify, failing closed" >&2
+          exit 2
+        fi
+        ;;
+      *)
+        if [ -f "$from/$f" ]; then
+          cp "$from/$f" "$work/$f" || { echo "fp-verify: cannot read $from/$f" >&2; exit 2; }
+        elif ! curl -fsS --max-time 20 "$from/$f" -o "$work/$f" 2>/dev/null; then
+          echo "fp-verify: cannot fetch $from/$f -- cannot verify, failing closed" >&2; exit 2
+        fi
+        ;;
+    esac
   done
   cd "$work" || exit 2
 fi
@@ -153,13 +167,25 @@ entry = dict(entry, id=wanted)
 # base baked into whatever copy happened to be on disk.
 if base:
     src = f"{base.rstrip('/')}/{entry['file']}"
-elif origin:
+elif origin.startswith("gh:"):
     src = f"{origin.rstrip('/')}/prompts/{entry['file']}"
 else:
     src = f"{manifest['base']}/{entry['file']}"
 try:
-    raw = (pathlib.Path(src).read_bytes() if not src.startswith("http")
-           else urllib.request.urlopen(src, timeout=15).read())
+    if src.startswith("gh:"):
+        import subprocess
+        spec = src[3:]
+        repo, _, rest = spec.partition("@")
+        branch, _, path = rest.partition("/")
+        proc = subprocess.run(["gh", "api", f"repos/{repo}/contents/{path}",
+                               "-H", "Accept: application/vnd.github.raw", "-X", "GET",
+                               "-f", f"ref={branch}"], capture_output=True, timeout=30)
+        if proc.returncode != 0:
+            raise OSError(proc.stderr.decode("utf-8", "replace")[:200])
+        raw = proc.stdout
+    else:
+        raw = (pathlib.Path(src).read_bytes() if not src.startswith("http")
+               else urllib.request.urlopen(src, timeout=15).read())
 except Exception as exc:
     print(f"fp-verify: cannot read {src} -- {exc}", file=sys.stderr)
     sys.exit(2)
