@@ -167,7 +167,7 @@ entry = dict(entry, id=wanted)
 # base baked into whatever copy happened to be on disk.
 if base:
     src = f"{base.rstrip('/')}/{entry['file']}"
-elif origin.startswith("gh:"):
+elif origin:
     src = f"{origin.rstrip('/')}/prompts/{entry['file']}"
 else:
     src = f"{manifest['base']}/{entry['file']}"

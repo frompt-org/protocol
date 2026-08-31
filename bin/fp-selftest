@@ -324,6 +324,18 @@ assert pinned == fit, f"{pinned ^ fit} differ"
 PY
 check "fpa.lock pins exactly the prompts fit for the registered context" 0 $?
 
+# --- transports: the digest is the constant, the fetcher is not --------------
+# A regression this check would have caught immediately: narrowing the document
+# path to gh: broke every other --from, because a local base fell through to the
+# manifest's own unreachable URL.
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  ghout=$("$here/bin/fp-lint" "gh:f-prompts/prompts@main/prompts/repo-recon/1.0.0.prompt.md" 2>&1)
+  printf '%s' "$ghout" | grep -q "VALID"
+  check "gh: transport reads a document from a private catalog" 0 $?
+else
+  echo "skip -- gh not authenticated; private-transport check needs it"
+fi
+
 # --- freshness is per catalog, not per client --------------------------------
 # Two catalogs, two serial lines. One global floor meant a brand new catalog
 # starting at 1 read as a rollback of an unrelated one already at 45.
