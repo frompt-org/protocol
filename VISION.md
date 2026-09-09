@@ -74,7 +74,7 @@ and is deliberately not the only publisher the protocol expects:
 | Repo | Role | Status |
 |---|---|---|
 | [`f-prompts/foreign-prompts`](https://github.com/f-prompts/foreign-prompts) | the protocol — spec, tools, reference prompts, conformance harness | exists, **private** |
-| [`f-prompts/prompts`](https://github.com/f-prompts/prompts) | the reference catalog — manifest, signature, documents | exists, **private** |
+| [`f-prompts/catalog`](https://github.com/f-prompts/catalog) | the reference catalog — manifest, signature, documents | exists, **private** |
 | [`f-prompts/.github`](https://github.com/f-prompts/.github) | the org's public face — what a foreign prompt is, the three doors out, what an agent landing there should do | exists, **private** |
 
 The protocol was born in the `agent-realm` constellation and moved out on 2026-09-09, before
@@ -111,7 +111,7 @@ Adoption in stages, each one useful alone, each one earning the next:
 | **0 — it works** | the protocol is specified, the tools run, an agent has been observed adopting, refusing, and holding an envelope | **done** |
 | **1 — we use it** | the constellation's own conventions become foreign prompts; agents in `agent-realm` adopt them instead of each reading a different convention file | **next** |
 | **2 — someone else uses it** | one team outside this constellation publishes a catalog and adopts from it | not started |
-| **3 — public, and findable** | `f-prompts/prompts` and `f-prompts/.github` go public; a directory at `f-prompts.io` lists this catalog and any other; adoption needs no prior relationship with a publisher, only a registration | written, not flipped; directory specified, unbuilt |
+| **3 — public, and findable** | `f-prompts/catalog` and `f-prompts/.github` go public; a directory at `f-prompts.io` lists this catalog and any other; adoption needs no prior relationship with a publisher, only a registration | written, not flipped; directory specified, unbuilt |
 | **4 — attestation** | authorities observe prompts and publish findings keyed by digest; pilots choose whose observations they value | reserved, unbuilt |
 
 Stage 1 is the honest test. A protocol whose author will not run their own conventions through

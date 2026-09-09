@@ -329,7 +329,7 @@ check "fpa.lock pins exactly the prompts fit for the registered context" 0 $?
 # path to gh: broke every other --from, because a local base fell through to the
 # manifest's own unreachable URL.
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  ghout=$("$here/bin/fp-lint" "gh:f-prompts/prompts@main/prompts/repo-recon/1.0.0.prompt.md" 2>&1)
+  ghout=$("$here/bin/fp-lint" "gh:f-prompts/catalog@main/prompts/repo-recon/1.0.0.prompt.md" 2>&1)
   printf '%s' "$ghout" | grep -q "VALID"
   check "gh: transport reads a document from a private catalog" 0 $?
 else
