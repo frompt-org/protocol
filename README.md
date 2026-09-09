@@ -36,6 +36,11 @@ No install, no plugin, no config, no restart. When the session ends, so does the
 Those URLs are live: every prompt in this repo is fetchable as raw text, which is the entire distribution mechanism. Pin to a commit when you care what you are adopting —
 `https://raw.githubusercontent.com/agent-realm/foreign-prompts/8f20b7c…/prompts/repo-recon/1.0.0.prompt.md` — because `main` can change under you and a commit cannot.
 
+**Four documents, one job each.** [`FPA.md`](FPA.md) is the protocol, normative — what an agent
+must do. [`VISION.md`](VISION.md) is the project — where prompts live, who publishes them, and
+what is not built yet. [`SECURITY.md`](SECURITY.md) is the trust model.
+[`TERMINOLOGY.md`](TERMINOLOGY.md) is the vocabulary. Everything else is listed at the end.
+
 ## Why this exists — one document, every agent
 
 A repository that several kinds of agent work in has a convention problem. `~/agent-realm/CLAUDE.md` is two hundred lines of rules every agent must follow: where worktrees live, how branches are named, which remotes are frozen, `git branch -d` and never `-D`, `docker rm -f -v` or you orphan a volume, contract before implementation on a cross-repo change.
@@ -381,11 +386,18 @@ So the index gives you part three, the document gives you part one, and you need
 
 ## Where this is going
 
-An **authority** is the intended layer above the protocol: a service that runs submitted prompts in isolation and publishes what it observed — capability footprint, whether the prompt fetched further sources, whether behaviour matched its declared envelope. Keyed by **digest**, never by URL or name, which is what the third part of the phrase makes possible.
+Three things, in order: the constellation's own conventions become foreign prompts and its
+agents adopt them; a public catalog and an index to browse it; then **authorities** — services
+that run a submitted prompt in isolation and publish what they observed, keyed by digest rather
+than by name, which is what the third part of the phrase makes possible.
 
-Two constraints are already written into [`FPA.md` §15](FPA.md): **observations, not verdicts** — a green tick invites the complacency that got the hostile-pattern scanner deleted — and **data, never prose**, because an attestation lands in an agent's context and a free-text field there is an injection channel with a badge on. Plural by design: many authorities, pilots choose whose observations they value.
+The authority's two constraints are already in [`FPA.md` §15](FPA.md): **observations, not
+verdicts** — a green tick invites the complacency that got the hostile-pattern scanner deleted —
+and **data, never prose**, because an attestation lands in an agent's context and a free-text
+field there is an injection channel with a badge on.
 
-Not built. The seam is reserved so it can plug in without a protocol change.
+None of it is built. [`VISION.md`](VISION.md) has the stages, the parties, the catalog layout,
+and an honest count of how many people other than the author have ever used this.
 
 ## Write one
 
@@ -405,6 +417,7 @@ To adopt one as a pilot, `bin/fp-adopt <url>` fetches the document, prints it fo
 | Path | What |
 |---|---|
 | [`FPA.md`](FPA.md) | The protocol, normative. |
+| [`VISION.md`](VISION.md) | The project — parties, catalogs, the org, the adoption stages, what is not built. |
 | [`TERMINOLOGY.md`](TERMINOLOGY.md) | Canon vocabulary — the words this repo uses, and the ones it refuses. |
 | [`SECURITY.md`](SECURITY.md) | Trust model, what to look for when you read a prompt, guidance for pilots and agents. |
 | [`prompts/`](prompts/) · [`TEMPLATE.prompt.md`](TEMPLATE.prompt.md) | Working prompts, and the skeleton for a new one. |
