@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""fp-assay — run a static scanner over a foreign prompt and record what it observed.
+
+    fp-assay <document.prompt.md> [-o attestations/]
+
+Writes two files keyed by the document's digest:
+
+    attestations/<digest>.skillspector.json       data only -- what a client may read
+    attestations/raw/<digest>.skillspector.json   the scanner's full report, for people
+
+The first is an attestation in the FPA.md 15 sense: an observation about these
+exact bytes, with a fixed schema, and no prose. The scanner's explanation,
+remediation and recommendation fields are dropped on purpose -- an attestation
+lands in an agent's context, and a free-text field there is an injection
+channel with a badge on. So is the matched text: a finding that quotes
+"ignore all previous instructions" would carry the payload it reports.
+
+Exit: 0 written · 2 could not scan. There is no exit code for "risky"; that is
+a verdict, and this tool publishes observations.
+"""
+import datetime
+import hashlib
+import json
+import pathlib
+import re
+import shutil
+import subprocess
+import sys
+
+ATTESTATION_VERSION = 1
+
+
+def fail(msg):
+    print(f"fp-assay: {msg}", file=sys.stderr)
+    sys.exit(2)
+
+
+def front_matter(raw):
+    text = raw.decode("utf-8", errors="replace")
+    m = re.search(r"^---\n(.*?)\n---", text, re.S | re.M)
+    fm = {}
+    if m:
+        for line in m.group(1).splitlines():
+            k, _, v = line.partition(":")
+            if _:
+                fm[k.strip()] = v.strip()
+    return fm
+
+
+def main(argv):
+    if len(argv) < 2 or argv[1] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
+    doc = pathlib.Path(argv[1])
+    out = pathlib.Path(argv[argv.index("-o") + 1]) if "-o" in argv else pathlib.Path("attestations")
+    if not doc.is_file():
+        fail(f"no such document: {doc}")
+    scanner = shutil.which("skillspector")
+    if not scanner:
+        fail("skillspector is not installed (uv tool install git+https://github.com/NVIDIA/skillspector.git)")
+
+    raw = doc.read_bytes()  # exact bytes: the digest must match the manifest's
+    digest = hashlib.sha256(raw).hexdigest()
+    fm = front_matter(raw)
+
+    version = subprocess.run([scanner, "--version"], capture_output=True, text=True)
+    scanner_version = (version.stdout or version.stderr).strip().split("\n")[-1][:40]
+
+    report_path = out / "raw" / f"{digest}.skillspector.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    run = subprocess.run([scanner, "scan", str(doc), "--no-llm", "--format", "json",
+                          "--output", str(report_path)], capture_output=True, text=True)
+    if run.returncode not in (0, 1) or not report_path.exists():  # 1 = findings, still a report
+        fail(f"scanner failed ({run.returncode}): {run.stderr.strip()[-300:]}")
+    report = json.loads(report_path.read_text())
+    if not report.get("execution_successful", True):
+        fail("scanner reported execution_successful=false; refusing to attest a partial scan")
+
+    ra = report.get("risk_assessment", {})
+    issues = []
+    for i in report.get("issues", []):
+        rule = re.match(r"YARA rule '([^']+)'", i.get("pattern") or "")
+        issues.append({
+            "id": i.get("id"),
+            "category": i.get("category"),
+            "rule": rule.group(1) if rule else None,
+            "severity": i.get("severity"),
+            "confidence": i.get("confidence"),
+            "line": (i.get("location") or {}).get("start_line"),
+        })
+    issues.sort(key=lambda x: (x["line"] or 0, x["id"] or ""))
+
+    attestation = {
+        "attestation": ATTESTATION_VERSION,
+        "digest": digest,
+        "id": fm.get("id"),
+        "version": fm.get("version"),
+        "authority": "skillspector",
+        "authority_version": scanner_version,
+        "kind": "static-scan",
+        "observed_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "coverage_percent": (report.get("analysis_completeness") or {}).get("coverage_percent"),
+        "score": ra.get("score"),
+        "severity": ra.get("severity"),
+        "issues": issues,
+    }
+    out_path = out / f"{digest}.skillspector.json"
+    out_path.write_text(json.dumps(attestation, indent=1, sort_keys=True) + "\n")
+    print(f"attested {fm.get('id')} v{fm.get('version')} digest {digest[:12]} "
+          f"score {ra.get('score')} {ra.get('severity')} issues {len(issues)} -> {out_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

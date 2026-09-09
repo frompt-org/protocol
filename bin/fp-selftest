@@ -432,5 +432,25 @@ printf 'not the published bytes\n' > "$pubscratch/prompts/repo-recon/1.0.0.promp
 check "fp-publish refuses a changed version before copying anything" 0 $?
 rm -rf "$pubscratch"
 
+# --- fp-assay: data, never prose (FPA.md AT3) ---------------------------------
+if command -v skillspector >/dev/null 2>&1; then
+  assay=$(mktemp -d 2>/dev/null || echo "/tmp/fp-assay-$$")
+  "$here/bin/fp-assay" "$here/examples/hostile-sample.prompt.md.txt" -o "$assay" >/dev/null 2>&1
+  python3 - "$assay" <<'PYEOF'
+import glob, json, sys
+files = [f for f in glob.glob(sys.argv[1] + "/*.json")]
+a = json.load(open(files[0]))
+banned = {"explanation", "remediation", "recommendation", "finding", "code_snippet", "pattern"}
+leaks = banned & set(a) | {k for i in a["issues"] for k in i} & banned
+assert not leaks, leaks
+assert "ignore all previous" not in json.dumps(a).lower()
+assert a["kind"] == "static-scan" and a["digest"] and a["severity"]
+PYEOF
+  check "fp-assay writes data only: no explanation, remediation, or quoted document text" 0 $?
+  rm -rf "$assay"
+else
+  echo "skip fp-assay: skillspector not installed"
+fi
+
 [ "$fails" -eq 0 ] && { echo "all checks passed"; exit 0; }
 echo "$fails check(s) failed"; exit 1

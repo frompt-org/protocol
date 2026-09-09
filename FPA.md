@@ -303,18 +303,18 @@ Two independent agents have been through it. Adoption, hostile-document refusal,
 
 A conformance run is the only evidence in this repository that the protocol describes behaviour rather than intentions. Everything else tests tools.
 
-## 15. Attestations (reserved)
+## 15. Attestations
 
-An **authority** — a service that runs submitted prompts in isolation and publishes what it observed — is the intended layer above this protocol, and this section reserves the seam rather than defining the service.
+An **authority** publishes what it observed about a document. An attestation is keyed by **digest, never by URL or name**, and is structured data with a fixed schema. Two kinds exist; one is realized.
 
-An attestation is keyed by **digest, never by URL or name**, and returns structured data with a fixed schema: observed capability footprint, whether the prompt fetched further sources, whether behaviour matched its declared envelope, whether it wrote outside its declared scope.
+- **AT1.** An attestation **MUST** carry: `attestation` (schema version), `digest`, `authority`, `authority_version`, `kind`, `observed_at`, and a body fixed by `kind`. It **MAY** carry the document's `id` and `version` for people; a client keys on the digest.
+- **AT2.** **Observations, not verdicts.** An attestation **MUST NOT** carry an approve/reject field, and a client **MUST NOT** refuse or adopt on a score alone. A green tick invites the complacency a "clean lint" invites, and this repo has already deleted one scanner for exactly that. Publish what was seen; the pilot compares it against what they wanted.
+- **AT3.** **Data, never prose.** An attestation lands in an agent's context, so a free-text field in a trusted-looking record is an injection channel with a badge on. Explanations, remediations and recommendations from a scanner stay in a separate raw report for people. So does any **quoted document text**: a finding that repeats `ignore all previous instructions` carries the payload it reports.
+- **AT4.** `kind: static-scan` — a scanner read the bytes. Body: `score`, `severity`, `coverage_percent`, and `issues[]` of `{id, category, rule, severity, confidence, line}`. Realized by `bin/fp-assay` over [SkillSpector](https://github.com/NVIDIA/SkillSpector); the reference deployment is the `assay` job on the `stable` catalog, which stores `attestations/<digest>.<authority>.json` beside the manifest.
+- **AT5.** `kind: run` — the document was adopted in isolation and behaviour was observed: capability footprint, whether it fetched further sources, whether it matched its declared envelope, whether it wrote outside its declared scope. **Reserved.** The seam is the schema above; the service is not built.
+- **AT6.** A scanner's own claim about itself is not evidence. `coverage_percent` below 100, or a scan the scanner reports as unsuccessful, **MUST NOT** produce an attestation.
 
-Two constraints on any implementation:
-
-- **Observations, not verdicts.** A green tick invites the complacency a "clean lint" invites, and this repo has already deleted one scanner for exactly that. Publish what was seen; let the pilot compare it against what they wanted.
-- **Data, never prose.** An attestation lands in an agent's context. A free-text field in a trusted-looking response is an injection channel with a badge on.
-
-Plural by design: many authorities, pilots choose whose observations they value, append-only logs so a stamp cannot be quietly revised.
+Plural by design: many authorities, pilots choose whose observations they value, append-only so a stamp cannot be quietly revised. What the first realized authority observed on this repo's own documents is recorded in `VISION.md`: it scored the hostile fixture 100 and every legitimate document between 6 and 39, which is the case for AT2 in one line.
 
 ## 16. Versioning
 
