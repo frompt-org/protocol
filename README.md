@@ -347,8 +347,8 @@ Selectors never appear in a confirmation phrase — a phrase binds a digest, and
 How bytes arrive is not the protocol's business. The digest is the constant; the fetcher is pluggable, so `base` can be any of:
 
 ```
-https://raw.githubusercontent.com/f-prompts/catalog/main   public, anonymous
-gh:f-prompts/catalog@main                                  private, the credential you already have
+https://raw.githubusercontent.com/f-prompts/reference/main   public, anonymous
+gh:f-prompts/reference@main                                  private, the credential you already have
 https://prompts.acme.internal                              your own static server
 /opt/prompts                                               a path, airgapped
 ```
@@ -356,7 +356,7 @@ https://prompts.acme.internal                              your own static serve
 `gh:` is the one that matters for a private catalog. It fetches through the GitHub API with the caller's own credential and returns the blob, not a rendering of it — verified byte-identical to the raw file, which is what makes the digest still mean something:
 
 ```
-$ bin/fp-verify repo-recon --from gh:f-prompts/catalog@main
+$ bin/fp-verify repo-recon --from gh:f-prompts/reference@main
 manifest verified: index.json signed by foreign-prompts-publisher
 authorized: repo-recon v1.0.0 digest b8fb83420745 serial 3 expires 2026-10-09T01:57:28Z
 ```
@@ -374,7 +374,7 @@ A **catalog** is a published set of prompts — a signed manifest and the docume
 <base>/prompts/<id>/<version>.prompt.md
 ```
 
-That is the whole standard, and it is a **shape rather than a privilege**: anyone who can serve files can publish one, and no catalog is more official than another. The reference catalog lives at [`f-prompts/catalog`](https://github.com/f-prompts/catalog), under an org whose [profile page](https://github.com/f-prompts/.github) is the thirty-second version of this README; a company publishes `acme/prompts` and serves it wherever they already serve static files.
+That is the whole standard, and it is a **shape rather than a privilege**: anyone who can serve files can publish one, and no catalog is more official than another. The reference catalog lives at [`f-prompts/reference`](https://github.com/f-prompts/reference), under an org whose [profile page](https://github.com/f-prompts/.github) is the thirty-second version of this README; a company publishes `acme/prompts` and serves it wherever they already serve static files.
 
 A client may adopt from several. Each carries its own freshness floor and is trusted through its own publisher key — held locally, never fetched from the catalog it validates.
 
