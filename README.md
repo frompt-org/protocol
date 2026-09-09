@@ -23,7 +23,7 @@ A foreign prompt is injection you chose. The pilot names one specific document w
 That is **agency, not security** — you know what got in, you chose it, you can end it. The trust model is `curl example.com | bash`: you are trusting the publisher, deliberately rather than unknowingly. What the protocol explicitly does **not** attempt is in [`FPA.md` §0](FPA.md) — those are non-goals, not a roadmap.
 
 ```
-recon https://raw.githubusercontent.com/f-prompts/foreign-prompts/main/prompts/repo-recon/1.0.0.prompt.md
+recon https://raw.githubusercontent.com/f-prompts/fpa/main/prompts/repo-recon/1.0.0.prompt.md
 ```
 ```
 ADOPTED: repo-recon v1.0.0
@@ -34,12 +34,12 @@ twelve file reads, and report in five fixed sections. Read-only.
 No install, no plugin, no config, no restart. When the session ends, so does the prompt — nothing was written anywhere.
 
 Those URLs are live: every prompt in this repo is fetchable as raw text, which is the entire distribution mechanism. Pin to a commit when you care what you are adopting —
-`https://raw.githubusercontent.com/f-prompts/foreign-prompts/8f20b7c…/prompts/repo-recon/1.0.0.prompt.md` — because `main` can change under you and a commit cannot.
+`https://raw.githubusercontent.com/f-prompts/fpa/8f20b7c…/prompts/repo-recon/1.0.0.prompt.md` — because `main` can change under you and a commit cannot.
 
 **Five documents, one job each.** [`FPA.md`](FPA.md) is the protocol, normative — what an agent
 must do. [`CLIENT.md`](CLIENT.md) is what the software around it must do — fetch, hash, verify —
-in four levels. [`VISION.md`](VISION.md) is the project — where prompts live, who publishes
-them, what is not built yet. [`SECURITY.md`](SECURITY.md) is the trust model.
+in four levels. [`VISION.md`](https://github.com/f-prompts/f-prompts/blob/main/VISION.md), in the umbrella repo, is the project — where prompts live,
+who publishes them, what is not built yet. [`SECURITY.md`](SECURITY.md) is the trust model.
 [`TERMINOLOGY.md`](TERMINOLOGY.md) is the vocabulary, including the words that collide.
 Everything else is listed at the end.
 
@@ -378,7 +378,7 @@ That is the whole standard, and it is a **shape rather than a privilege**: anyon
 
 A client may adopt from several. Each carries its own freshness floor and is trusted through its own publisher key — held locally, never fetched from the catalog it validates.
 
-Finding a catalog you do not already know is a different layer — a **directory** of catalogs, specified in [`DIRECTORY.md`](DIRECTORY.md) and not built. It lists; it never authorizes.
+Finding a catalog you do not already know is a different layer — a **directory** of catalogs, specified in [`DIRECTORY.md`](https://github.com/f-prompts/f-prompts/blob/main/DIRECTORY.md) and not built. It lists; it never authorizes.
 
 `bin/fp-publish <catalog>` stages this repo's prompts into a catalog checkout and tells you what to run there. It refuses to overwrite a published version with different bytes, because that is the one rule everything else rests on.
 
@@ -400,7 +400,7 @@ verdicts** — a green tick invites the complacency that got the hostile-pattern
 and **data, never prose**, because an attestation lands in an agent's context and a free-text
 field there is an injection channel with a badge on.
 
-None of it is built. [`VISION.md`](VISION.md) has the stages, the parties, the catalog layout,
+None of it is built. [`VISION.md`](https://github.com/f-prompts/f-prompts/blob/main/VISION.md) has the stages, the parties, the catalog layout,
 and an honest count of how many people other than the author have ever used this.
 
 ## Write one
@@ -422,8 +422,7 @@ To adopt one as a pilot, `bin/fp-adopt <url>` fetches the document, prints it fo
 |---|---|
 | [`FPA.md`](FPA.md) | The protocol, normative. |
 | [`CLIENT.md`](CLIENT.md) | What a harness implements — mechanism versus convention, four levels, how a level is claimed. |
-| [`VISION.md`](VISION.md) | The project — parties, catalogs, the org, the adoption stages, what is not built. |
-| [`DIRECTORY.md`](DIRECTORY.md) | Discovery across catalogs — the rules for `f-prompts.io` before it exists. Discovery is not authorization. |
+| [`f-prompts/f-prompts`](https://github.com/f-prompts/f-prompts) | The umbrella — homepage, `VISION.md` (the project), `DIRECTORY.md` (discovery). Project documents live there, not here. |
 | [`TERMINOLOGY.md`](TERMINOLOGY.md) | Canon vocabulary — the words this repo uses, and the ones it refuses. |
 | [`SECURITY.md`](SECURITY.md) | Trust model, what to look for when you read a prompt, guidance for pilots and agents. |
 | [`prompts/`](prompts/) · [`TEMPLATE.prompt.md`](TEMPLATE.prompt.md) | Working prompts, and the skeleton for a new one. |

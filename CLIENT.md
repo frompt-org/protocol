@@ -131,4 +131,4 @@ adopted on startup would be adopting on nobody's authority, wearing the badge of
 Today one harness has this: [`plugin/`](plugin/) for Claude Code, at level 2. Every other
 agent in the constellation is a level-0 client with a shell, which is enough to adopt
 interactively and not enough to run unattended. That gap is the stage-1 work in
-[`VISION.md`](VISION.md), and it is the reason this document exists.
+[`VISION.md`](https://github.com/f-prompts/f-prompts/blob/main/VISION.md), and it is the reason this document exists.
