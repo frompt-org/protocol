@@ -356,7 +356,7 @@ https://prompts.acme.internal                              your own static serve
 ```
 $ bin/fp-verify repo-recon --from gh:f-prompts/prompts@main
 manifest verified: index.json signed by foreign-prompts-publisher
-authorized: repo-recon v1.0.0 digest b8fb834207455d serial 1 expires 2026-09-29T22:16:05Z
+authorized: repo-recon v1.0.0 digest b8fb83420745 serial 2 expires 2026-10-09T00:48:45Z
 ```
 
 Signature, freshness and digest, against a repository nobody can read without permission. **Publishing is a decision about audience, not a prerequisite for the protocol working.**

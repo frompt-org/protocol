@@ -39,7 +39,10 @@ def main(argv):
     if "--base" in argv:
         base = argv[argv.index("--base") + 1]
 
-    changed, added = [], []
+    # Compare everything before copying anything. An earlier version copied inside
+    # this loop and refused afterwards, so "a published version is immutable" was
+    # printed over a catalog it had already overwritten.
+    changed, added, pending = [], [], []
     for src in sorted(ROOT.glob("prompts/*/*.prompt.md")):
         rel = src.relative_to(ROOT)
         dst = target / rel
@@ -47,9 +50,7 @@ def main(argv):
             added.append(str(rel))
         elif not filecmp.cmp(src, dst, shallow=False):
             changed.append(str(rel))
-        if not check:
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dst)
+        pending.append((src, dst))
 
     # A published version's bytes never change (FPA.md V1). If one differs, that is
     # either an edit-in-place or a stale catalog, and both need a human.
@@ -62,6 +63,10 @@ def main(argv):
     if check:
         print(f"{len(added)} new, 0 changed" if added else "catalog is up to date")
         return 1 if added else 0
+
+    for src, dst in pending:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
 
     for extra in ("TEMPLATE.prompt.md",):
         if (ROOT / extra).exists():

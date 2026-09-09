@@ -1,7 +1,7 @@
 {
   "base": "https://raw.githubusercontent.com/f-prompts/foreign-prompts/main/prompts",
   "manifest_version": 2,
-  "not_after": "2026-10-09T00:46:39Z",
+  "not_after": "2026-10-09T00:49:32Z",
   "prompts": [
     {
       "id": "help-me",
@@ -197,5 +197,5 @@
     }
   ],
   "protocol": "FOREIGN-PROMPT v2",
-  "serial": 98
+  "serial": 102
 }
