@@ -7,7 +7,7 @@ The whole loop, start to finish. Annotations in *italics*.
 **pilot**
 
 ```
-i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-b8fb834 https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/repo-recon/1.0.0.frompt.md
+i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-9cde6b0 https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/repo-recon/1.0.0.frompt.md
 ```
 
 *One line, three parts: a sentence written for this prompt and published only at the end of it, the prompt's id, and a digest of the exact bytes. The agent recomputes that digest over what it fetched — if the two disagree, it refuses. Deliberate and byte-bound. Still not proof the pilot read it.*

@@ -68,7 +68,7 @@ Vocabulary is canon in [`TERMINOLOGY.md`](TERMINOLOGY.md); the protocol is [`FPA
 The pilot sends a **confirmation phrase** with the URL. The phrase is built from up to three parts, and each part proves a different thing:
 
 ```
-i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-b8fb834  <url>
+i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-9cde6b0  <url>
 └──────────────── 1. consent sentence ─────────────────────────┘ └── 2. id ──┘ └3. digest┘
 ```
 
@@ -358,7 +358,7 @@ https://prompts.acme.internal                              your own static serve
 ```
 $ bin/fp-verify repo-recon --from gh:frompt-org/reference@main
 manifest verified: index.json signed by foreign-prompts-publisher
-authorized: repo-recon v1.0.0 digest b8fb83420745 serial 3 expires 2026-10-09T01:57:28Z
+authorized: repo-recon v1.0.0 digest 9cde6b0397af serial 3 expires 2026-10-09T01:57:28Z
 ```
 
 Signature, freshness and digest, against a repository nobody can read without permission. **Publishing is a decision about audience, not a prerequisite for the protocol working.**
