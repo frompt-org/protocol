@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""fp-lint — validate the structure of a foreign prompt (.prompt.md).
+"""fp-lint — validate the structure of a foreign prompt (.frompt.md).
 
 Checks what can be checked deterministically against FPA.md v1: the marker, the
 front matter, the capability tokens, and the section frame. Takes a path, a URL,
 or '-' for stdin.
 
-    fp-lint prompts/repo-recon.prompt.md
-    fp-lint https://raw.githubusercontent.com/org/repo/main/thing.prompt.md
-    cat thing.prompt.md | fp-lint -
+    fp-lint prompts/repo-recon.frompt.md
+    fp-lint https://raw.githubusercontent.com/org/repo/main/thing.frompt.md
+    cat thing.frompt.md | fp-lint -
 
 Flags: -q errors only · -v show notes · --json · --strict (warnings fail).
 
@@ -424,8 +424,8 @@ def lint(text, name):
     if "id" in fm and "version" in fm and hs not in text:
         warn(f"body: the '## Handshake' section should show the computed line {hs!r}")
 
-    if name not in ("-", "<stdin>") and not name.endswith(".prompt.md"):
-        warn(f"{name}: conventional extension is '.prompt.md'")
+    if name not in ("-", "<stdin>") and not name.endswith(".frompt.md"):
+        warn(f"{name}: conventional extension is '.frompt.md'")
 
     return errors, warnings, notes, fm
 

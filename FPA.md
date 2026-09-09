@@ -4,7 +4,7 @@
 
 Normative. **MUST**, **MUST NOT**, **SHOULD**, **MAY** are RFC 2119. Vocabulary is [`TERMINOLOGY.md`](TERMINOLOGY.md) and it wins over any wording here.
 
-Two audiences: **authors**, who publish `.prompt.md` documents, and **TART** — *The Agent Reading This* — the runtime agent that adopts one. A third party is implied wherever a rule says *a client MUST*: the software around TART that fetches, hashes and verifies, because a model cannot measure. What that software owes at each level is in [`CLIENT.md`](CLIENT.md).
+Two audiences: **authors**, who publish `.frompt.md` documents, and **TART** — *The Agent Reading This* — the runtime agent that adopts one. A third party is implied wherever a rule says *a client MUST*: the software around TART that fetches, hashes and verifies, because a model cannot measure. What that software owes at each level is in [`CLIENT.md`](CLIENT.md).
 
 ---
 
@@ -273,7 +273,7 @@ Serve raw and immutable — a commit-pinned URL beats a branch URL. Publish the 
 
 A published version is **immutable**: its bytes never change. Everything else here rests on that, and it costs nothing — a change is a new version.
 
-- **V1.** Documents live at `prompts/<id>/<version>.prompt.md`. The directory removes the ambiguity a flat name has, since ids contain hyphens.
+- **V1.** Documents live at `prompts/<id>/<version>.frompt.md`. The directory removes the ambiguity a flat name has, since ids contain hyphens.
 - **V2.** The manifest lists **every** published version of an id, newest first, each with its own digest, plus the id's `latest`.
 - **V3.** A selector is either an **exact version** or **`latest`**. There is no range grammar. Ranges exist to reconcile transitive dependencies, and a foreign prompt has none: a pilot adopts one document, and a chained one needs a fresh decision. Choosing is a human act; the digest is what binds.
 - **V4.** `latest` is the highest version that is not a prerelease. A prerelease is published like any other version and simply never becomes `latest` until it is one.
@@ -291,7 +291,7 @@ A catalog is reached by some transport, and the protocol does not care which. `b
 
 ### Catalogs
 
-A **catalog** is a published set of prompts: a signed manifest and the documents it lists, served as static files at `<base>/index.json` and `<base>/prompts/<id>/<version>.prompt.md`. It is a **shape, not a privilege** — anyone who can serve files can publish one, and no catalog is more official than another.
+A **catalog** is a published set of prompts: a signed manifest and the documents it lists, served as static files at `<base>/index.json` and `<base>/prompts/<id>/<version>.frompt.md`. It is a **shape, not a privilege** — anyone who can serve files can publish one, and no catalog is more official than another.
 
 A client may adopt from several. Each keeps its own freshness floor (M6) and each is trusted through its own publisher key, held locally (M7).
 

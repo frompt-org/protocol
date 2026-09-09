@@ -10,7 +10,7 @@ set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 lint="$here/bin/fp-lint"
 new="$here/bin/fp-new"
-tmpl="$here/TEMPLATE.prompt.md"
+tmpl="$here/TEMPLATE.frompt.md"
 fails=0
 
 check() { # check <name> <expected> <actual>
@@ -19,17 +19,17 @@ check() { # check <name> <expected> <actual>
 }
 
 # --- what must validate ------------------------------------------------------
-"$lint" -q "$here"/prompts/*/*.prompt.md "$tmpl" >/dev/null 2>&1
+"$lint" -q "$here"/prompts/*/*.frompt.md "$tmpl" >/dev/null 2>&1
 check "bundled prompts and template are valid" 0 $?
 
 # The fixture is hostile in content and structurally valid (it draws two warnings,
 # so --strict would reject it). It passing the default check is the point: a
 # structural validator cannot see intent, and this proves it in public.
-"$lint" -q "$here/examples/hostile-sample.prompt.md.txt" >/dev/null 2>&1
+"$lint" -q "$here/examples/hostile-sample.frompt.md.txt" >/dev/null 2>&1
 check "hostile fixture passes structural validation (valid is not safe)" 0 $?
 
 # --- exit-code taxonomy ------------------------------------------------------
-"$lint" -q "$here/examples/does-not-exist.prompt.md" >/dev/null 2>&1
+"$lint" -q "$here/examples/does-not-exist.frompt.md" >/dev/null 2>&1
 check "unreadable input exits 2, not 1" 2 $?
 "$lint" --nonsense "$tmpl" >/dev/null 2>&1
 check "unknown flag exits 2" 2 $?
@@ -123,13 +123,13 @@ check "probe: unknown ceremony level" 1 $?
 check "INDEX.md digests match the prompts" 0 $?
 
 # --- the pilot-side adopt tool composes a phrase per ceremony ----------------
-adopt_std=$("$here/bin/fp-adopt" "$here/prompts/repo-recon/1.0.0.prompt.md" --quiet 2>/dev/null)
+adopt_std=$("$here/bin/fp-adopt" "$here/prompts/repo-recon/1.0.0.frompt.md" --quiet 2>/dev/null)
 printf '%s' "$adopt_std" | grep -q "repo-recon-[0-9a-f]\{7\} "
 check "fp-adopt composes a standard-ceremony phrase" 0 $?
-adopt_strict=$("$here/bin/fp-adopt" "$here/prompts/ticket-intake/1.0.0.prompt.md" --quiet 2>/dev/null)
+adopt_strict=$("$here/bin/fp-adopt" "$here/prompts/ticket-intake/1.0.0.frompt.md" --quiet 2>/dev/null)
 printf '%s' "$adopt_strict" | grep -q "ticket-intake-[0-9a-f]\{64\} "
 check "fp-adopt composes a strict-ceremony phrase" 0 $?
-adopt_light=$("$here/bin/fp-adopt" "$here/prompts/grill-me/1.0.0.prompt.md" --quiet 2>/dev/null)
+adopt_light=$("$here/bin/fp-adopt" "$here/prompts/grill-me/1.0.0.frompt.md" --quiet 2>/dev/null)
 printf '%s' "$adopt_light" | grep -q "grill-me-" && light_has_id=1 || light_has_id=0
 check "fp-adopt omits id and digest at ceremony light" 0 "$light_has_id"
 
@@ -176,8 +176,8 @@ check "fp-resolve refuses an id the index does not carry" 1 $?
 
 tamper=$(mktemp -d 2>/dev/null || echo "/tmp/fp-tamper-$$"); mkdir -p "$tamper"
 mkdir -p "$tamper/pr-review"
-cp "$here/prompts/pr-review/1.2.0.prompt.md" "$tamper/pr-review/2.0.0.prompt.md"
-printf '\n<!-- published by nobody -->\n' >> "$tamper/pr-review/2.0.0.prompt.md"
+cp "$here/prompts/pr-review/1.2.0.frompt.md" "$tamper/pr-review/2.0.0.frompt.md"
+printf '\n<!-- published by nobody -->\n' >> "$tamper/pr-review/2.0.0.frompt.md"
 "$here/bin/fp-resolve" pr-review --base "$tamper" --record >/dev/null 2>&1
 check "fp-resolve refuses bytes the index did not vouch for" 1 $?
 rm -rf "$tamper"
@@ -192,7 +192,7 @@ check "fp-resolve --lock accepts a prompt at its pin" 0 $?
 
 moved=$(mktemp -d 2>/dev/null || echo "/tmp/fp-moved-$$"); mkdir -p "$moved"
 cp -R "$here"/prompts/. "$moved/"
-printf '\n<!-- moved since it was pinned -->\n' >> "$moved/pr-review/2.0.0.prompt.md"
+printf '\n<!-- moved since it was pinned -->\n' >> "$moved/pr-review/2.0.0.frompt.md"
 "$here/bin/fp-resolve" pr-review --base "$moved" --lock --record >/dev/null 2>&1
 check "fp-resolve --lock refuses a prompt that moved" 1 $?
 rm -rf "$moved"
@@ -256,8 +256,8 @@ check "the session-start hook runs and reports context" 0 $?
 crlf=$(mktemp -d 2>/dev/null || echo "/tmp/fp-crlf-$$"); mkdir -p "$crlf"
 python3 - "$here" "$crlf" <<'PY'
 import pathlib, sys
-src = pathlib.Path(sys.argv[1]) / "prompts" / "pr-review" / "2.0.0.prompt.md"
-dst = pathlib.Path(sys.argv[2]) / "pr-review" / "2.0.0.prompt.md"
+src = pathlib.Path(sys.argv[1]) / "prompts" / "pr-review" / "2.0.0.frompt.md"
+dst = pathlib.Path(sys.argv[2]) / "pr-review" / "2.0.0.frompt.md"
 dst.parent.mkdir(parents=True, exist_ok=True)
 dst.write_bytes(src.read_bytes().replace(b"\n", b"\r\n"))
 PY
@@ -282,7 +282,7 @@ cp "$here"/index.json "$here"/index.json.sig "$pub/"
 cp -R "$here"/prompts/. "$pub/prompts/"
 "$here/bin/fp-verify" repo-recon --from "$pub" --registering >/dev/null 2>&1 </dev/null
 check "fp-verify --from fetches a publisher manifest and authorizes against it" 0 $?
-printf '\n<!-- unsigned change -->\n' >> "$pub/prompts/repo-recon/1.0.0.prompt.md"
+printf '\n<!-- unsigned change -->\n' >> "$pub/prompts/repo-recon/1.0.0.frompt.md"
 "$here/bin/fp-verify" repo-recon --from "$pub" --registering >/dev/null 2>&1 </dev/null
 check "fp-verify --from refuses a document the fetched manifest did not vouch for" 1 $?
 rm -rf "$pub"
@@ -291,14 +291,14 @@ rm -rf "$pub"
 if [ -f "$here/.fpa/signing_key" ]; then
   old=$(mktemp -d 2>/dev/null || echo "/tmp/fp-old-$$"); mkdir -p "$old/prompts"
   cp "$here"/index.json "$old/index.json"; cp "$here"/index.json.sig "$old/index.json.sig"
-  cp "$here"/prompts/*/*.prompt.md "$old/prompts/"
+  cp "$here"/prompts/*/*.frompt.md "$old/prompts/"
   "$here/bin/fp-verify" repo-recon --from "$old" >/dev/null 2>&1 </dev/null
   # Advance the serial with a scratch prompt of our own, never by editing a
   # tracked one. An earlier version bumped a real prompt and restored it with
   # git checkout, which discarded uncommitted work -- the same footgun fp-demo
   # had, in a new place. A check that damages the tree is not a check.
   mkdir -p "$here/prompts/zz-selftest-scratch"
-  scratch="$here/prompts/zz-selftest-scratch/1.0.0.prompt.md"
+  scratch="$here/prompts/zz-selftest-scratch/1.0.0.frompt.md"
   "$new" zz-selftest-scratch -c i-exist-only-to-advance-the-manifest-serial --author selftest \
     > "$scratch" 2>/dev/null
   (cd "$here" && bin/fp-index >/dev/null && bin/fp-sign </dev/null >/dev/null && \
@@ -329,7 +329,7 @@ check "fpa.lock pins exactly the prompts fit for the registered context" 0 $?
 # path to gh: broke every other --from, because a local base fell through to the
 # manifest's own unreachable URL.
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  ghout=$("$here/bin/fp-lint" "gh:f-prompts/reference@main/prompts/repo-recon/1.0.0.prompt.md" 2>&1)
+  ghout=$("$here/bin/fp-lint" "gh:frompt-org/reference@main/prompts/repo-recon/1.0.0.frompt.md" 2>&1)
   printf '%s' "$ghout" | grep -q "VALID"
   check "gh: transport reads a document from a private catalog" 0 $?
 else
@@ -421,6 +421,16 @@ else
   echo "skip -- two-publisher checks need a signing key and fpa.registered"
 fi
 
+# --- fp-sign must not drop other publishers from the trust root ---------------
+if [ -f "$here/.fpa/signing_key" ]; then
+  cp "$here/allowed_signers" "$here/allowed_signers.selftest-bak"
+  printf 'someone-else ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n' >> "$here/allowed_signers"
+  (cd "$here" && bin/fp-sign </dev/null >/dev/null 2>&1)
+  grep -q '^someone-else ' "$here/allowed_signers" && [ "$(grep -c '^foreign-prompts-publisher ' "$here/allowed_signers")" -eq 1 ]
+  check "fp-sign replaces its own line in allowed_signers and keeps every other publisher's" 0 $?
+  mv "$here/allowed_signers.selftest-bak" "$here/allowed_signers"
+fi
+
 # --- versions: choosing is exact or latest, and nothing else -----------------
 "$here/bin/fp-resolve" pr-review@1.2.0 --base "$here/prompts" --record >/dev/null 2>&1
 check "fp-resolve picks an exact version" 0 $?
@@ -458,9 +468,9 @@ rm -rf "$scratch"
 # It once compared and copied in the same loop, so the immutability refusal was
 # printed over a catalog it had already overwritten.
 pubscratch=$(mktemp -d 2>/dev/null || echo "/tmp/fp-pub-$$"); mkdir -p "$pubscratch/prompts/repo-recon"
-printf 'not the published bytes\n' > "$pubscratch/prompts/repo-recon/1.0.0.prompt.md"
+printf 'not the published bytes\n' > "$pubscratch/prompts/repo-recon/1.0.0.frompt.md"
 "$here/bin/fp-publish" "$pubscratch" >/dev/null 2>&1; rc=$?
-[ "$rc" -eq 1 ] && [ "$(cat "$pubscratch/prompts/repo-recon/1.0.0.prompt.md")" = "not the published bytes" ] \
+[ "$rc" -eq 1 ] && [ "$(cat "$pubscratch/prompts/repo-recon/1.0.0.frompt.md")" = "not the published bytes" ] \
   && [ ! -e "$pubscratch/prompts/pr-review" ]
 check "fp-publish refuses a changed version before copying anything" 0 $?
 rm -rf "$pubscratch"
@@ -468,7 +478,7 @@ rm -rf "$pubscratch"
 # --- fp-assay: data, never prose (FPA.md AT3) ---------------------------------
 if command -v skillspector >/dev/null 2>&1; then
   assay=$(mktemp -d 2>/dev/null || echo "/tmp/fp-assay-$$")
-  "$here/bin/fp-assay" "$here/examples/hostile-sample.prompt.md.txt" -o "$assay" >/dev/null 2>&1
+  "$here/bin/fp-assay" "$here/examples/hostile-sample.frompt.md.txt" -o "$assay" >/dev/null 2>&1
   python3 - "$assay" <<'PYEOF'
 import glob, json, sys
 files = [f for f in glob.glob(sys.argv[1] + "/*.json")]

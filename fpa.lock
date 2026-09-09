@@ -6,8 +6,8 @@
 #
 # Regenerate with bin/fp-lock. Check with bin/fp-lock --check.
 
-bug-repro 1.0.0 sha256:f6d3c59d88e4d89b242c5f67576da499859a25331f1ef2068ff62c41163c460c https://raw.githubusercontent.com/f-prompts/fpa/main/prompts/bug-repro/1.0.0.prompt.md
-fpa-bootstrap 2.0.0 sha256:29a57f152f064a2148d63bc5562953037902c68993dd97989e1912f6e001bec9 https://raw.githubusercontent.com/f-prompts/fpa/main/prompts/fpa-bootstrap/2.0.0.prompt.md
-grill-me 1.0.0 sha256:a50e381d57f87f633904e52c0fab21dd344df9eb76eeaaf138c41d7c9c9bc6d3 https://raw.githubusercontent.com/f-prompts/fpa/main/prompts/grill-me/1.0.0.prompt.md
-pr-review 2.0.0 sha256:42eefbbc11cd3340f9616ab4bbb60890219e8e747289f15588786ef666871e0d https://raw.githubusercontent.com/f-prompts/fpa/main/prompts/pr-review/2.0.0.prompt.md
-repo-recon 1.0.0 sha256:b8fb834207455dcaabf28258df40bebf154e43d951d4e1dea6b8eeb02f226cca https://raw.githubusercontent.com/f-prompts/fpa/main/prompts/repo-recon/1.0.0.prompt.md
+bug-repro 1.0.0 sha256:6ce2af47a6bfe53800b382b016fbafd98fe449b7b609f7a8a1fc0d60def9e27e https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/bug-repro/1.0.0.frompt.md
+fpa-bootstrap 2.0.0 sha256:e495a52bcaa6c67b4eed0f227511237b53101143e43c8882d17d029c2917e643 https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/fpa-bootstrap/2.0.0.frompt.md
+grill-me 1.0.0 sha256:2992a1b12f4a26abc1e6cc8046e64d3995ab4b3722ded4201c1607b1f0f21687 https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/grill-me/1.0.0.frompt.md
+pr-review 2.0.0 sha256:dc6ae5acfbf20011da599e0569bdd556ee5a58d0a06a3f9387f28a70c8405c74 https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/pr-review/2.0.0.frompt.md
+repo-recon 1.0.0 sha256:9cde6b0397af38cdcc91787cad5e69d7af6eee6e7afa2742336dc482b870b538 https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/repo-recon/1.0.0.frompt.md

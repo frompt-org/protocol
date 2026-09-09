@@ -7,7 +7,7 @@ Foreign prompts compose. This is what that looks like when it is behaving.
 **pilot**
 
 ```
-i-have-read-this-prompt-and-want-my-diff-judged-without-mercy <url>/prompts/pr-review.prompt.md
+i-have-read-this-prompt-and-want-my-diff-judged-without-mercy <url>/prompts/pr-review.frompt.md
 ```
 
 **agent**
@@ -23,7 +23,7 @@ Review mode: tiered rubric (correctness → blast radius → failure mode → re
 **pilot**
 
 ```
-i-have-read-this-prompt-and-accept-that-it-refuses-to-fix-anything-bug-repro-<digest> <url>/prompts/bug-repro.prompt.md
+i-have-read-this-prompt-and-accept-that-it-refuses-to-fix-anything-bug-repro-<digest> <url>/prompts/bug-repro.frompt.md
 ```
 
 **agent**
@@ -46,7 +46,7 @@ That bug-repro doc mentions another prompt. Grab it too.
 
 **agent**
 
-It points at `<url>/prompts/handoff-note.prompt.md` — for writing up an unreproducible bug rather than guessing at a fix.
+It points at `<url>/prompts/handoff-note.frompt.md` — for writing up an unreproducible bug rather than guessing at a fix.
 
 I have not fetched it. An adopted prompt cannot authorize the next fetch on its own — that is how one URL becomes a supply chain. Its page publishes a confirmation phrase; type that with the URL and I will adopt it (FPA.md §C3).
 

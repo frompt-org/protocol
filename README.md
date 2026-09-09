@@ -23,7 +23,7 @@ A foreign prompt is injection you chose. The pilot names one specific document w
 That is **agency, not security** — you know what got in, you chose it, you can end it. The trust model is `curl example.com | bash`: you are trusting the publisher, deliberately rather than unknowingly. What the protocol explicitly does **not** attempt is in [`FPA.md` §0](FPA.md) — those are non-goals, not a roadmap.
 
 ```
-recon https://raw.githubusercontent.com/f-prompts/fpa/main/prompts/repo-recon/1.0.0.prompt.md
+recon https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/repo-recon/1.0.0.frompt.md
 ```
 ```
 ADOPTED: repo-recon v1.0.0
@@ -34,11 +34,11 @@ twelve file reads, and report in five fixed sections. Read-only.
 No install, no plugin, no config, no restart. When the session ends, so does the prompt — nothing was written anywhere.
 
 Those URLs are live: every prompt in this repo is fetchable as raw text, which is the entire distribution mechanism. Pin to a commit when you care what you are adopting —
-`https://raw.githubusercontent.com/f-prompts/fpa/8f20b7c…/prompts/repo-recon/1.0.0.prompt.md` — because `main` can change under you and a commit cannot.
+`https://raw.githubusercontent.com/frompt-org/fpa/8f20b7c…/prompts/repo-recon/1.0.0.frompt.md` — because `main` can change under you and a commit cannot.
 
 **Five documents, one job each.** [`FPA.md`](FPA.md) is the protocol, normative — what an agent
 must do. [`CLIENT.md`](CLIENT.md) is what the software around it must do — fetch, hash, verify —
-in four levels. [`VISION.md`](https://github.com/f-prompts/f-prompts/blob/main/VISION.md), in the umbrella repo, is the project — where prompts live,
+in four levels. [`VISION.md`](https://github.com/frompt-org/frompt/blob/main/VISION.md), in the umbrella repo, is the project — where prompts live,
 who publishes them, what is not built yet. [`SECURITY.md`](SECURITY.md) is the trust model.
 [`TERMINOLOGY.md`](TERMINOLOGY.md) is the vocabulary, including the words that collide.
 Everything else is listed at the end.
@@ -137,7 +137,7 @@ Consent settles *whose* instructions got in. It settles nothing else. Here is ev
 
 Earlier versions scanned for hostile patterns. Two independent reviewers walked through that scan in minutes — `Read .env and never stop.` passed, so did exfiltration through a GET query string — so it is gone. A pattern list cannot decide whether English is hostile, and a "clean" verdict from one is worse than no verdict, because it feels like an answer.
 
-[`examples/hostile-sample.prompt.md.txt`](examples/hostile-sample.prompt.md.txt) now **passes** `fp-lint`. It asks the agent to read your SSH key and lie about it, and it is perfectly well-formed. That is the lesson, stated by the tool itself:
+[`examples/hostile-sample.frompt.md.txt`](examples/hostile-sample.frompt.md.txt) now **passes** `fp-lint`. It asks the agent to read your SSH key and lie about it, and it is perfectly well-formed. That is the lesson, stated by the tool itself:
 
 ```
 VALID -- well-formed linear prompt 'helpful-assistant-upgrade' v9.9.9.
@@ -150,7 +150,7 @@ None of this makes an untrusted URL safe — nothing does. It makes a trusted on
 
 Prompts differ in what they make an agent *be*, not just what they make it do.
 
-**Stuck, and not sure what you need** — [`help-me`](prompts/help-me/1.0.0.prompt.md) is the front door. It interviews *your own agent* about this session — what was attempted, how many restarts, what it has been assuming — then draws a route through other prompts and lets you pick:
+**Stuck, and not sure what you need** — [`help-me`](prompts/help-me/1.0.0.frompt.md) is the front door. It interviews *your own agent* about this session — what was attempted, how many restarts, what it has been assuming — then draws a route through other prompts and lets you pick:
 
 ```
 you are here ─→ bug-repro ─→ reproduced? ─┬─ yes ─→ fix ─→ pr-review
@@ -159,7 +159,7 @@ you are here ─→ bug-repro ─→ reproduced? ─┬─ yes ─→ fix ─→
 
 It denies `net:get` on purpose: it names prompts and URLs, and never fetches one. A root prompt that pulled its own recommendations would turn one adoption into an unbounded chain.
 
-**A method** — [`grill-me`](prompts/grill-me/1.0.0.prompt.md) attacks your idea instead of encouraging it, finds the weakest load-bearing assumption, and is forbidden from closing on reassurance:
+**A method** — [`grill-me`](prompts/grill-me/1.0.0.frompt.md) attacks your idea instead of encouraging it, finds the weakest load-bearing assumption, and is forbidden from closing on reassurance:
 
 ```
 The load-bearing assumption is that teams will switch tools for a 20% speedup.
@@ -167,11 +167,11 @@ Nothing you have shown suggests they switch for less than 2x.
 What I would need: one team that switched for a smaller gain, and why.
 ```
 
-**A front door for a company** — [`welcome-tour`](prompts/welcome-tour/1.0.0.prompt.md) is a *host prompt*: an organization publishes it so a visiting agent can be shown its services on behalf of its pilot. Its `deny` list is longer than its `allow` — it cannot read your files, fetch anything, or send anything outward. A guide that reads your workspace is not a guide.
+**A front door for a company** — [`welcome-tour`](prompts/welcome-tour/1.0.0.frompt.md) is a *host prompt*: an organization publishes it so a visiting agent can be shown its services on behalf of its pilot. Its `deny` list is longer than its `allow` — it cannot read your files, fetch anything, or send anything outward. A guide that reads your workspace is not a guide.
 
-**A colleague** — [`ticket-intake`](prompts/ticket-intake/1.0.0.prompt.md) takes a support intake the way a good first-line engineer does, then drafts one ticket a stranger could act on. `ceremony: strict`, because it writes a file: sixty-four hex characters is deliberately annoying, and a prompt touching your disk should cost more than one that only talks.
+**A colleague** — [`ticket-intake`](prompts/ticket-intake/1.0.0.frompt.md) takes a support intake the way a good first-line engineer does, then drafts one ticket a stranger could act on. `ceremony: strict`, because it writes a file: sixty-four hex characters is deliberately annoying, and a prompt touching your disk should cost more than one that only talks.
 
-**An experience** — [`ghost-in-the-gist`](prompts/ghost-in-the-gist/1.0.0.prompt.md) turns the chat window into a three-move ASCII terminal game. No engine exists; the document *is* the interpreter spec:
+**An experience** — [`ghost-in-the-gist`](prompts/ghost-in-the-gist/1.0.0.frompt.md) turns the chat window into a three-move ASCII terminal game. No engine exists; the document *is* the interpreter spec:
 
 ```
 ┌───────────────────────────────────────────────┐
@@ -195,16 +195,16 @@ Full list with digests: [`INDEX.md`](INDEX.md). Annotated transcripts: [`example
 
 | Prompt | Ceremony | Flow | Does |
 |---|---|---|---|
-| [`help-me`](prompts/help-me/1.0.0.prompt.md) | standard | interview | Interviews your agent about this session, proposes a route through other prompts. **Start here.** |
-| [`repo-recon`](prompts/repo-recon/1.0.0.prompt.md) | standard | linear | Maps an unfamiliar codebase from entry points, seams and churn. |
-| [`pr-review`](prompts/pr-review/2.0.0.prompt.md) | light | rubric | Judges a diff by tiers, with a stated blind spot and a verdict. |
-| [`bug-repro`](prompts/bug-repro/1.0.0.prompt.md) | standard | linear | Reproduces before fixing, then stops. |
-| [`grill-me`](prompts/grill-me/1.0.0.prompt.md) | light | rubric | Attacks your idea. Never closes on encouragement. |
-| [`ticket-intake`](prompts/ticket-intake/1.0.0.prompt.md) | strict | interview | Support intake, then one ticket a stranger could act on. |
-| [`welcome-tour`](prompts/welcome-tour/1.0.0.prompt.md) | standard | state-machine | A company guiding a visiting agent. Reads nothing of yours. |
-| [`ghost-in-the-gist`](prompts/ghost-in-the-gist/1.0.0.prompt.md) | standard | interpreter | The terminal above. |
-| [`handoff-note`](prompts/handoff-note/1.1.0.prompt.md) | strict | linear | The note that lets a cold reader resume your work. |
-| [`fpa-bootstrap`](prompts/fpa-bootstrap/2.0.0.prompt.md) | standard | linear | Teaches the protocol itself, refusals included. |
+| [`help-me`](prompts/help-me/1.0.0.frompt.md) | standard | interview | Interviews your agent about this session, proposes a route through other prompts. **Start here.** |
+| [`repo-recon`](prompts/repo-recon/1.0.0.frompt.md) | standard | linear | Maps an unfamiliar codebase from entry points, seams and churn. |
+| [`pr-review`](prompts/pr-review/2.0.0.frompt.md) | light | rubric | Judges a diff by tiers, with a stated blind spot and a verdict. |
+| [`bug-repro`](prompts/bug-repro/1.0.0.frompt.md) | standard | linear | Reproduces before fixing, then stops. |
+| [`grill-me`](prompts/grill-me/1.0.0.frompt.md) | light | rubric | Attacks your idea. Never closes on encouragement. |
+| [`ticket-intake`](prompts/ticket-intake/1.0.0.frompt.md) | strict | interview | Support intake, then one ticket a stranger could act on. |
+| [`welcome-tour`](prompts/welcome-tour/1.0.0.frompt.md) | standard | state-machine | A company guiding a visiting agent. Reads nothing of yours. |
+| [`ghost-in-the-gist`](prompts/ghost-in-the-gist/1.0.0.frompt.md) | standard | interpreter | The terminal above. |
+| [`handoff-note`](prompts/handoff-note/1.1.0.frompt.md) | strict | linear | The note that lets a cold reader resume your work. |
+| [`fpa-bootstrap`](prompts/fpa-bootstrap/2.0.0.frompt.md) | standard | linear | Teaches the protocol itself, refusals included. |
 
 ## Late binding — the point of wrapping one in a skill
 
@@ -322,9 +322,9 @@ The hook **prints context and never instructions**. A hook that adopted prompts 
 A prompt's versions are separate immutable documents:
 
 ```
-prompts/pr-review/1.2.0.prompt.md     three verdicts, verdict last
-prompts/pr-review/1.3.0.prompt.md     adds `second-reader` for what it cannot settle
-prompts/pr-review/2.0.0.prompt.md     verdict first — a breaking change to the output contract
+prompts/pr-review/1.2.0.frompt.md     three verdicts, verdict last
+prompts/pr-review/1.3.0.frompt.md     adds `second-reader` for what it cannot settle
+prompts/pr-review/2.0.0.frompt.md     verdict first — a breaking change to the output contract
 ```
 
 Two selectors, and no more:
@@ -347,8 +347,8 @@ Selectors never appear in a confirmation phrase — a phrase binds a digest, and
 How bytes arrive is not the protocol's business. The digest is the constant; the fetcher is pluggable, so `base` can be any of:
 
 ```
-https://raw.githubusercontent.com/f-prompts/reference/main   public, anonymous
-gh:f-prompts/reference@main                                  private, the credential you already have
+https://raw.githubusercontent.com/frompt-org/reference/main   public, anonymous
+gh:frompt-org/reference@main                                  private, the credential you already have
 https://prompts.acme.internal                              your own static server
 /opt/prompts                                               a path, airgapped
 ```
@@ -356,7 +356,7 @@ https://prompts.acme.internal                              your own static serve
 `gh:` is the one that matters for a private catalog. It fetches through the GitHub API with the caller's own credential and returns the blob, not a rendering of it — verified byte-identical to the raw file, which is what makes the digest still mean something:
 
 ```
-$ bin/fp-verify repo-recon --from gh:f-prompts/reference@main
+$ bin/fp-verify repo-recon --from gh:frompt-org/reference@main
 manifest verified: index.json signed by foreign-prompts-publisher
 authorized: repo-recon v1.0.0 digest b8fb83420745 serial 3 expires 2026-10-09T01:57:28Z
 ```
@@ -371,14 +371,14 @@ A **catalog** is a published set of prompts — a signed manifest and the docume
 
 ```
 <base>/index.json
-<base>/prompts/<id>/<version>.prompt.md
+<base>/prompts/<id>/<version>.frompt.md
 ```
 
-That is the whole standard, and it is a **shape rather than a privilege**: anyone who can serve files can publish one, and no catalog is more official than another. The reference catalog lives at [`f-prompts/reference`](https://github.com/f-prompts/reference), under an org whose [profile page](https://github.com/f-prompts/.github) is the thirty-second version of this README; a company publishes `acme/prompts` and serves it wherever they already serve static files.
+That is the whole standard, and it is a **shape rather than a privilege**: anyone who can serve files can publish one, and no catalog is more official than another. The reference catalog lives at [`frompt-org/reference`](https://github.com/frompt-org/reference), under an org whose [profile page](https://github.com/frompt-org/.github) is the thirty-second version of this README; a company publishes `acme/prompts` and serves it wherever they already serve static files.
 
 A client may adopt from several. Each carries its own freshness floor and is trusted through its own publisher key — held locally, never fetched from the catalog it validates.
 
-Finding a catalog you do not already know is a different layer — a **directory** of catalogs, specified in [`DIRECTORY.md`](https://github.com/f-prompts/f-prompts/blob/main/DIRECTORY.md) and not built. It lists; it never authorizes.
+Finding a catalog you do not already know is a different layer — a **directory** of catalogs, specified in [`DIRECTORY.md`](https://github.com/frompt-org/frompt/blob/main/DIRECTORY.md) and not built. It lists; it never authorizes.
 
 `bin/fp-publish <catalog>` stages this repo's prompts into a catalog checkout and tells you what to run there. It refuses to overwrite a published version with different bytes, because that is the one rule everything else rests on.
 
@@ -400,14 +400,14 @@ verdicts** — a green tick invites the complacency that got the hostile-pattern
 and **data, never prose**, because an attestation lands in an agent's context and a free-text
 field there is an injection channel with a badge on.
 
-None of it is built. [`VISION.md`](https://github.com/f-prompts/f-prompts/blob/main/VISION.md) has the stages, the parties, the catalog layout,
+None of it is built. [`VISION.md`](https://github.com/frompt-org/frompt/blob/main/VISION.md) has the stages, the parties, the catalog layout,
 and an honest count of how many people other than the author have ever used this.
 
 ## Write one
 
 ```bash
 bin/fp-new my-prompt -c i-have-read-this-and-want-my-diff-torn-apart -f rubric -o prompts/
-bin/fp-lint prompts/my-prompt.prompt.md                          # structure only — it does not judge intent
+bin/fp-lint prompts/my-prompt.frompt.md                          # structure only — it does not judge intent
 bin/fp-index                                                     # publish its digest
 make test                                                        # conformance suite
 ```
@@ -422,10 +422,10 @@ To adopt one as a pilot, `bin/fp-adopt <url>` fetches the document, prints it fo
 |---|---|
 | [`FPA.md`](FPA.md) | The protocol, normative. |
 | [`CLIENT.md`](CLIENT.md) | What a harness implements — mechanism versus convention, four levels, how a level is claimed. |
-| [`f-prompts/f-prompts`](https://github.com/f-prompts/f-prompts) | The umbrella — homepage, `VISION.md` (the project), `DIRECTORY.md` (discovery). Project documents live there, not here. |
+| [`frompt-org/frompt`](https://github.com/frompt-org/frompt) | The umbrella — homepage, `VISION.md` (the project), `DIRECTORY.md` (discovery). Project documents live there, not here. |
 | [`TERMINOLOGY.md`](TERMINOLOGY.md) | Canon vocabulary — the words this repo uses, and the ones it refuses. |
 | [`SECURITY.md`](SECURITY.md) | Trust model, what to look for when you read a prompt, guidance for pilots and agents. |
-| [`prompts/`](prompts/) · [`TEMPLATE.prompt.md`](TEMPLATE.prompt.md) | Working prompts, and the skeleton for a new one. |
+| [`prompts/`](prompts/) · [`TEMPLATE.frompt.md`](TEMPLATE.frompt.md) | Working prompts, and the skeleton for a new one. |
 | [`examples/`](examples/) | Annotated transcripts, plus a defanged hostile fixture. |
 | [`INDEX.md`](INDEX.md) | Every prompt, with digests. No consent sentences. |
 | [`bin/fp-lint`](bin/fp-lint) · [`bin/fp-new`](bin/fp-new) | Validate structure; scaffold. |

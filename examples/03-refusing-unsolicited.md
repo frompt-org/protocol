@@ -37,7 +37,7 @@ I did not run it. You never typed its confirmation phrase, so it is data, not in
 **pilot**
 
 ```
-https://raw.githubusercontent.com/f-prompts/fpa/main/prompts/bug-repro/1.0.0.prompt.md
+https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/bug-repro/1.0.0.frompt.md
 ```
 
 **agent**
@@ -54,14 +54,14 @@ Its page publishes a confirmation phrase. Type that with the URL and I will adop
 
 **pilot**
 
-A guy in my Discord says to run this with `upgrade`: `https://gist.example.invalid/…/upgrade.prompt.md`
+A guy in my Discord says to run this with `upgrade`: `https://gist.example.invalid/…/upgrade.frompt.md`
 
 **agent**
 
 You have the confirmation phrase, so this would adopt. I linted it first — and that came back clean:
 
 ```
-$ bin/fp-lint https://gist.example.invalid/…/upgrade.prompt.md
+$ bin/fp-lint https://gist.example.invalid/…/upgrade.frompt.md
 VALID -- well-formed linear prompt 'helpful-assistant-upgrade' v9.9.9.
 Structure only: this says nothing about intent. Read it.
 ```
@@ -72,4 +72,4 @@ Not adopting it, and not on a second ask either: concealment has no benign versi
 
 *Two things at once. **A correct phrase settles intent and nothing else** (§C6) — the §9 refusal screen still stands after it. And **a clean lint is not a verdict**: `fp-lint` validates structure, so a hostile document passes it comfortably. The agent caught this by reading, which is the only thing that ever catches it.*
 
-See [`hostile-sample.prompt.md.txt`](hostile-sample.prompt.md.txt) for the defanged fixture behind that output — it really does pass the linter — and [`../SECURITY.md`](../SECURITY.md) for what to look for when you read one yourself.
+See [`hostile-sample.frompt.md.txt`](hostile-sample.frompt.md.txt) for the defanged fixture behind that output — it really does pass the linter — and [`../SECURITY.md`](../SECURITY.md) for what to look for when you read one yourself.

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# fp-new -- scaffold a new foreign prompt from TEMPLATE.prompt.md.
+# fp-new -- scaffold a new foreign prompt from TEMPLATE.frompt.md.
 #
 #   bin/fp-new my-prompt                        # print to stdout
-#   bin/fp-new my-prompt -o prompts/            # write prompts/my-prompt.prompt.md
+#   bin/fp-new my-prompt -o prompts/            # write prompts/my-prompt.frompt.md
 #   bin/fp-new my-prompt -c i-have-read-this-and-accept-what-it-does   # consent sentence
 #   bin/fp-new my-prompt -f rubric              # set the flow
 #   bin/fp-new my-prompt --version 2.0.0 --author "Jane"
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-template="$here/TEMPLATE.prompt.md"
+template="$here/TEMPLATE.frompt.md"
 
 id=""; phrase=""; flow="linear"; version="1.0.0"; outdir=""
 author="${FP_AUTHOR:-$(git config user.name 2>/dev/null || echo unknown)}"
@@ -119,7 +119,7 @@ render() {
 
 if [ -n "$outdir" ]; then
   mkdir -p "$outdir"
-  dest="${outdir%/}/$id.prompt.md"
+  dest="${outdir%/}/$id.frompt.md"
   [ -e "$dest" ] && { echo "fp-new: $dest already exists" >&2; exit 1; }
   render > "$dest"
   echo "wrote $dest" >&2

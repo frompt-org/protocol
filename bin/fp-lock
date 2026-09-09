@@ -54,7 +54,7 @@ def current():
         for v in entry["versions"]:
             urls[(entry["id"], v["version"])] = f"{m['base']}/{v['file']}"
     out = {}
-    for path in sorted(ROOT.glob("prompts/*/*.prompt.md")):
+    for path in sorted(ROOT.glob("prompts/*/*.frompt.md")):
         raw = path.read_bytes()
         fm = {}
         for line in raw.decode("utf-8").splitlines()[2:]:

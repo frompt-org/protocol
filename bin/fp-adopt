@@ -6,7 +6,7 @@ is fine, automation the publisher shipped is the thing ceremony exists to preven
 It never adopts anything and never talks to an agent — it fetches bytes, prints
 them for you to read, computes the digest, and hands you the line to send.
 
-    fp-adopt https://example.org/thing.prompt.md          # read it, then get the phrase
+    fp-adopt https://example.org/thing.frompt.md          # read it, then get the phrase
     fp-adopt <url> --quiet                                # phrase only, you have read it already
 
 Exit: 0 composed, 1 the document is not a valid foreign prompt, 2 unreadable.

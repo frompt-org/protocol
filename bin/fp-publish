@@ -2,13 +2,13 @@
 """fp-publish — copy this repo's prompts into a catalog checkout, and sign it there.
 
 A catalog is a shape, not a privilege: index.json, its signature, and
-prompts/<id>/<version>.prompt.md served as static files. This makes publishing a
+prompts/<id>/<version>.frompt.md served as static files. This makes publishing a
 command rather than a copy-paste, so the protocol repo and the catalog cannot
 drift into disagreeing about what was published.
 
-    fp-publish ~/f-prompts/reference              # sync, reindex, report
-    fp-publish ~/f-prompts/reference --base URL   # set where the catalog is served from
-    fp-publish ~/f-prompts/reference --check      # would anything change?
+    fp-publish ~/frompt/reference              # sync, reindex, report
+    fp-publish ~/frompt/reference --base URL   # set where the catalog is served from
+    fp-publish ~/frompt/reference --check      # would anything change?
 
 It never commits and never signs on your behalf — it stages files and tells you
 what to run. Publishing is an act someone should perform deliberately, and a tool
@@ -43,7 +43,7 @@ def main(argv):
     # this loop and refused afterwards, so "a published version is immutable" was
     # printed over a catalog it had already overwritten.
     changed, added, pending = [], [], []
-    for src in sorted(ROOT.glob("prompts/*/*.prompt.md")):
+    for src in sorted(ROOT.glob("prompts/*/*.frompt.md")):
         rel = src.relative_to(ROOT)
         dst = target / rel
         if not dst.exists():
@@ -68,7 +68,7 @@ def main(argv):
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
 
-    for extra in ("TEMPLATE.prompt.md",):
+    for extra in ("TEMPLATE.frompt.md",):
         if (ROOT / extra).exists():
             shutil.copy2(ROOT / extra, target / extra)
 

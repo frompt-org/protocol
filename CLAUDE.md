@@ -12,7 +12,7 @@ Living documents — `FPA.md`, `README.md`, `SECURITY.md`, `TERMINOLOGY.md`, `IN
 
 ## Prompts are versioned documents too
 
-A `prompts/*.prompt.md` file is a living document with a `version` and a digest published in `INDEX.md`. Changing one changes its digest, which invalidates every phrase a pilot already holds — so bump `version`, change the `consent` sentence when the change is material, and regenerate the index with `bin/fp-index`.
+A `prompts/*.frompt.md` file is a living document with a `version` and a digest published in `INDEX.md`. Changing one changes its digest, which invalidates every phrase a pilot already holds — so bump `version`, change the `consent` sentence when the change is material, and regenerate the index with `bin/fp-index`.
 
 ## Before pushing
 

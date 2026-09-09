@@ -54,7 +54,8 @@ KNOWN_FLOWS = set(fp.FLOWS)
 RETIRED = [
     (r"\bSKILL-INJECTION\b|\bREMOTE-SKILL\b|FOREIGN-PROMPT v1", "retired marker"),
     (r"^confirmation: ", "retired front-matter key; v2 uses consent: plus ceremony:"),
-    (r"\.skill\.md\b|\.claw\.md\b", "retired extension"),
+    (r"\.skill\.md\b|\.claw\.md\b|\.prompt\.md\b", "retired extension"),
+    (r"\bf-prompts?\b", "retired spelling; say frompt"),
     (r"\bSKILL OK:|\bCLAW OK:", "retired handshake"),
     (r"\bremote skills?\b|\bskill injection\b", "retired protocol name"),
     (r"structure \+ hostile scan|scans for hostile|hostile-pattern scan (?:catches|finds)",

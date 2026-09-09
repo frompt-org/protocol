@@ -45,7 +45,12 @@ if ! ssh-keygen -Y sign -f "$key" -n foreign-prompts index.json >/dev/null 2>&1;
   echo "fp-sign: ssh-keygen could not sign index.json" >&2
   exit 1
 fi
-printf '%s %s\n' "$identity" "$(cat "$key.pub")" > allowed_signers
+# Merge, do not overwrite: allowed_signers is also this workspace's trust root
+# for OTHER publishers' catalogs, and an earlier version replaced the whole file
+# with one line every time it signed -- silently dropping every registered key.
+tmp_signers=$(mktemp 2>/dev/null || echo "/tmp/fp-signers-$$")
+{ [ -f allowed_signers ] && awk -v id="$identity" '$1 != id' allowed_signers; printf '%s %s\n' "$identity" "$(cat "$key.pub")"; } > "$tmp_signers"
+mv "$tmp_signers" allowed_signers
 
 # Never claim a signature without checking it. This is the cheap half of the
 # whole mechanism, and skipping it is how the stale .sig went unnoticed.
