@@ -7,11 +7,11 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 | Term | Meaning |
 |---|---|
 | **foreign prompt** | A prompt acquired from a non-local source — usually a URL — to be checked, adopted, and run by an agent that did not write it. Prompt injection with the pilot's authorization, declared limits, and a visible handshake. Extension `.prompt.md`, marker `<!-- FOREIGN-PROMPT v2 -->` on line 1. "Foreign" names **origin, never location** — like a foreign key, which lives in your table. |
-| **f-prompt** | The short form of *foreign prompt* — the document. Three spellings, three jobs, and no fourth: **f-prompt** is the document, **FPA** is the protocol, **`fp-`** is the tool prefix. The org is `f-prompts`. |
+| **f-prompt** · **FP** | The short form and the initialism of *foreign prompt* — the document, singular. Names, each with one job: **foreign prompt / f-prompt / FP** is the document, **FPA** is the protocol, **f-prompts** is the project and the org, **`fp-`** is the tool prefix. FP pairs with FPA on purpose: the acronym contains the noun, and that is the only sense in which they nest. |
 | **Foreign Prompt Adoption (FPA)** | The protocol in [`FPA.md`](FPA.md): how a foreign prompt is fetched, checked, confirmed, adopted, run, and ended. |
 | **consent** | The pilot deliberately choosing *this document*, by typing the phrase it publishes. The point of the protocol, and the only thing it establishes — not comprehension, not safety, not containment. |
 | **non-goal** | Something FPA deliberately does not attempt: sandboxing, filtering, detecting hostility, or defending against a publisher the pilot trusted. Listed in [`FPA.md`](FPA.md) §0. Non-goals are not a roadmap. |
-| **adoption** | The runtime agent holding a foreign prompt as active instructions for a declared span. The way a committee adopts a resolution — not the way a family adopts a child. |
+| **adoption** | The **act**: the runtime agent holding a foreign prompt as active instructions for a declared span. The way a committee adopts a resolution — not the way a family adopts a child. Begins with the handshake, ends on `disown` or expiry. **It can fail** — no phrase, wrong phrase, digest mismatch, the §9 screen, an agent that cannot hash — and a failed adoption is a *refusal*, said out loud. A foreign prompt is complete before anyone attempts one; FPA governs the attempt. Thing, act, rules: FP, adoption, FPA. |
 | **pilot** | Whoever sends commands to the agent. The only party who can authorize an adoption. |
 | **runtime agent** | The agent that fetches and runs the foreign prompt. |
 | **TART** | *The Agent Reading This.* How a foreign prompt addresses the runtime agent in the second person, since it cannot know which agent will read it. |
