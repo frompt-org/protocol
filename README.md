@@ -372,7 +372,7 @@ A **catalog** is a published set of prompts — a signed manifest and the docume
 <base>/prompts/<id>/<version>.prompt.md
 ```
 
-That is the whole standard, and it is a **shape rather than a privilege**: anyone who can serve files can publish one, and no catalog is more official than another. The reference catalog lives at [`f-prompts/prompts`](https://github.com/f-prompts/prompts); a company publishes `acme/prompts` and serves it wherever they already serve static files.
+That is the whole standard, and it is a **shape rather than a privilege**: anyone who can serve files can publish one, and no catalog is more official than another. The reference catalog lives at [`f-prompts/prompts`](https://github.com/f-prompts/prompts), under an org whose [profile page](https://github.com/f-prompts/.github) is the thirty-second version of this README; a company publishes `acme/prompts` and serves it wherever they already serve static files.
 
 A client may adopt from several. Each carries its own freshness floor and is trusted through its own publisher key — held locally, never fetched from the catalog it validates.
 

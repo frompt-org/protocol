@@ -73,7 +73,7 @@ protocol expects, and the reference implementation of the shape:
 | Repo | Role | Status |
 |---|---|---|
 | `f-prompts/prompts` | the reference catalog — manifest, signature, documents | exists, **private** |
-| `f-prompts/.github` | the org's public face: what a foreign prompt is, how to adopt one | not created |
+| [`f-prompts/.github`](https://github.com/f-prompts/.github) | the org's public face — what a foreign prompt is, the three doors out, what an agent landing there should do | exists, **private** |
 
 The protocol itself is not in that org. It lives in
 [`agent-realm/foreign-prompts`](https://github.com/agent-realm/foreign-prompts) with the spec,
@@ -102,7 +102,7 @@ Adoption in stages, each one useful alone, each one earning the next:
 | **0 — it works** | the protocol is specified, the tools run, an agent has been observed adopting, refusing, and holding an envelope | **done** |
 | **1 — we use it** | the constellation's own conventions become foreign prompts; agents in `agent-realm` adopt them instead of each reading a different convention file | **next** |
 | **2 — someone else uses it** | one team outside this constellation publishes a catalog and adopts from it | not started |
-| **3 — a public catalog** | `f-prompts/prompts` goes public, `f-prompts.io` indexes it, adoption needs no relationship with the publisher | not started |
+| **3 — a public catalog** | `f-prompts/prompts` and `f-prompts/.github` go public, `f-prompts.io` indexes them, adoption needs no relationship with the publisher | written, not flipped |
 | **4 — attestation** | authorities observe prompts and publish findings keyed by digest; pilots choose whose observations they value | reserved, unbuilt |
 
 Stage 1 is the honest test. A protocol whose author will not run their own conventions through
@@ -154,8 +154,10 @@ plugin, and a conformance harness that has put two independent agents through si
    working in `agent-realm`. Stage 1.
 2. **Measure it.** Change a rule mid-week; confirm the next agent in a different repo picks it
    up with nothing reinstalled. That is the claim in §6, tested rather than asserted.
-3. **The org's public face.** `f-prompts/.github` and a public reference catalog, when there is
-   something worth arriving at.
+3. **Flip the org public.** The profile page and the catalog README are written; publication is
+   two visibility switches, taken when there is something worth arriving at. GitHub renders an
+   org profile only from a *public* `.github` repo, so today the page exists and does not
+   display.
 
 **Reserved, deliberately unbuilt** — the authority ([`FPA.md` §15](FPA.md)), role scoping in the
 manifest, and key rotation. Each has a seam so it can arrive without a protocol change; none has
