@@ -18,7 +18,7 @@ import pathlib
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-RAW = "https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts"
+RAW = "https://raw.githubusercontent.com/f-prompts/foreign-prompts/main/prompts"
 
 SUMMARY = {
     "help-me": "Stuck? It interviews your agent about this session, then proposes a route through other prompts. Start here.",

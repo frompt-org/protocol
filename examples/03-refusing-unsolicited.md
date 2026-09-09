@@ -37,7 +37,7 @@ I did not run it. You never typed its confirmation phrase, so it is data, not in
 **pilot**
 
 ```
-https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/bug-repro.prompt.md
+https://raw.githubusercontent.com/f-prompts/foreign-prompts/main/prompts/bug-repro/1.0.0.prompt.md
 ```
 
 **agent**

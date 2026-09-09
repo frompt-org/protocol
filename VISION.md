@@ -67,18 +67,25 @@ than a degraded one. See [`README.md`](README.md) for the working commands.
 
 ### The org
 
-[`github.com/f-prompts`](https://github.com/f-prompts) is one publisher among the many the
-protocol expects, and the reference implementation of the shape:
+[`github.com/f-prompts`](https://github.com/f-prompts) holds the protocol and one catalog of it,
+and is deliberately not the only publisher the protocol expects:
 
 | Repo | Role | Status |
 |---|---|---|
-| `f-prompts/prompts` | the reference catalog — manifest, signature, documents | exists, **private** |
+| [`f-prompts/foreign-prompts`](https://github.com/f-prompts/foreign-prompts) | the protocol — spec, tools, reference prompts, conformance harness | exists, **private** |
+| [`f-prompts/prompts`](https://github.com/f-prompts/prompts) | the reference catalog — manifest, signature, documents | exists, **private** |
 | [`f-prompts/.github`](https://github.com/f-prompts/.github) | the org's public face — what a foreign prompt is, the three doors out, what an agent landing there should do | exists, **private** |
 
-The protocol itself is not in that org. It lives in
-[`agent-realm/foreign-prompts`](https://github.com/agent-realm/foreign-prompts) with the spec,
-the tools and the conformance harness, because the standard and a catalog of it are different
-things and one org owning both invites the assumption that they are the same.
+The protocol was born in the `agent-realm` constellation and moved out on 2026-09-09, before
+anything was published. The constellation is meant to be this protocol's first **consumer**,
+and stage 1 below is a more honest test when the publisher is external to it. The old address
+redirects.
+
+Standard and catalog are separate repositories on purpose. The catalog is a set of published,
+immutable artifacts with its own rules; the protocol repo is edited freely. `bin/fp-publish`
+crosses that boundary deliberately, and refuses to overwrite a published version with different
+bytes. That a catalog is its own small repo is also the demonstration of the claim above — it is
+a shape anyone can serve, and this one is not special for sitting next to the spec.
 
 ### f-prompts.io
 

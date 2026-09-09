@@ -116,7 +116,11 @@ def main(argv):
         return 0
 
     if "--update" in argv:
-        wanted = argv[argv.index("--update") + 1]
+        at = argv.index("--update") + 1
+        if at >= len(argv) or argv[at].startswith("-"):
+            print("fp-lock: --update needs a prompt id\n" + __doc__.split("\n\n")[2], file=sys.stderr)
+            return 2
+        wanted = argv[at]
         pins, now = parse(), current()
         if wanted not in now:
             print(f"fp-lock: {wanted!r} is not in the index", file=sys.stderr)

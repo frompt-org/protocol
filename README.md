@@ -23,7 +23,7 @@ A foreign prompt is injection you chose. The pilot names one specific document w
 That is **agency, not security** — you know what got in, you chose it, you can end it. The trust model is `curl example.com | bash`: you are trusting the publisher, deliberately rather than unknowingly. What the protocol explicitly does **not** attempt is in [`FPA.md` §0](FPA.md) — those are non-goals, not a roadmap.
 
 ```
-recon https://raw.githubusercontent.com/agent-realm/foreign-prompts/main/prompts/repo-recon/1.0.0.prompt.md
+recon https://raw.githubusercontent.com/f-prompts/foreign-prompts/main/prompts/repo-recon/1.0.0.prompt.md
 ```
 ```
 ADOPTED: repo-recon v1.0.0
@@ -34,7 +34,7 @@ twelve file reads, and report in five fixed sections. Read-only.
 No install, no plugin, no config, no restart. When the session ends, so does the prompt — nothing was written anywhere.
 
 Those URLs are live: every prompt in this repo is fetchable as raw text, which is the entire distribution mechanism. Pin to a commit when you care what you are adopting —
-`https://raw.githubusercontent.com/agent-realm/foreign-prompts/8f20b7c…/prompts/repo-recon/1.0.0.prompt.md` — because `main` can change under you and a commit cannot.
+`https://raw.githubusercontent.com/f-prompts/foreign-prompts/8f20b7c…/prompts/repo-recon/1.0.0.prompt.md` — because `main` can change under you and a commit cannot.
 
 **Four documents, one job each.** [`FPA.md`](FPA.md) is the protocol, normative — what an agent
 must do. [`VISION.md`](VISION.md) is the project — where prompts live, who publishes them, and
@@ -66,7 +66,7 @@ Vocabulary is canon in [`TERMINOLOGY.md`](TERMINOLOGY.md); the protocol is [`FPA
 The pilot sends a **confirmation phrase** with the URL. The phrase is built from up to three parts, and each part proves a different thing:
 
 ```
-i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-8b060ea  <url>
+i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-b8fb834  <url>
 └──────────────── 1. consent sentence ─────────────────────────┘ └── 2. id ──┘ └3. digest┘
 ```
 
@@ -356,7 +356,7 @@ https://prompts.acme.internal                              your own static serve
 ```
 $ bin/fp-verify repo-recon --from gh:f-prompts/prompts@main
 manifest verified: index.json signed by foreign-prompts-publisher
-authorized: repo-recon v1.0.0 digest 0ee1331bb6d7 serial 1 expires 2026-09-29T22:16:05Z
+authorized: repo-recon v1.0.0 digest b8fb834207455d serial 1 expires 2026-09-29T22:16:05Z
 ```
 
 Signature, freshness and digest, against a repository nobody can read without permission. **Publishing is a decision about audience, not a prerequisite for the protocol working.**
