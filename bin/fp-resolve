@@ -13,8 +13,16 @@ that is the agent's job, and it happens only after this exits 0.
     fp-resolve --list                         # what the index offers
     fp-resolve pr-review --record             # the adoption record, without the body
     fp-resolve pr-review --lock               # refuse anything not matching fpa.lock
+    fp-resolve pr-review --from gh:frompt-org/stable@main   # a registered catalog's manifest
 
-Exit: 0 verified · 1 digest mismatch or unknown id · 2 unreachable.
+--from fetches the publisher's manifest and resolves against it: that is the
+registered context. An earlier version had no --from, so "register, then
+resolve" resolved from this checkout's own index -- a different publisher than
+the one just registered. With --from, a workspace that keeps fpa.registered
+refuses an unregistered catalog, and the pin mode it registered with is
+enforced: `latest` floats, `version` and `digest` require a matching fpa.lock.
+
+Exit: 0 verified · 1 digest mismatch, unknown id, or refused · 2 unreachable.
 
 A mismatch is not a warning. If the bytes are not the bytes the index vouched
 for, the pilot and the agent are not looking at the same document, and there is
@@ -36,17 +44,46 @@ def semver_key(v):
     return nums + ((0, pre) if pre else (1, ""))
 
 
-def entries():
-    """id -> {latest, versions[]} from the signed manifest.
+def entries(manifest):
+    """id -> {latest, versions[]} from a manifest.
 
     Read from index.json rather than INDEX.md: the machine-readable copy is the
     one a signature covers, and prose is not a data structure.
     """
+    return {p["id"]: p for p in manifest.get("prompts", [])}
+
+
+def local_manifest():
     try:
-        manifest = json.loads((ROOT / "index.json").read_text())
+        return json.loads((ROOT / "index.json").read_text())
     except OSError:
         return {}
-    return {p["id"]: p for p in manifest.get("prompts", [])}
+
+
+def registered(base):
+    """The fpa.registered line for a base, or None. A workspace with no such file
+    is not using the registered model and is unaffected."""
+    reg = ROOT / "fpa.registered"
+    if not reg.exists():
+        return "unregistered-model"
+    for line in reg.read_text().splitlines():
+        if line.strip() and not line.startswith("#"):
+            parts = line.split()
+            if parts[0] == base.rstrip("/"):
+                return {"fingerprint": parts[1], "pin": parts[2] if len(parts) > 2 else "latest"}
+    return None
+
+
+def pins():
+    lock = ROOT / "fpa.lock"
+    if not lock.exists():
+        return None
+    out = {}
+    for line in lock.read_text().splitlines():
+        if line.strip() and not line.startswith("#"):
+            pid, version, dg, url = line.split()
+            out[pid] = (version, dg.removeprefix("sha256:"), url)
+    return out
 
 
 def select(entry, selector):
@@ -101,7 +138,25 @@ def main(argv):
         print(__doc__)
         return 0 if ("-h" in flags or "--help" in flags) else 2
 
-    known = entries()
+    origin = None
+    if "--from" in argv:
+        origin = argv[argv.index("--from") + 1].rstrip("/")
+        reg = registered(origin)
+        if reg is None:
+            print(f"fp-resolve: {origin} is not in fpa.registered.\n"
+                  "  This workspace registers the catalogs it accepts. Register it deliberately:\n"
+                  f"    bin/fp-register {origin}", file=sys.stderr)
+            return 1
+        try:
+            manifest = json.loads(read(f"{origin}/index.json").decode("utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            print(f"fp-resolve: cannot fetch {origin}/index.json -- {exc}", file=sys.stderr)
+            return 2
+        pin_mode = reg["pin"] if isinstance(reg, dict) else "latest"
+    else:
+        manifest = local_manifest()
+        pin_mode = None
+    known = entries(manifest)
     if "--list" in flags:
         for e in known.values():
             newest = e["versions"][0]
@@ -123,8 +178,12 @@ def main(argv):
                   file=sys.stderr)
             return 1
         entry = dict(version, id=wanted)
-        source = (f"{base.rstrip('/')}/{entry['file']}" if base
-                  else f"{json.loads((ROOT / 'index.json').read_text())['base']}/{entry['file']}")
+        if base:
+            source = f"{base.rstrip('/')}/{entry['file']}"
+        elif origin:
+            source = f"{origin}/prompts/{entry['file']}"
+        else:
+            source = f"{manifest['base']}/{entry['file']}"
     elif wanted.startswith(("http://", "https://")) or pathlib.Path(wanted).exists():
         # Nothing vouched for these bytes, so there is nothing to verify against.
         # Exiting 0 here meant a skill told "adopt what it printed" adopted a
@@ -146,30 +205,43 @@ def main(argv):
 
     digest = hashlib.sha256(raw).hexdigest()
 
-    # --lock is the registered context: consent was given once, to a pin, so the
-    # pin is what bounds it. A prompt that moved since it was pinned is refused
-    # here rather than adopted quietly and noticed later.
-    if "--lock" in flags:
-        lock = ROOT / "fpa.lock"
-        if not lock.exists():
-            print("fp-resolve: --lock given but there is no fpa.lock", file=sys.stderr)
+    # A pin is what bounds registered consent (FPA.md AC2). `latest` floats;
+    # `version` and `digest` need a matching fpa.lock line, and the check covers
+    # version and origin as well as digest (M5) -- an earlier version compared
+    # the digest alone, so a pin was satisfied by the right bytes from the wrong
+    # publisher, or at a version nobody had reviewed.
+    want_lock = "--lock" in flags or pin_mode in ("version", "digest")
+    if want_lock:
+        locked = pins()
+        if locked is None:
+            print("fp-resolve: a lock is required here but there is no fpa.lock", file=sys.stderr)
             return 2
-        pins = {}
-        for line in lock.read_text().splitlines():
-            if line.strip() and not line.startswith("#"):
-                pid, version, dg, url = line.split()
-                pins[pid] = (version, dg.removeprefix("sha256:"), url)
-        if wanted not in pins:
-            print(f"fp-resolve: {wanted!r} is not pinned in fpa.lock -- refusing", file=sys.stderr)
+        if wanted not in locked:
+            print(f"fp-resolve: {wanted!r} is not pinned in fpa.lock -- refusing"
+                  + (f" (this catalog was registered with pin mode {pin_mode!r})" if pin_mode else ""),
+                  file=sys.stderr)
             return 1
         if "registered" not in tokens_of(entry.get("contexts", "interactive")):
             print(f"fp-resolve: {wanted} declares contexts "
                   f"[{entry.get('contexts', 'interactive')}] -- it is not fit for the registered "
                   "context, so a pin does not authorize it (FPA.md AC1).", file=sys.stderr)
             return 1
-        if pins[wanted][1] != digest:
+        pv, pd, purl = locked[wanted]
+        pub_base = manifest.get("base", "")
+        if pub_base and not purl.startswith(pub_base.rstrip("/") + "/"):
+            print(f"fp-resolve: {wanted} is pinned from a different publisher\n"
+                  f"  pinned  {purl}\n  manifest base {pub_base}\n"
+                  "A pin names one catalog; the same bytes from another are not what was agreed to (M5).",
+                  file=sys.stderr)
+            return 1
+        if pin_mode != "digest" and pv != entry["version"]:
+            print(f"fp-resolve: {wanted} is pinned at {pv}, the manifest offers {entry['version']}\n"
+                  "Re-pin deliberately with 'bin/fp-lock --update' if the bump is wanted (M5).",
+                  file=sys.stderr)
+            return 1
+        if pd != digest:
             print(f"fp-resolve: {wanted} has moved since it was pinned\n"
-                  f"  pinned  {pins[wanted][0]} {pins[wanted][1]}\n"
+                  f"  pinned  {pv} {pd}\n"
                   f"  fetched {digest}\n"
                   "Re-pin deliberately with 'bin/fp-lock --update' if that is what you want.",
                   file=sys.stderr)
@@ -184,7 +256,7 @@ def main(argv):
               "the bytes the index vouched for.", file=sys.stderr)
         return 1
 
-    how = "pinned" if "--lock" in flags else "indexed"
+    how = "pinned" if want_lock else ("registered" if origin else "indexed")
     asked = selector or "latest"
     record = (f"resolved={wanted}@{asked} version={entry['version']} "
               f"digest={digest[:12]} source={source} verified={how}")

@@ -431,6 +431,41 @@ if [ -f "$here/.fpa/signing_key" ]; then
   mv "$here/allowed_signers.selftest-bak" "$here/allowed_signers"
 fi
 
+# --- fp-resolve --from: the registered context actually resolves the registered catalog
+# "Register, then fp-resolve" once resolved from this checkout's own index -- a
+# different publisher than the one just registered -- and a pin mode was a label
+# nothing read back. Two reviewers found it in the same afternoon.
+if [ -f "$here/fpa.registered" ] && [ -f "$here/fpa.lock" ]; then
+  cp "$here/fpa.registered" "$here/fpa.registered.selftest-bak"
+  rf=$(mktemp -d 2>/dev/null || echo "/tmp/fp-rf-$$"); mkdir -p "$rf/prompts"
+  cp "$here/index.json" "$rf/"; cp -R "$here"/prompts/. "$rf/prompts/"
+  "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
+  check "--from an unregistered catalog is refused once the workspace keeps a register" 1 $?
+  fp=$(awk '$1 ~ /^gh:/ {print $2; exit}' "$here/fpa.registered")
+  printf '%s %s latest 2026-01-01 selftest\n' "$rf" "$fp" >> "$here/fpa.registered"
+  out=$("$here/bin/fp-resolve" pr-review --from "$rf" --record 2>/dev/null); rc=$?
+  [ $rc -eq 0 ] && printf '%s' "$out" | grep -q "source=$rf/prompts/" && printf '%s' "$out" | grep -q 'verified=registered'
+  check "--from resolves against the registered catalog's own manifest, pin mode latest floats" 0 $?
+  sed -i.bak "s#^$rf .* latest 2026-01-01 selftest\$#$rf $fp version 2026-01-01 selftest#" "$here/fpa.registered" && rm -f "$here/fpa.registered.bak"
+  "$here/bin/fp-resolve" pr-review@1.2.0 --from "$rf" --record >/dev/null 2>&1
+  check "pin mode 'version' refuses a version that is not the pinned one (M5)" 1 $?
+  pinned=$(awk '$1=="pr-review" {print $2; exit}' "$here/fpa.lock")
+  "$here/bin/fp-resolve" "pr-review@$pinned" --from "$rf" --record >/dev/null 2>&1
+  check "pin mode 'version' accepts the pinned version" 0 $?
+  python3 - "$rf" <<'PYEOF'
+import json, pathlib, sys
+d = pathlib.Path(sys.argv[1]); m = json.loads((d / "index.json").read_text())
+m["base"] = "https://other-publisher.invalid/prompts"
+(d / "index.json").write_text(json.dumps(m, indent=2, sort_keys=True) + "\n")
+PYEOF
+  "$here/bin/fp-resolve" "pr-review@$pinned" --from "$rf" --record >/dev/null 2>&1
+  check "a pin from one publisher does not authorize the same bytes from another (M5 origin)" 1 $?
+  mv "$here/fpa.registered.selftest-bak" "$here/fpa.registered"
+  rm -rf "$rf"
+else
+  echo "skip -- --from checks need fpa.registered and fpa.lock"
+fi
+
 # --- versions: choosing is exact or latest, and nothing else -----------------
 "$here/bin/fp-resolve" pr-review@1.2.0 --base "$here/prompts" --record >/dev/null 2>&1
 check "fp-resolve picks an exact version" 0 $?

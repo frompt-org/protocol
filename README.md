@@ -23,7 +23,7 @@ A foreign prompt is injection you chose. The pilot names one specific document w
 That is **agency, not security** — you know what got in, you chose it, you can end it. The trust model is `curl example.com | bash`: you are trusting the publisher, deliberately rather than unknowingly. What the protocol explicitly does **not** attempt is in [`FPA.md` §0](FPA.md) — those are non-goals, not a roadmap.
 
 ```
-recon https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/repo-recon/1.0.0.frompt.md
+i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-9cde6b0 https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/repo-recon/1.0.0.frompt.md
 ```
 ```
 ADOPTED: repo-recon v1.0.0
@@ -82,7 +82,7 @@ Three properties fall out of that, and they are the whole design:
 
 1. **It cannot be guessed.** The sentence is specific to this prompt and deliberately not standardized — a protocol-wide sentence would become muscle memory, and muscle memory is what ceremony exists to prevent.
 2. **It cannot be pasted innocently.** You are typing a first-person sentence stating what you are agreeing to. Pasting that without reading should feel wrong, the way typing a repo name to delete it feels wrong.
-3. **It is bound to the bytes.** The agent recomputes the digest over what *it* fetched. If a server showed you one document and your agent another, the hashes disagree and it refuses. **This is the only rule in the protocol that needs no goodwill** — everything else is a convention an agent follows.
+3. **It is bound to the bytes.** The agent recomputes the digest over what *it* fetched. If a server showed you one document and your agent another, the hashes disagree and it refuses. **This is the only rule in the protocol that needs no goodwill once a client computes it** — at level 0 the agent runs the hash itself and could misreport it ([`CLIENT.md`](CLIENT.md)); everything else is a convention an agent follows.
 
 How much of that a prompt demands is the author's call, declared as `ceremony` and scaled to the ask:
 
@@ -204,7 +204,7 @@ Full list with digests: [`INDEX.md`](INDEX.md). Annotated transcripts: [`example
 | [`welcome-tour`](prompts/welcome-tour/1.0.0.frompt.md) | standard | state-machine | A company guiding a visiting agent. Reads nothing of yours. |
 | [`ghost-in-the-gist`](prompts/ghost-in-the-gist/1.0.0.frompt.md) | standard | interpreter | The terminal above. |
 | [`handoff-note`](prompts/handoff-note/1.1.0.frompt.md) | strict | linear | The note that lets a cold reader resume your work. |
-| [`fpa-bootstrap`](prompts/fpa-bootstrap/2.0.0.frompt.md) | standard | linear | Teaches the protocol itself, refusals included. |
+| [`fpa-bootstrap`](prompts/fpa-bootstrap/2.1.0.frompt.md) | standard | linear | Teaches the protocol itself, refusals included. |
 
 ## Late binding — the point of wrapping one in a skill
 

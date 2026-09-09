@@ -17,7 +17,7 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 | **TART** | *The Agent Reading This.* How a foreign prompt addresses the runtime agent in the second person, since it cannot know which agent will read it. |
 | **confirmation phrase** | What the pilot sends to adopt a prompt: a **consent sentence** the author wrote, plus the prompt's **id**, plus a **digest** of the exact bytes. It establishes deliberateness — the ask was aimed at this document and no other — never comprehension. |
 | **consent sentence** | Part one of the phrase. Author-chosen, specific to the prompt, first-person, and published only in the prompt's final `## Consent` section, so reaching it means traversing the document. Deliberately not standardized: a protocol-wide sentence would become muscle memory. |
-| **digest** | Part three. SHA-256 of the document as fetched. It cannot live inside the document — adding it would change it — so the pilot computes it or takes it out of band, and **the agent recomputes it over what it fetched**. The one rule in FPA that needs no goodwill. |
+| **digest** | Part three. SHA-256 of the document as fetched. It cannot live inside the document — adding it would change it — so the pilot computes it or takes it out of band, and **the agent recomputes it over what it fetched**. The one rule in FPA that needs no goodwill once a client computes it; an agent that runs the hash itself could misreport it — see [`CLIENT.md`](CLIENT.md). |
 | **ceremony** | How much of the phrase a prompt demands: `light` (sentence only), `standard` (+ id + 7 hex), `strict` (+ full 64 hex). The author's choice, scaled to what the prompt asks for. |
 | **fan-out** | A prompt sending the agent to read further documents, each a fresh injection surface the pilot did not choose. Why `net:get` is the highest-consequence capability, and why `help-me` denies it. |
 | **catalog** | A published set of foreign prompts: a signed manifest plus the documents it lists, served as static files. A catalog is a **shape, not a privilege** — `index.json`, `index.json.sig`, `prompts/<id>/<version>.frompt.md` — so anyone who can serve files can publish one, and no catalog is more official than another. |
@@ -37,7 +37,7 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 
 - **index** — three things wore this word. The **manifest** is `index.json`, one catalog's signed prompt list. The **catalog index** is `INDEX.md`, the same list for people. A list of catalogs across publishers is a **directory**, never an index. `bin/fp-index` writes the first two.
 - **registered / registration / registry** — `registered` is an adoption context: a workspace agreed to a publisher once, and a **pin** bounds what that covers. The **registration record** (`fpa.registered`) is the evidence that somebody did. A **registry** would be a central place a catalog must be admitted to, and there is none: a catalog is a shape, and a directory that lists one admits nothing.
-- **runtime agent / TART / client** — the same agent seen three ways. *Runtime agent* is the party; *TART* is how a document addresses it; the *client* is the software it calls to do what a model cannot, which is measure.
+- **runtime agent / TART / client** — two things, three names. *Runtime agent* is the party and *TART* is how a document addresses it — one agent. The *client* is the other thing: the software that agent calls to do what a model cannot, which is measure ([`CLIENT.md`](CLIENT.md)).
 
 ## Borrowed carefully
 

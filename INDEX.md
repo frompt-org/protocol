@@ -138,7 +138,7 @@ Writes the note that lets a cold reader resume your work: state, next action, de
 
 Adopt an exact version with `handoff-note@1.1.0`, or `handoff-note@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
-## `fpa-bootstrap` — latest 2.0.0
+## `fpa-bootstrap` — latest 2.1.0
 
 Teaches the protocol itself to an agent that has never heard of it, refusals included.
 
@@ -147,9 +147,9 @@ Teaches the protocol itself to an agent that has never heard of it, refusals inc
 
 | version | sha256 | url |
 |---|---|---|
-| `2.0.0` ← latest | `e495a52bcaa6c67b4eed0f227511237b53101143e43c8882d17d029c2917e643` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/fpa-bootstrap/2.0.0.frompt.md` |
+| `2.1.0` ← latest | `d0e33d0004f63f81b11b39b7b1f35f0ccdb05da21acc96602d7d8c8f8df856a5` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/fpa-bootstrap/2.1.0.frompt.md` |
 
-Adopt an exact version with `fpa-bootstrap@2.0.0`, or `fpa-bootstrap@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+Adopt an exact version with `fpa-bootstrap@2.1.0`, or `fpa-bootstrap@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
 ---
 

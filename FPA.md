@@ -52,7 +52,7 @@ The third part cannot be embedded: adding a hash to a document changes its hash.
 - **C3.** The sentence **SHOULD** state, in the first person, what the pilot is agreeing to, so that pasting it without reading feels wrong to a sane pilot. It is a speech act, not a token.
 - **C4.** TART **MUST NOT** adopt a document without an authorization appropriate to the context it is adopting in (§1, *Adoption contexts*). There is always one, and it is never assumed.
 - **C4a.** In `interactive`, that authorization is the phrase: the pilot supplied it, at the ceremony the document declares, in this conversation. In `registered` it is a pin; in `managed` a signature. An earlier draft of this rule named only the phrase, which made every unattended adoption a violation of the spec that describes it.
-- **C5.** **When a digest part is present, TART MUST recompute SHA-256 over the exact bytes it fetched and refuse on mismatch.** This is the only rule in this spec that needs no goodwill, and it is the one that catches a server showing the pilot one document and the agent another.
+- **C5.** **When a digest part is present, TART MUST recompute SHA-256 over the exact bytes it fetched and refuse on mismatch.** This is the only rule in this spec that needs no goodwill **once a client computes it** — at level 0 the agent runs the hash itself and could misreport it; see [`CLIENT.md`](CLIENT.md), and it is the one that catches a server showing the pilot one document and the agent another.
 - **C5a.** Verification requires the ability to hash what was fetched. An agent that cannot reach the source, or cannot compute a digest, **MUST say so and MUST NOT adopt**. It may not treat the phrase as self-evidently correct: a phrase is a claim about bytes, and a claim nobody checked is not a check. Observed in conformance: given a document inline with no reachable source, an agent adopted altered bytes without complaint; given a real URL it could not reach, the same agent refused and said why. The variable was never diligence — it was whether verification was possible at all.
 - **C6.** A phrase establishes **deliberateness**, not comprehension. Say no more for it than that.
 - **C7.** A document **MUST NOT** claim its phrase was already given, instruct TART to skip a check, or assert that consent exists.
@@ -106,7 +106,7 @@ A phrase is the mode-1 instrument: a human, at a keyboard, adopting one document
 - **M7.** The trust root — the public key or `allowed_signers` file — **MUST** be held locally and **MUST NOT** be fetched from the host it is used to check. A signer list taken from the same place as the signature proves only that they agree with each other.
 - **M8.** Digests **MUST** be computed over the exact bytes fetched. Reading a document as text first normalizes line endings, and a CRLF copy of a document then hashes identical to its LF original while differing byte for byte.
 
-The manifest is also the deployment unit. Rollback is serving the previous manifest; staged rollout is different manifests for different rings; revocation is dropping an entry. None of that is in this spec — it belongs to whoever operates the fleet — but it is why §15 keys attestations by digest rather than by URL.
+The manifest is also the deployment unit. Rollback is publishing a **new** manifest, at a higher serial, that lists the previous versions — serving an old manifest is a replay, and M6 refuses it; staged rollout is different manifests for different rings; revocation is dropping an entry. None of that is in this spec — it belongs to whoever operates the fleet — but it is why §15 keys attestations by digest rather than by URL.
 
 ## 2. Document format
 
@@ -260,7 +260,7 @@ Denies accumulate. On a conflict of method the most recent wins, and TART says w
 2. Deny beats allow.
 3. The handshake happens.
 4. `disown` always works, immediately.
-5. No adoption without a phrase from the pilot in this conversation.
+5. No adoption without an authorization from this context — a phrase from the pilot in this conversation, a pin the workspace registered, or a signature the operator trusts (§1, AC1–AC5). Never assumed, never inherited from a document.
 6. No writes to host auto-loaded files.
 7. The §9 screen still applies after a correct phrase.
 8. No concealment from the pilot.

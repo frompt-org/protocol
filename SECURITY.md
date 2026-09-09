@@ -126,3 +126,13 @@ What remains is `persistence: artifact`: **one deliverable, at a path the pilot 
 ## Reporting
 
 Found a `.frompt.md` in the wild that violates §9, or a bypass of the phrase rule? Open an issue with the URL and the offending lines. Do not adopt it to "see what it does".
+
+## What a digest prefix buys
+
+| `ceremony` | Digest part | Bits | Defeated by |
+|---|---|---|---|
+| `light` | none | 0 | any substitution; the sentence alone binds nothing |
+| `standard` | 7 hex | 28 | about 2^28 hash attempts — seconds on a laptop, for anyone who can pad a document until its prefix matches |
+| `strict` | 64 hex | 256 | nothing practical |
+
+So `standard` binds against **accident and casual substitution** — a moved file, a stale mirror, a typo in the URL — and not against a determined party who can serve you a crafted document and precompute its prefix. That party has to control what your agent fetches, which is the same position as the publisher you already trust, so the exposure is *in transit*, not at the source. Choose `strict` for anything irreversible, and treat a `standard` phrase as a check that the right document arrived rather than proof that no other document could have.

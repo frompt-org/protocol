@@ -1,7 +1,7 @@
 {
   "base": "https://raw.githubusercontent.com/frompt-org/fpa/main/prompts",
   "manifest_version": 2,
-  "not_after": "2026-10-09T22:19:56Z",
+  "not_after": "2026-10-09T22:39:24Z",
   "prompts": [
     {
       "id": "help-me",
@@ -180,22 +180,22 @@
     },
     {
       "id": "fpa-bootstrap",
-      "latest": "2.0.0",
+      "latest": "2.1.0",
       "versions": [
         {
           "allow": "net:get, read:files",
           "ceremony": "standard",
           "contexts": "interactive, registered, managed",
           "deny": "write:files, net:post, secrets:read, pkg:install",
-          "digest": "e495a52bcaa6c67b4eed0f227511237b53101143e43c8882d17d029c2917e643",
-          "file": "fpa-bootstrap/2.0.0.frompt.md",
+          "digest": "d0e33d0004f63f81b11b39b7b1f35f0ccdb05da21acc96602d7d8c8f8df856a5",
+          "file": "fpa-bootstrap/2.1.0.frompt.md",
           "flow": "linear",
           "persistence": "none",
-          "version": "2.0.0"
+          "version": "2.1.0"
         }
       ]
     }
   ],
   "protocol": "FOREIGN-PROMPT v2",
-  "serial": 128
+  "serial": 133
 }
