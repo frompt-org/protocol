@@ -79,14 +79,34 @@ for f in index.json index.json.sig allowed_signers; do
 done
 command -v ssh-keygen >/dev/null || { echo "fp-verify: ssh-keygen not found" >&2; exit 2; }
 
-signer=$(awk '{print $1; exit}' allowed_signers)
+# Which trusted key made this signature? A trust root holds one line per
+# publisher, and an earlier version checked the first line only -- a second
+# catalog with its own key was "NOT signed by" the first catalog's publisher.
+signer=$(ssh-keygen -Y find-principals -s index.json.sig -f allowed_signers 2>/dev/null | head -1)
+if [ -z "$signer" ]; then
+  echo "fp-verify: index.json.sig was not made by any key in allowed_signers" >&2
+  echo "  Either the manifest was modified after signing, or this publisher's key is not in the local trust root." >&2
+  exit 1
+fi
 if ! ssh-keygen -Y verify -f allowed_signers -I "$signer" -n foreign-prompts \
      -s index.json.sig < index.json >/dev/null 2>&1; then
   echo "fp-verify: index.json is NOT signed by $signer" >&2
   echo "  Either the manifest was modified after signing, or it was signed by someone else." >&2
   exit 1
 fi
-echo "manifest verified: index.json signed by $signer"
+sigfp=$(awk -v p="$signer" '$1==p {print $2" "$3; exit}' allowed_signers | ssh-keygen -lf - 2>/dev/null | awk '{print $2}')
+echo "manifest verified: index.json signed by $signer $sigfp"
+
+# AC2b: the key that signed must be the key this workspace registered. A new key
+# in allowed_signers is not consent; the registration line is.
+if [ -n "$from" ] && [ -z "$registering" ] && [ -f "$here/fpa.registered" ]; then
+  recorded=$(awk -v b="${from%/}" '$1==b {print $2; exit}' "$here/fpa.registered")
+  if [ -n "$recorded" ] && [ "$recorded" != "$sigfp" ]; then
+    echo "fp-verify: ${from%/} is signed by $sigfp but this workspace registered $recorded" >&2
+    echo "  The publisher's key changed since somebody agreed to it. If that is expected, re-register deliberately." >&2
+    exit 1
+  fi
+fi
 
 [ $# -gt 0 ] && [ "${1#-}" = "$1" ] || exit 0
 id="$1"; shift

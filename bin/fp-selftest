@@ -388,6 +388,39 @@ else
 fi
 rm -rf "$reg"
 
+# --- two publishers, one trust root ------------------------------------------
+# fp-verify once checked the first key in allowed_signers only, so a second catalog
+# under its own key was "NOT signed by" the first catalog's publisher; and
+# fp-register recorded the first local key's fingerprint, never the signing key's.
+if [ -f "$here/.fpa/signing_key" ] && [ -f "$here/fpa.registered" ]; then
+  cp "$here/allowed_signers" "$here/allowed_signers.selftest-bak"
+  cp "$here/fpa.registered" "$here/fpa.registered.selftest-bak"
+  sp=$(mktemp -d 2>/dev/null || echo "/tmp/fp-sp-$$"); mkdir -p "$sp/prompts"
+  cp -R "$here"/prompts/. "$sp/prompts/"; cp "$here/index.json" "$sp/"
+  ssh-keygen -q -t ed25519 -N "" -C second-publisher -f "$sp/key2" >/dev/null 2>&1
+  ssh-keygen -Y sign -f "$sp/key2" -n foreign-prompts "$sp/index.json" >/dev/null 2>&1
+  "$here/bin/fp-verify" repo-recon --from "$sp" --registering >/dev/null 2>&1 </dev/null
+  check "a publisher whose key is not in the local trust root is refused" 1 $?
+  printf 'second-publisher %s\n' "$(cat "$sp/key2.pub")" >> "$here/allowed_signers"
+  out=$("$here/bin/fp-verify" repo-recon --from "$sp" --registering 2>/dev/null </dev/null); rc=$?
+  [ $rc -eq 0 ] && printf '%s' "$out" | grep -q 'signed by second-publisher SHA256:'
+  check "with two keys in the trust root, verification names the one that actually signed" 0 $?
+  "$here/bin/fp-register" "$sp" --pin latest --as selftest >/dev/null 2>&1 </dev/null
+  want=$(ssh-keygen -lf "$sp/key2.pub" | awk '{print $2}')
+  grep -q "^$sp $want " "$here/fpa.registered"
+  check "registration records the signing key's fingerprint, not the first local key's" 0 $?
+  ssh-keygen -q -t ed25519 -N "" -C second-publisher-rotated -f "$sp/key3" >/dev/null 2>&1
+  printf 'second-publisher-rotated %s\n' "$(cat "$sp/key3.pub")" >> "$here/allowed_signers"
+  rm -f "$sp/index.json.sig"; ssh-keygen -Y sign -f "$sp/key3" -n foreign-prompts "$sp/index.json" >/dev/null 2>&1
+  "$here/bin/fp-verify" repo-recon --from "$sp" >/dev/null 2>&1 </dev/null
+  check "a catalog re-signed with a different trusted key is refused: registered key wins (AC2b)" 1 $?
+  mv "$here/allowed_signers.selftest-bak" "$here/allowed_signers"
+  mv "$here/fpa.registered.selftest-bak" "$here/fpa.registered"
+  rm -rf "$sp"
+else
+  echo "skip -- two-publisher checks need a signing key and fpa.registered"
+fi
+
 # --- versions: choosing is exact or latest, and nothing else -----------------
 "$here/bin/fp-resolve" pr-review@1.2.0 --base "$here/prompts" --record >/dev/null 2>&1
 check "fp-resolve picks an exact version" 0 $?

@@ -60,18 +60,6 @@ def render(entries):
     return "\n".join(lines) + "\n"
 
 
-def fingerprint():
-    """The signer we would actually verify against, from the local trust root."""
-    signers = ROOT / "allowed_signers"
-    if not signers.exists():
-        return None
-    key = signers.read_text().split(None, 1)[1].strip() if signers.read_text().strip() else ""
-    proc = subprocess.run(["ssh-keygen", "-lf", "-"], input=key, capture_output=True, text=True)
-    if proc.returncode != 0:
-        return None
-    return proc.stdout.split()[1]
-
-
 def main(argv):
     invoked_as = pathlib.Path(argv[0]).name
     args = [a for a in argv[1:] if not a.startswith("-")]
@@ -107,6 +95,22 @@ def main(argv):
                   "  every catalog is refused until one is registered. Delete the file to opt out.")
         return 0
 
+    # --trust <allowed_signers>: extend the local trust root with this publisher's
+    # key, obtained out of band. The trust root is never fetched from the catalog
+    # it validates (M7); registering is where the pilot brings the key themselves.
+    if "--trust" in argv:
+        src = pathlib.Path(argv[argv.index("--trust") + 1])
+        local = ROOT / "allowed_signers"
+        have = {l.split()[0] for l in local.read_text().splitlines() if l.strip()} if local.exists() else set()
+        added = []
+        for line in src.read_text().splitlines():
+            if line.strip() and line.split()[0] not in have:
+                with local.open("a") as f:
+                    f.write(line.rstrip("\n") + "\n")
+                added.append(line.split()[0])
+        if added:
+            print(f"trust root extended with {', '.join(added)} from {src} -- confirm that fingerprint out of band")
+
     verify = ROOT / "bin" / "fp-verify"
     # --registering: check the catalog itself, but not whether it is already
     # registered. Otherwise the first check forbids the act it is checking for.
@@ -118,9 +122,14 @@ def main(argv):
               file=sys.stderr)
         return 1
 
-    fp = fingerprint()
+    # The fingerprint of the key that signed THIS catalog's manifest, as fp-verify
+    # found it -- not the first key in the local file, which is some other publisher's.
+    fp = None
+    for line in proc.stdout.splitlines():
+        if line.startswith("manifest verified:") and line.split()[-1].startswith("SHA256:"):
+            fp = line.split()[-1]
     if not fp:
-        print("fp-register: no local allowed_signers to pin a fingerprint against", file=sys.stderr)
+        print("fp-register: fp-verify did not report the signing key's fingerprint", file=sys.stderr)
         return 1
 
     pin = "latest"
