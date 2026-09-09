@@ -4,7 +4,7 @@
 
 Normative. **MUST**, **MUST NOT**, **SHOULD**, **MAY** are RFC 2119. Vocabulary is [`TERMINOLOGY.md`](TERMINOLOGY.md) and it wins over any wording here.
 
-Two audiences: **authors**, who publish `.prompt.md` documents, and **TART** — *The Agent Reading This* — the runtime agent that adopts one.
+Two audiences: **authors**, who publish `.prompt.md` documents, and **TART** — *The Agent Reading This* — the runtime agent that adopts one. A third party is implied wherever a rule says *a client MUST*: the software around TART that fetches, hashes and verifies, because a model cannot measure. What that software owes at each level is in [`CLIENT.md`](CLIENT.md).
 
 ---
 
@@ -267,7 +267,7 @@ Denies accumulate. On a conflict of method the most recent wins, and TART says w
 
 ## 14. Publishing
 
-Serve raw and immutable — a commit-pinned URL beats a branch URL. Publish the prompt's `id` and consent sentence next to the link; publish the digest **separately** from the document, or tell pilots how to compute it. Version it. Change the consent sentence when the content changes materially.
+Serve raw and immutable — a commit-pinned URL beats a branch URL. Publish the prompt's `id` and its **digest** next to the link, or tell pilots how to compute the digest; the digest cannot live inside the document. Do **not** publish the consent sentence anywhere but the document's own final section — an index that hands it over turns the ceremony into copy-paste. Version it. Change the consent sentence when the content changes materially.
 
 ## 14b. Versions
 

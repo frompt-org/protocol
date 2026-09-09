@@ -7,6 +7,7 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 | Term | Meaning |
 |---|---|
 | **foreign prompt** | A prompt acquired from a non-local source — usually a URL — to be checked, adopted, and run by an agent that did not write it. Prompt injection with the pilot's authorization, declared limits, and a visible handshake. Extension `.prompt.md`, marker `<!-- FOREIGN-PROMPT v2 -->` on line 1. "Foreign" names **origin, never location** — like a foreign key, which lives in your table. |
+| **f-prompt** | The short form of *foreign prompt* — the document. Three spellings, three jobs, and no fourth: **f-prompt** is the document, **FPA** is the protocol, **`fp-`** is the tool prefix. The org is `f-prompts`. |
 | **Foreign Prompt Adoption (FPA)** | The protocol in [`FPA.md`](FPA.md): how a foreign prompt is fetched, checked, confirmed, adopted, run, and ended. |
 | **consent** | The pilot deliberately choosing *this document*, by typing the phrase it publishes. The point of the protocol, and the only thing it establishes — not comprehension, not safety, not containment. |
 | **non-goal** | Something FPA deliberately does not attempt: sandboxing, filtering, detecting hostility, or defending against a publisher the pilot trusted. Listed in [`FPA.md`](FPA.md) §0. Non-goals are not a roadmap. |
@@ -21,6 +22,8 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 | **fan-out** | A prompt sending the agent to read further documents, each a fresh injection surface the pilot did not choose. Why `net:get` is the highest-consequence capability, and why `help-me` denies it. |
 | **catalog** | A published set of foreign prompts: a signed manifest plus the documents it lists, served as static files. A catalog is a **shape, not a privilege** — `index.json`, `index.json.sig`, `prompts/<id>/<version>.prompt.md` — so anyone who can serve files can publish one, and no catalog is more official than another. |
 | **publisher** | Whoever owns a catalog and holds the key that signs its manifest. A role, not a place: a company, a team, or one person with a repo. |
+| **client** | The software around the runtime agent that performs the *mechanism* in FPA — fetch exact bytes, hash, verify a manifest, hold locks and records. TART decides; the client measures. Defined with four levels in [`CLIENT.md`](CLIENT.md). A rule in `FPA.md` that says *a client MUST* binds this software; one that says *TART MUST* is a convention. |
+| **directory** | A list of *catalogs*, for discovery across publishers. Never lists consent sentences, never ranks, never admits — **discovery is not authorization**. Rules in [`DIRECTORY.md`](DIRECTORY.md); the intended instance is `f-prompts.io`, unbuilt. |
 | **authority** | A service that runs submitted prompts in isolation and publishes what it observed, keyed by digest. The intended layer above FPA; a reserved seam, not a built thing. |
 | **envelope** | The allow/deny capabilities a prompt declares for itself, as tokens from the fixed §4 vocabulary. Deny always wins. It is a **declaration the agent honours**, and a boundary only where a host maps it onto real permissions. |
 | **handshake** | The one exact line — `ADOPTED: <id> v<version>` — the runtime agent emits on adoption, so adoption is never silent. |
@@ -29,6 +32,12 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 | **preview** | Reporting what a URL contains without adopting it. Needs no phrase, because reading is not running. |
 | **adoption record** | What the runtime agent can report about what it has adopted: id, version, source, phrase, flow, persistence, expiry, files written. |
 | **disown** | The pilot's command to end an adoption immediately. `disown <id>`, or *disown everything*, which no prompt may disable. |
+
+## Confusable
+
+- **index** — three things wore this word. The **manifest** is `index.json`, one catalog's signed prompt list. The **catalog index** is `INDEX.md`, the same list for people. A list of catalogs across publishers is a **directory**, never an index. `bin/fp-index` writes the first two.
+- **registered / registration / registry** — `registered` is an adoption context: a workspace agreed to a publisher once, and a **pin** bounds what that covers. The **registration record** (`fpa.registered`) is the evidence that somebody did. A **registry** would be a central place a catalog must be admitted to, and there is none: a catalog is a shape, and a directory that lists one admits nothing.
+- **runtime agent / TART / client** — the same agent seen three ways. *Runtime agent* is the party; *TART* is how a document addresses it; the *client* is the software it calls to do what a model cannot, which is measure.
 
 ## Borrowed carefully
 

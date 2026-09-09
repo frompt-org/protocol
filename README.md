@@ -36,10 +36,12 @@ No install, no plugin, no config, no restart. When the session ends, so does the
 Those URLs are live: every prompt in this repo is fetchable as raw text, which is the entire distribution mechanism. Pin to a commit when you care what you are adopting —
 `https://raw.githubusercontent.com/f-prompts/foreign-prompts/8f20b7c…/prompts/repo-recon/1.0.0.prompt.md` — because `main` can change under you and a commit cannot.
 
-**Four documents, one job each.** [`FPA.md`](FPA.md) is the protocol, normative — what an agent
-must do. [`VISION.md`](VISION.md) is the project — where prompts live, who publishes them, and
-what is not built yet. [`SECURITY.md`](SECURITY.md) is the trust model.
-[`TERMINOLOGY.md`](TERMINOLOGY.md) is the vocabulary. Everything else is listed at the end.
+**Five documents, one job each.** [`FPA.md`](FPA.md) is the protocol, normative — what an agent
+must do. [`CLIENT.md`](CLIENT.md) is what the software around it must do — fetch, hash, verify —
+in four levels. [`VISION.md`](VISION.md) is the project — where prompts live, who publishes
+them, what is not built yet. [`SECURITY.md`](SECURITY.md) is the trust model.
+[`TERMINOLOGY.md`](TERMINOLOGY.md) is the vocabulary, including the words that collide.
+Everything else is listed at the end.
 
 ## Why this exists — one document, every agent
 
@@ -376,6 +378,8 @@ That is the whole standard, and it is a **shape rather than a privilege**: anyon
 
 A client may adopt from several. Each carries its own freshness floor and is trusted through its own publisher key — held locally, never fetched from the catalog it validates.
 
+Finding a catalog you do not already know is a different layer — a **directory** of catalogs, specified in [`DIRECTORY.md`](DIRECTORY.md) and not built. It lists; it never authorizes.
+
 `bin/fp-publish <catalog>` stages this repo's prompts into a catalog checkout and tells you what to run there. It refuses to overwrite a published version with different bytes, because that is the one rule everything else rests on.
 
 ## The index, and what it deliberately withholds
@@ -417,7 +421,9 @@ To adopt one as a pilot, `bin/fp-adopt <url>` fetches the document, prints it fo
 | Path | What |
 |---|---|
 | [`FPA.md`](FPA.md) | The protocol, normative. |
+| [`CLIENT.md`](CLIENT.md) | What a harness implements — mechanism versus convention, four levels, how a level is claimed. |
 | [`VISION.md`](VISION.md) | The project — parties, catalogs, the org, the adoption stages, what is not built. |
+| [`DIRECTORY.md`](DIRECTORY.md) | Discovery across catalogs — the rules for `f-prompts.io` before it exists. Discovery is not authorization. |
 | [`TERMINOLOGY.md`](TERMINOLOGY.md) | Canon vocabulary — the words this repo uses, and the ones it refuses. |
 | [`SECURITY.md`](SECURITY.md) | Trust model, what to look for when you read a prompt, guidance for pilots and agents. |
 | [`prompts/`](prompts/) · [`TEMPLATE.prompt.md`](TEMPLATE.prompt.md) | Working prompts, and the skeleton for a new one. |

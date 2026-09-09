@@ -39,6 +39,7 @@ for *instructions* has to carry, because unlike a package, a prompt steers the a
 | **author** | anyone | writes a document addressed to `TART`, declares its envelope, publishes a consent sentence in its last section | [`TEMPLATE.prompt.md`](TEMPLATE.prompt.md), `bin/fp-new`, `bin/fp-lint` |
 | **publisher** | anyone who can serve files | signs a manifest over a set of documents and serves it | `bin/fp-index`, `bin/fp-sign`, `bin/fp-publish` |
 | **pilot** | anyone with an agent | names one document, authorizes it, ends it | a phrase, or a pin, or a signature |
+| **client** | a harness, a plugin, a shell | does what a model cannot: fetches exact bytes, hashes, verifies, keeps the lock and the record | [`CLIENT.md`](CLIENT.md), levels 0–3 |
 | **authority** | *reserved, unbuilt* | runs a submitted prompt in isolation and publishes what it observed | [`FPA.md` §15](FPA.md) |
 
 Author and publisher are usually the same person and do not have to be. Pilot and author are
@@ -87,18 +88,19 @@ crosses that boundary deliberately, and refuses to overwrite a published version
 bytes. That a catalog is its own small repo is also the demonstration of the claim above — it is
 a shape anyone can serve, and this one is not special for sitting next to the spec.
 
-### f-prompts.io
+### f-prompts.io — a directory, not a bigger catalog
 
-The intended front door: a browsable index of published prompts, each with its id, versions,
-envelope, flow and **digest** — the one part a document cannot contain about itself.
+The intended front door is a **directory**: a list of catalogs across publishers, with each
+catalog's manifest cached so a search can return an id, a version and a **digest** — the one
+part a document cannot contain about itself.
 
-It would publish digests and **never consent sentences**. An index that handed over whole
-phrases is a copy-paste machine for the ceremony the phrase exists to create; the sentence
-stays in the document's last section, where reaching it means reaching the end. That asymmetry
-is the same one [`INDEX.md`](INDEX.md) already implements at repo scale.
+Its rules are fixed in [`DIRECTORY.md`](DIRECTORY.md) before it exists, because the important
+ones are the ones convenience erodes: it publishes digests and **never consent sentences**; it
+never ranks; listing admits nothing and removal revokes nothing; and **discovery is not
+authorization** — a client registers each catalog itself, by the pilot, recorded. A directory
+answers *what exists*, never *may I*.
 
-**Status: the domain is unregistered and nothing is built.** It is written down here so the
-constraint above is decided before anybody builds it, not after.
+**Status: the domain is unregistered and nothing is built.**
 
 ## 4. How this gets used
 
@@ -109,7 +111,7 @@ Adoption in stages, each one useful alone, each one earning the next:
 | **0 — it works** | the protocol is specified, the tools run, an agent has been observed adopting, refusing, and holding an envelope | **done** |
 | **1 — we use it** | the constellation's own conventions become foreign prompts; agents in `agent-realm` adopt them instead of each reading a different convention file | **next** |
 | **2 — someone else uses it** | one team outside this constellation publishes a catalog and adopts from it | not started |
-| **3 — a public catalog** | `f-prompts/prompts` and `f-prompts/.github` go public, `f-prompts.io` indexes them, adoption needs no relationship with the publisher | written, not flipped |
+| **3 — public, and findable** | `f-prompts/prompts` and `f-prompts/.github` go public; a directory at `f-prompts.io` lists this catalog and any other; adoption needs no prior relationship with a publisher, only a registration | written, not flipped; directory specified, unbuilt |
 | **4 — attestation** | authorities observe prompts and publish findings keyed by digest; pilots choose whose observations they value | reserved, unbuilt |
 
 Stage 1 is the honest test. A protocol whose author will not run their own conventions through
@@ -165,6 +167,8 @@ plugin, and a conformance harness that has put two independent agents through si
    two visibility switches, taken when there is something worth arriving at. GitHub renders an
    org profile only from a *public* `.github` repo, so today the page exists and does not
    display.
+
+**Specified, unbuilt** — the directory ([`DIRECTORY.md`](DIRECTORY.md)) and a level-3 client that maps envelope tokens onto real permissions ([`CLIENT.md`](CLIENT.md)). Both have rules now so that building them is not also designing them.
 
 **Reserved, deliberately unbuilt** — the authority ([`FPA.md` §15](FPA.md)), role scoping in the
 manifest, and key rotation. Each has a seam so it can arrive without a protocol change; none has
