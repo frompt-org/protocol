@@ -58,7 +58,7 @@ That is the case this protocol was built for, and it is not a demonstration: it 
 Every agent already fetches URLs on request, and what it reads steers it. A foreign prompt is what happens when the fetched document is **written for the reading agent instead of for a human**: it addresses the agent directly, declares what it may and may not do, states its flow, and asks for a handshake proving it started.
 
 - **Foreign** = origin, never location. Like a *foreign key*, which lives in your table. It is acquired from elsewhere and runs **here**, in this context.
-- **Prompt**, not *skill* — a skill is installed, dormant, progressively disclosed. This arrives on demand and is gone at the end.
+- **Directive**, not *skill* — a skill is what an agent *can do*: installed, dormant, progressively disclosed. A directive is what it is *told to do*. `CLAUDE.md` is the local kind, standing and loaded by one harness; this is the foreign kind — it arrives on demand, on any agent, and is gone at the end.
 - **Adoption** = holding it as active instructions for a declared span. The way a committee adopts a resolution, not the way a family adopts a child.
 
 Vocabulary is canon in [`TERMINOLOGY.md`](TERMINOLOGY.md); the protocol is [`FPA.md`](FPA.md).

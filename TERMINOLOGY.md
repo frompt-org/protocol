@@ -6,6 +6,7 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 
 | Term | Meaning |
 |---|---|
+| **directive** | The category. What an agent is *told to do*, as distinct from a **skill**, which is what it *can do*. A `CLAUDE.md` or `AGENTS.md` is a **local directive**: installed, standing, always on, obeyed by the one harness that loads it. A foreign prompt is the **foreign directive**: fetched when named, adopted on purpose, bounded, ended. |
 | **foreign prompt** | A prompt acquired from a non-local source — usually a URL — to be checked, adopted, and run by an agent that did not write it. Prompt injection with the pilot's authorization, declared limits, and a visible handshake. Extension `.frompt.md`, marker `<!-- FOREIGN-PROMPT v2 -->` on line 1. "Foreign" names **origin, never location** — like a foreign key, which lives in your table. |
 | **frompt** | The short form of *foreign prompt* — the document, singular; *frompts* plural. Say *f-prompt* fast. One word names the thing and the project; **FPA** is the protocol, **`fp-`** the tool prefix, `frompt-org` the GitHub login (`frompt` was taken), [frompt.org](https://frompt.org) the site. Retired spellings, do not use: *f-prompt*, *FP*, *f-prompts*. |
 | **Foreign Prompt Adoption (FPA)** | The protocol in [`FPA.md`](FPA.md): how a foreign prompt is fetched, checked, confirmed, adopted, run, and ended. |
@@ -45,6 +46,6 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 
 ## Not our words
 
-- **skill** — an installed, dormant, progressively-disclosed capability belonging to an agent harness. A foreign prompt is none of those. Say *prompt*.
+- **skill** — an installed, dormant, progressively-disclosed capability belonging to an agent harness: what an agent *can do*. A foreign prompt is what an agent is *told to do* — a directive — and none of those things. Say *frompt*, or *directive* for the category.
 - **prompt injection** — the mechanism: instructions from elsewhere entering an agent's context and steering it. Foreign Prompt Adoption **is** prompt injection, performed on purpose. Say so. What the word alone does not tell you is who authorized it, what bounded it, and whether anyone saw it — which is the whole of this protocol.
 - **remote** — reserved for things that actually execute elsewhere. A foreign prompt executes here.
