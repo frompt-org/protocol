@@ -59,6 +59,7 @@ Every agent already fetches URLs on request, and what it reads steers it. A fore
 
 - **Foreign** = origin, never location. Like a *foreign key*, which lives in your table. It is acquired from elsewhere and runs **here**, in this context.
 - **Directive**, not *skill* — a skill is what an agent *can do*: installed, dormant, progressively disclosed. A directive is what it is *told to do*. `CLAUDE.md` is the local kind, standing and loaded by one harness; this is the foreign kind — it arrives on demand, on any agent, and is gone at the end.
+- **A directive, not a prompt** — a prompt is written, sent, and answered by one party. Here the author writes it, the pilot authorizes it, TART implements it, and the pilot receives the result; the author gets nothing back. It addresses a role rather than a person, and it constrains conduct (`MUST NOT`) instead of asking a question. Its force comes from adoption, never from its author.
 - **Adoption** = holding it as active instructions for a declared span. The way a committee adopts a resolution, not the way a family adopts a child.
 
 Vocabulary is canon in [`TERMINOLOGY.md`](TERMINOLOGY.md); the protocol is [`FPA.md`](FPA.md).
