@@ -34,6 +34,15 @@ Canon for this repo. If any other file disagrees with this one, **this one wins*
 | **adoption record** | What the runtime agent can report about what it has adopted: id, version, source, phrase, flow, persistence, expiry, files written. |
 | **disown** | The pilot's command to end an adoption immediately. `disown <id>`, or *disown everything*, which no prompt may disable. |
 
+## Settled, so it stays settled
+
+- **`directive` is the category, never the name.** The thing is a **frompt**; a directive is what
+  kind of thing it is, and a `CLAUDE.md` is one too. Naming the species with the genus breaks the
+  one sentence the positioning rests on — *a directive that comes from somewhere else* — the way
+  Rust would have broken *crate* by calling it *package*. The phrase "agent directives" is also
+  already the common name for the `CLAUDE.md` genre, which is the thing a frompt is defined
+  against, and a descriptive phrase belongs to nobody. Decided 2026-09-19.
+
 ## Confusable
 
 - **index** — three things wore this word. The **manifest** is `index.json`, one catalog's signed prompt list. The **catalog index** is `INDEX.md`, the same list for people. A list of catalogs across publishers is a **directory**, never an index. `bin/fp-index` writes the first two.
