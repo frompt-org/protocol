@@ -151,6 +151,19 @@ Teaches the protocol itself to an agent that has never heard of it, refusals inc
 
 Adopt an exact version with `fpa-bootstrap@2.1.0`, or `fpa-bootstrap@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
+## `gentar-adopt` — latest 1.0.0
+
+
+
+- **Contexts** `interactive` · **flow** `linear` · **ceremony** `strict`
+- **Capabilities** `read:files, read:git, run:shell-ro, write:files, net:get`
+
+| version | sha256 | url |
+|---|---|---|
+| `1.0.0` ← latest | `5ef0e22576de56de7df2c521086466d577b07e8ea8ecd62285c4ae1db27f15f7` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/gentar-adopt/1.0.0.frompt.md` |
+
+Adopt an exact version with `gentar-adopt@1.0.0`, or `gentar-adopt@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+
 ---
 
 Regenerate with `bin/fp-index`, which also writes `index.json` — the same data, machine-readable, and the thing a signature covers. `make test` fails if either drifts from the prompts.
