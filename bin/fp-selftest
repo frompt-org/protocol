@@ -431,41 +431,68 @@ if [ -f "$here/.fpa/signing_key" ]; then
   mv "$here/allowed_signers.selftest-bak" "$here/allowed_signers"
 fi
 
-# --- fp-resolve --from: the registered context actually resolves the registered catalog
-# "Register, then fp-resolve" once resolved from this checkout's own index -- a
-# different publisher than the one just registered -- and a pin mode was a label
-# nothing read back. Two reviewers found it in the same afternoon.
-if [ -f "$here/fpa.registered" ] && [ -f "$here/fpa.lock" ]; then
+# --- fp-resolve --from: the registered context resolves the registered catalog,
+# from a manifest that was verified first. "Register, then fp-resolve" once read
+# the checkout's own index; then it read the publisher's JSON without checking
+# the signature, the registered key, expiry or context fitness. Two reviewers
+# found each in turn.
+if [ -f "$here/fpa.registered" ] && [ -f "$here/fpa.lock" ] && [ -f "$here/.fpa/signing_key" ]; then
   cp "$here/fpa.registered" "$here/fpa.registered.selftest-bak"
+  cp "$here/allowed_signers" "$here/allowed_signers.selftest-bak"
   rf=$(mktemp -d 2>/dev/null || echo "/tmp/fp-rf-$$"); mkdir -p "$rf/prompts"
-  cp "$here/index.json" "$rf/"; cp -R "$here"/prompts/. "$rf/prompts/"
+  cp "$here/index.json" "$here/index.json.sig" "$rf/"; cp -R "$here"/prompts/. "$rf/prompts/"
+  fp=$(ssh-keygen -lf "$here/.fpa/signing_key.pub" | awk '{print $2}')
+  resign() { rm -f "$rf/index.json.sig"; ssh-keygen -Y sign -f "${1:-$here/.fpa/signing_key}" -n foreign-prompts "$rf/index.json" >/dev/null 2>&1; }
+
   "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
   check "--from an unregistered catalog is refused once the workspace keeps a register" 1 $?
-  # The scratch catalog is this repo's own manifest, so its signer is this repo's key --
-  # not whichever catalog happens to be registered first.
-  fp=$(ssh-keygen -lf "$here/.fpa/signing_key.pub" | awk '{print $2}')
   printf '%s %s latest 2026-01-01 selftest\n' "$rf" "$fp" >> "$here/fpa.registered"
+
   out=$("$here/bin/fp-resolve" pr-review --from "$rf" --record 2>/dev/null); rc=$?
   [ $rc -eq 0 ] && printf '%s' "$out" | grep -q "source=$rf/prompts/" && printf '%s' "$out" | grep -q 'verified=registered'
-  check "--from resolves against the registered catalog's own manifest, pin mode latest floats" 0 $?
+  check "--from resolves against the registered catalog's own verified manifest" 0 $?
+
+  "$here/bin/fp-resolve" --list --from "$rf" 2>/dev/null | grep -q '^pr-review '
+  check "--list --from lists the registered catalog, not the catalog address as an id" 0 $?
+
+  "$here/bin/fp-resolve" ghost-in-the-gist --from "$rf" --record >/dev/null 2>&1
+  check "a floating registration does not authorize a frompt that never offered 'registered' (AC4b)" 1 $?
+
+  cp "$rf/index.json" "$rf/index.json.orig"
+  python3 -c "import json,sys; p=sys.argv[1]; m=json.load(open(p)); m['prompts'][0]['versions'][0]['digest']='0'*64; open(p,'w').write(json.dumps(m,indent=2,sort_keys=True)+'\n')" "$rf/index.json"
+  "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
+  check "a manifest edited after signing is refused before anything resolves from it" 1 $?
+  mv "$rf/index.json.orig" "$rf/index.json"
+
+  ssh-keygen -q -t ed25519 -N "" -C intruder -f "$rf/key2" >/dev/null 2>&1
+  printf 'intruder %s\n' "$(cat "$rf/key2.pub")" >> "$here/allowed_signers"
+  resign "$rf/key2"
+  "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
+  check "a catalog re-signed by another trusted key is refused: the registered key wins (AC2b)" 1 $?
+  resign
+
+  rm -f "$rf/index.json.sig"
+  "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
+  check "an unsigned catalog cannot be resolved from: cannot check is exit 2, not a fallback" 2 $?
+  resign
+
   sed -i.bak "s#^$rf .* latest 2026-01-01 selftest\$#$rf $fp version 2026-01-01 selftest#" "$here/fpa.registered" && rm -f "$here/fpa.registered.bak"
   "$here/bin/fp-resolve" pr-review@1.2.0 --from "$rf" --record >/dev/null 2>&1
   check "pin mode 'version' refuses a version that is not the pinned one (M5)" 1 $?
   pinned=$(awk '$1=="pr-review" {print $2; exit}' "$here/fpa.lock")
   "$here/bin/fp-resolve" "pr-review@$pinned" --from "$rf" --record >/dev/null 2>&1
   check "pin mode 'version' accepts the pinned version" 0 $?
-  python3 - "$rf" <<'PYEOF'
-import json, pathlib, sys
-d = pathlib.Path(sys.argv[1]); m = json.loads((d / "index.json").read_text())
-m["base"] = "https://other-publisher.invalid/prompts"
-(d / "index.json").write_text(json.dumps(m, indent=2, sort_keys=True) + "\n")
-PYEOF
+
+  python3 -c "import json,sys; p=sys.argv[1]; m=json.load(open(p)); m['base']='https://other-publisher.invalid/prompts'; open(p,'w').write(json.dumps(m,indent=2,sort_keys=True)+'\n')" "$rf/index.json"
+  resign
   "$here/bin/fp-resolve" "pr-review@$pinned" --from "$rf" --record >/dev/null 2>&1
   check "a pin from one publisher does not authorize the same bytes from another (M5 origin)" 1 $?
+
   mv "$here/fpa.registered.selftest-bak" "$here/fpa.registered"
+  mv "$here/allowed_signers.selftest-bak" "$here/allowed_signers"
   rm -rf "$rf"
 else
-  echo "skip -- --from checks need fpa.registered and fpa.lock"
+  echo "skip -- --from checks need fpa.registered, fpa.lock and a signing key"
 fi
 
 # --- versions: choosing is exact or latest, and nothing else -----------------

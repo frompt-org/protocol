@@ -4,6 +4,12 @@
 #   fp-verify                          # is the local index.json signed by a known publisher?
 #   fp-verify <id> [--base DIR]        # ...and are these the bytes it vouched for?
 #   fp-verify <id> --from <dir-or-url> # fetch the publisher's manifest, then check
+#   ... --context registered            # fitness check for that context (default: managed)
+#   ... --manifest-out FILE             # write the exact manifest bytes that were verified
+#
+# --manifest-out exists for fp-resolve. Resolving from a manifest other than the
+# one just verified -- fetched a second time, say -- would let a server hand the
+# verifier a signed manifest and the resolver an unsigned one.
 #
 # --from is what makes late binding real. Without it this reads a manifest from
 # your own checkout, so a publisher updating a prompt reaches nobody until they
@@ -21,11 +27,15 @@ set -uo pipefail
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$here"
 
-from=""
+from=""; context="managed"; manifest_out=""
 for i in "$@"; do
   [ "${prev:-}" = "--from" ] && from="$i"
+  [ "${prev:-}" = "--context" ] && context="$i"
+  [ "${prev:-}" = "--manifest-out" ] && manifest_out="$i"
   prev="$i"
 done
+case "$context" in registered|managed) ;; *) echo "fp-verify: --context must be registered or managed" >&2; exit 2;; esac
+case "$manifest_out" in ""|/*) ;; *) manifest_out="$PWD/$manifest_out";; esac
 
 # Once fpa.registered exists, this workspace has opted into the registered model,
 # and a catalog absent from it was never agreed to. A workspace with no such file
@@ -108,8 +118,10 @@ if [ -n "$from" ] && [ -z "$registering" ] && [ -f "$here/fpa.registered" ]; the
   fi
 fi
 
-[ $# -gt 0 ] && [ "${1#-}" = "$1" ] || exit 0
-id="$1"; shift
+# With no prompt id the manifest itself is still checked for expiry and freshness:
+# a valid signature on a stale manifest is not a current manifest.
+id=""
+if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then id="$1"; shift; fi
 base=""
 if [ "${1:-}" = "--base" ]; then
   # ${2:-} not $2: with set -u a missing value crashed the script and exited 1,
@@ -121,9 +133,10 @@ if [ "${1:-}" = "--base" ]; then
   fi
 fi
 
-python3 - "$id" "$base" "$here" "$from" <<'PY'
+python3 - "$id" "$base" "$here" "$from" "$context" "$manifest_out" <<'PY'
 import hashlib, json, pathlib, sys, urllib.request
 wanted, base, root, origin = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3]), sys.argv[4]
+context, manifest_out = sys.argv[5], sys.argv[6]
 manifest = json.load(open("index.json"))
 # Expiry first, because it is the half that needs no memory. A serial floor only
 # protects a client that has already seen something newer; a fresh agent, a wiped
@@ -169,6 +182,11 @@ if catalog in floors:
 floors[catalog] = serial
 seen.parent.mkdir(parents=True, exist_ok=True)
 seen.write_text(json.dumps(floors, indent=2, sort_keys=True) + "\n")
+if not wanted:
+    if manifest_out:
+        pathlib.Path(manifest_out).write_bytes(pathlib.Path("index.json").read_bytes())
+    print(f"manifest current: serial {serial} expires {not_after}")
+    sys.exit(0)
 wanted, _, selector = wanted.partition("@")
 group = next((p for p in manifest["prompts"] if p["id"] == wanted), None)
 if group is None:
@@ -214,15 +232,18 @@ if got != entry["digest"]:
     print(f"fp-verify: DIGEST MISMATCH for {wanted}\n  manifest {entry['digest']}\n"
           f"  fetched  {got}\n  source   {src}\nRefusing.", file=sys.stderr)
     sys.exit(1)
-if "managed" not in [c.strip() for c in entry["contexts"].split(",")]:
+if context not in [c.strip() for c in entry["contexts"].split(",")]:
+    how = "a signature" if context == "managed" else "a registration"
     print(f"fp-verify: {wanted} declares contexts [{entry['contexts']}] -- it is not fit for the "
-          "managed context, so a signature does not authorize it (FPA.md AC1).", file=sys.stderr)
+          f"{context} context, so {how} does not authorize it (FPA.md AC4b).", file=sys.stderr)
     sys.exit(1)
 soon = (datetime.datetime.strptime(not_after, "%Y-%m-%dT%H:%M:%SZ")
         .replace(tzinfo=datetime.timezone.utc) - datetime.datetime.now(datetime.timezone.utc)).days
 if soon <= 3:
     print(f"fp-verify: note -- this manifest expires in {soon} day(s), on {not_after}",
           file=sys.stderr)
+if manifest_out:
+    pathlib.Path(manifest_out).write_bytes(pathlib.Path("index.json").read_bytes())
 print(f"authorized: {wanted} v{entry['version']} digest {got[:12]} "
       f"contexts [{entry['contexts']}] serial {serial} expires {not_after} source {src}")
 PY

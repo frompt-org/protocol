@@ -132,7 +132,12 @@ def read(source):
 
 
 def main(argv):
-    args = [a for a in argv[1:] if not a.startswith("-")]
+    # Positional arguments only: the value after --from or --base is not a prompt id.
+    # Counting it as one made `fp-resolve --list --from <catalog>` resolve the catalog
+    # address as if it were a prompt.
+    valued = {"--from", "--base"}
+    args = [a for i, a in enumerate(argv[1:], 1)
+            if not a.startswith("-") and argv[i - 1] not in valued]
     flags = [a for a in argv[1:] if a.startswith("-")]
     if "-h" in flags or "--help" in flags or (not args and "--list" not in flags):
         print(__doc__)
@@ -147,11 +152,24 @@ def main(argv):
                   "  This workspace registers the catalogs it accepts. Register it deliberately:\n"
                   f"    bin/fp-register {origin}", file=sys.stderr)
             return 1
-        try:
-            manifest = json.loads(read(f"{origin}/index.json").decode("utf-8"))
-        except Exception as exc:  # noqa: BLE001
-            print(f"fp-resolve: cannot fetch {origin}/index.json -- {exc}", file=sys.stderr)
-            return 2
+        # The manifest is used only as fp-verify verified it: signature against the
+        # local trust root, the signing key against the registered one (AC2b),
+        # expiry, the serial floor, and fitness for the registered context (AC4b).
+        # An earlier version read the fetched JSON directly and checked none of
+        # that, while the catalog README promised all of it.
+        import subprocess, tempfile
+        target = args[0] if args else ""
+        with tempfile.TemporaryDirectory() as td:
+            out = pathlib.Path(td) / "index.json"
+            cmd = [str(ROOT / "bin" / "fp-verify")] + ([target] if target else []) + [
+                "--from", origin, "--context", "registered", "--manifest-out", str(out)]
+            proc = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
+            if proc.returncode != 0 or not out.exists():
+                sys.stderr.write(proc.stderr)
+                print(f"fp-resolve: refusing -- {origin} did not pass verification for the "
+                      "registered context (reason above).", file=sys.stderr)
+                return proc.returncode if proc.returncode in (1, 2) else 2
+            manifest = json.loads(out.read_bytes().decode("utf-8"))
         pin_mode = reg["pin"] if isinstance(reg, dict) else "latest"
     else:
         manifest = local_manifest()
