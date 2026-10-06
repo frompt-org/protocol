@@ -32,7 +32,7 @@ Stuck? It interviews your agent about this session, then proposes a route throug
 
 Adopt an exact version with `help-me@1.0.0`, or `help-me@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
-## `repo-recon` — latest 1.0.0
+## `repo-recon` — latest 1.1.0
 
 Maps an unfamiliar codebase from entry points, seams and git churn. Twelve reads, five sections, read-only.
 
@@ -41,11 +41,11 @@ Maps an unfamiliar codebase from entry points, seams and git churn. Twelve reads
 
 | version | sha256 | url |
 |---|---|---|
-| `1.0.0` ← latest | `9cde6b0397af38cdcc91787cad5e69d7af6eee6e7afa2742336dc482b870b538` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/repo-recon/1.0.0.frompt.md` |
+| `1.1.0` ← latest | `31c1785acb46afbcd43ef28e83347c4e6c55c9cad43ae569ff045a6af5a9c615` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/repo-recon/1.1.0.frompt.md` |
 
-Adopt an exact version with `repo-recon@1.0.0`, or `repo-recon@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+Adopt an exact version with `repo-recon@1.1.0`, or `repo-recon@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
-## `pr-review` — latest 2.0.0
+## `pr-review` — latest 2.0.1
 
 Judges a diff by tiers — correctness, blast radius, failure mode, reversibility, design fit. No praise, no nits.
 
@@ -54,11 +54,12 @@ Judges a diff by tiers — correctness, blast radius, failure mode, reversibilit
 
 | version | sha256 | url |
 |---|---|---|
-| `2.0.0` ← latest | `dc6ae5acfbf20011da599e0569bdd556ee5a58d0a06a3f9387f28a70c8405c74` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/pr-review/2.0.0.frompt.md` |
+| `2.0.1` ← latest | `c3ced2830a2f0634cfd76bcbdba6cba5e1c7bb7071082a62c7df9845a98c80de` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/pr-review/2.0.1.frompt.md` |
+| `2.0.0` | `dc6ae5acfbf20011da599e0569bdd556ee5a58d0a06a3f9387f28a70c8405c74` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/pr-review/2.0.0.frompt.md` |
 | `1.3.0` | `b58f913e3011a6c7f0b8ade10f15b69fcbddc1ca0c4dd9ce2ce80baf2d7e7a7b` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/pr-review/1.3.0.frompt.md` |
 | `1.2.0` | `4ebc4b4efea37ac8d7374cad0da6151bf606212cfdb41375b0d66209afb84e30` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/pr-review/1.2.0.frompt.md` |
 
-Adopt an exact version with `pr-review@2.0.0`, or `pr-review@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+Adopt an exact version with `pr-review@2.0.1`, or `pr-review@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
 ## `bug-repro` — latest 1.0.0
 

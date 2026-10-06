@@ -23,10 +23,10 @@ A foreign prompt is injection you chose. The pilot names one specific document w
 That is **agency, not security** — you know what got in, you chose it, you can end it. The trust model is `curl example.com | bash`: you are trusting the publisher, deliberately rather than unknowingly. What the protocol explicitly does **not** attempt is in [`FPA.md` §0](FPA.md) — those are non-goals, not a roadmap.
 
 ```
-i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-9cde6b0 https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/repo-recon/1.0.0.frompt.md
+i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-31c1785 https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/repo-recon/1.1.0.frompt.md
 ```
 ```
-ADOPTED: repo-recon v1.0.0
+ADOPTED: repo-recon v1.1.0
 Recon mode: I map a repo from entry points, seams, and git churn, cap myself at
 twelve file reads, and report in five fixed sections. Read-only.
 ```
@@ -34,7 +34,7 @@ twelve file reads, and report in five fixed sections. Read-only.
 No install, no plugin, no config, no restart. When the session ends, so does the prompt — nothing was written anywhere.
 
 Those URLs are live: every prompt in this repo is fetchable as raw text, which is the entire distribution mechanism. Pin to a commit when you care what you are adopting —
-`https://raw.githubusercontent.com/frompt-org/protocol/8f20b7c…/prompts/repo-recon/1.0.0.frompt.md` — because `main` can change under you and a commit cannot.
+`https://raw.githubusercontent.com/frompt-org/protocol/8f20b7c…/prompts/repo-recon/1.1.0.frompt.md` — because `main` can change under you and a commit cannot.
 
 **Five documents, one job each.** [`FPA.md`](FPA.md) is the protocol, normative — what an agent
 must do. [`CLIENT.md`](CLIENT.md) is what the software around it must do — fetch, hash, verify —
@@ -69,7 +69,7 @@ Vocabulary is canon in [`TERMINOLOGY.md`](TERMINOLOGY.md); the protocol is [`FPA
 The pilot sends a **confirmation phrase** with the URL. The phrase is built from up to three parts, and each part proves a different thing:
 
 ```
-i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-9cde6b0  <url>
+i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-31c1785  <url>
 └──────────────── 1. consent sentence ─────────────────────────┘ └── 2. id ──┘ └3. digest┘
 ```
 
@@ -197,7 +197,7 @@ Full list with digests: [`INDEX.md`](INDEX.md). Annotated transcripts: [`example
 | Prompt | Ceremony | Flow | Does |
 |---|---|---|---|
 | [`help-me`](prompts/help-me/1.0.0.frompt.md) | standard | interview | Interviews your agent about this session, proposes a route through other prompts. **Start here.** |
-| [`repo-recon`](prompts/repo-recon/1.0.0.frompt.md) | standard | linear | Maps an unfamiliar codebase from entry points, seams and churn. |
+| [`repo-recon`](prompts/repo-recon/1.1.0.frompt.md) | standard | linear | Maps an unfamiliar codebase from entry points, seams and churn. |
 | [`pr-review`](prompts/pr-review/2.0.0.frompt.md) | light | rubric | Judges a diff by tiers, with a stated blind spot and a verdict. |
 | [`bug-repro`](prompts/bug-repro/1.0.0.frompt.md) | standard | linear | Reproduces before fixing, then stops. |
 | [`grill-me`](prompts/grill-me/1.0.0.frompt.md) | light | rubric | Attacks your idea. Never closes on encouragement. |
@@ -264,7 +264,7 @@ That file is the consent. A lock says what is pinned; it never says anybody agre
 ```
 $ bin/fp-verify repo-recon --from https://prompts.example.org
 manifest verified: index.json signed by foreign-prompts-publisher
-authorized: repo-recon v1.0.0 digest 1f79578951aa contexts [interactive, registered, managed] serial 6
+authorized: repo-recon v1.1.0 digest 31c1785acb46 contexts [interactive, registered, managed] serial 6
 ```
 
 Four things have to hold, and each one closes an attack that the others do not:
@@ -358,8 +358,8 @@ https://prompts.acme.internal                              your own static serve
 
 ```
 $ bin/fp-verify repo-recon --from gh:frompt-org/catalog@main
-manifest verified: index.json signed by frompt-catalog
-authorized: repo-recon v1.0.0 digest 9cde6b0397af serial 3 expires 2026-10-09T01:57:28Z
+manifest verified: index.json signed by frompt-catalog SHA256:x4Z+wsX1wVrBt5SV/NWWgPfapXlpcmSk3rqZ36Y/rKY
+authorized: repo-recon v1.1.0 digest 31c1785acb46 contexts [interactive, registered, managed] serial 5 expires 2026-11-05T15:05:25Z
 ```
 
 Signature, freshness and digest, against a repository nobody can read without permission. **Publishing is a decision about audience, not a prerequisite for the protocol working.**

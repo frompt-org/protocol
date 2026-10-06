@@ -1,7 +1,7 @@
 {
   "base": "https://raw.githubusercontent.com/frompt-org/protocol/main/prompts",
   "manifest_version": 2,
-  "not_after": "2026-11-05T15:02:24Z",
+  "not_after": "2026-11-05T15:06:35Z",
   "prompts": [
     {
       "id": "help-me",
@@ -22,25 +22,36 @@
     },
     {
       "id": "repo-recon",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
         {
           "allow": "read:files, read:git, run:shell-ro",
           "ceremony": "standard",
           "contexts": "interactive, registered, managed",
           "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read, pkg:install, run:tests",
-          "digest": "9cde6b0397af38cdcc91787cad5e69d7af6eee6e7afa2742336dc482b870b538",
-          "file": "repo-recon/1.0.0.frompt.md",
+          "digest": "31c1785acb46afbcd43ef28e83347c4e6c55c9cad43ae569ff045a6af5a9c615",
+          "file": "repo-recon/1.1.0.frompt.md",
           "flow": "linear",
           "persistence": "none",
-          "version": "1.0.0"
+          "version": "1.1.0"
         }
       ]
     },
     {
       "id": "pr-review",
-      "latest": "2.0.0",
+      "latest": "2.0.1",
       "versions": [
+        {
+          "allow": "read:files, read:git",
+          "ceremony": "light",
+          "contexts": "interactive, registered, managed",
+          "deny": "write:files, vcs:commit, vcs:push, net:post, secrets:read",
+          "digest": "c3ced2830a2f0634cfd76bcbdba6cba5e1c7bb7071082a62c7df9845a98c80de",
+          "file": "pr-review/2.0.1.frompt.md",
+          "flow": "rubric",
+          "persistence": "none",
+          "version": "2.0.1"
+        },
         {
           "allow": "read:files, read:git",
           "ceremony": "light",
@@ -214,5 +225,5 @@
     }
   ],
   "protocol": "FOREIGN-PROMPT v2",
-  "serial": 162
+  "serial": 167
 }

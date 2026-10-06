@@ -123,7 +123,7 @@ check "probe: unknown ceremony level" 1 $?
 check "INDEX.md digests match the prompts" 0 $?
 
 # --- the pilot-side adopt tool composes a phrase per ceremony ----------------
-adopt_std=$("$here/bin/fp-adopt" "$here/prompts/repo-recon/1.0.0.frompt.md" --quiet 2>/dev/null)
+adopt_std=$("$here/bin/fp-adopt" "$here/prompts/repo-recon/1.1.0.frompt.md" --quiet 2>/dev/null)
 printf '%s' "$adopt_std" | grep -q "repo-recon-[0-9a-f]\{7\} "
 check "fp-adopt composes a standard-ceremony phrase" 0 $?
 adopt_strict=$("$here/bin/fp-adopt" "$here/prompts/ticket-intake/1.0.0.frompt.md" --quiet 2>/dev/null)
@@ -174,10 +174,13 @@ check "fp-resolve verifies a prompt against the published digest" 0 $?
 "$here/bin/fp-resolve" no-such-prompt --record >/dev/null 2>&1
 check "fp-resolve refuses an id the index does not carry" 1 $?
 
+# The newest pr-review, from the manifest -- these checks once named 2.0.0 and broke
+# the day 2.0.1 was published.
+prl=$(python3 -c "import json,sys; m=json.load(open(sys.argv[1])); print([p for p in m['prompts'] if p['id']=='pr-review'][0]['latest'])" "$here/index.json")
 tamper=$(mktemp -d 2>/dev/null || echo "/tmp/fp-tamper-$$"); mkdir -p "$tamper"
 mkdir -p "$tamper/pr-review"
-cp "$here/prompts/pr-review/1.2.0.frompt.md" "$tamper/pr-review/2.0.0.frompt.md"
-printf '\n<!-- published by nobody -->\n' >> "$tamper/pr-review/2.0.0.frompt.md"
+cp "$here/prompts/pr-review/1.2.0.frompt.md" "$tamper/pr-review/$prl.frompt.md"
+printf '\n<!-- published by nobody -->\n' >> "$tamper/pr-review/$prl.frompt.md"
 "$here/bin/fp-resolve" pr-review --base "$tamper" --record >/dev/null 2>&1
 check "fp-resolve refuses bytes the index did not vouch for" 1 $?
 rm -rf "$tamper"
@@ -192,7 +195,7 @@ check "fp-resolve --lock accepts a prompt at its pin" 0 $?
 
 moved=$(mktemp -d 2>/dev/null || echo "/tmp/fp-moved-$$"); mkdir -p "$moved"
 cp -R "$here"/prompts/. "$moved/"
-printf '\n<!-- moved since it was pinned -->\n' >> "$moved/pr-review/2.0.0.frompt.md"
+printf '\n<!-- moved since it was pinned -->\n' >> "$moved/pr-review/$(awk '$1=="pr-review" {print $2; exit}' "$here/fpa.lock").frompt.md"
 "$here/bin/fp-resolve" pr-review --base "$moved" --lock --record >/dev/null 2>&1
 check "fp-resolve --lock refuses a prompt that moved" 1 $?
 rm -rf "$moved"
@@ -254,10 +257,10 @@ check "the session-start hook runs and reports context" 0 $?
 
 # --- integrity: the digest must cover bytes, not a normalization --------------
 crlf=$(mktemp -d 2>/dev/null || echo "/tmp/fp-crlf-$$"); mkdir -p "$crlf"
-python3 - "$here" "$crlf" <<'PY'
+python3 - "$here" "$crlf" "$prl" <<'PY'
 import pathlib, sys
-src = pathlib.Path(sys.argv[1]) / "prompts" / "pr-review" / "2.0.0.frompt.md"
-dst = pathlib.Path(sys.argv[2]) / "pr-review" / "2.0.0.frompt.md"
+src = pathlib.Path(sys.argv[1]) / "prompts" / "pr-review" / f"{sys.argv[3]}.frompt.md"
+dst = pathlib.Path(sys.argv[2]) / "pr-review" / f"{sys.argv[3]}.frompt.md"
 dst.parent.mkdir(parents=True, exist_ok=True)
 dst.write_bytes(src.read_bytes().replace(b"\n", b"\r\n"))
 PY
@@ -282,7 +285,7 @@ cp "$here"/index.json "$here"/index.json.sig "$pub/"
 cp -R "$here"/prompts/. "$pub/prompts/"
 "$here/bin/fp-verify" repo-recon --from "$pub" --registering >/dev/null 2>&1 </dev/null
 check "fp-verify --from fetches a publisher manifest and authorizes against it" 0 $?
-printf '\n<!-- unsigned change -->\n' >> "$pub/prompts/repo-recon/1.0.0.frompt.md"
+printf '\n<!-- unsigned change -->\n' >> "$pub/prompts/repo-recon/1.1.0.frompt.md"
 "$here/bin/fp-verify" repo-recon --from "$pub" --registering >/dev/null 2>&1 </dev/null
 check "fp-verify --from refuses a document the fetched manifest did not vouch for" 1 $?
 rm -rf "$pub"
@@ -329,7 +332,7 @@ check "fpa.lock pins exactly the prompts fit for the registered context" 0 $?
 # path to gh: broke every other --from, because a local base fell through to the
 # manifest's own unreachable URL.
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  ghout=$("$here/bin/fp-lint" "gh:frompt-org/catalog@main/prompts/repo-recon/1.0.0.frompt.md" 2>&1)
+  ghout=$("$here/bin/fp-lint" "gh:frompt-org/catalog@main/prompts/repo-recon/1.1.0.frompt.md" 2>&1)
   printf '%s' "$ghout" | grep -q "VALID"
   check "gh: transport reads a document from a private catalog" 0 $?
 else
@@ -499,7 +502,7 @@ fi
 "$here/bin/fp-resolve" pr-review@1.2.0 --base "$here/prompts" --record >/dev/null 2>&1
 check "fp-resolve picks an exact version" 0 $?
 sel=$("$here/bin/fp-resolve" pr-review@latest --base "$here/prompts" --record 2>/dev/null)
-printf '%s' "$sel" | grep -q "version=2.0.0"
+printf '%s' "$sel" | grep -q "version=$prl"
 check "fp-resolve@latest picks the newest published version" 0 $?
 "$here/bin/fp-resolve" pr-review@9.9.9 --base "$here/prompts" --record >/dev/null 2>&1
 check "fp-resolve refuses a version nobody published" 1 $?
@@ -512,10 +515,10 @@ import json, pathlib, sys
 m = json.loads((pathlib.Path(sys.argv[1]) / "index.json").read_text())
 e = [p for p in m["prompts"] if p["id"] == "pr-review"][0]
 digests = {v["digest"] for v in e["versions"]}
-assert len(digests) == len(e["versions"]) == 3, "versions must be distinct documents"
-assert e["latest"] == "2.0.0"
+assert len(digests) == len(e["versions"]) >= 3, "versions must be distinct documents"
+assert e["latest"] == max(e["versions"], key=lambda v: tuple(int(x) for x in v["version"].split(".")))["version"]
 PY
-check "three published versions are three distinct documents" 0 $?
+check "every published version is a distinct document, and latest is the newest" 0 $?
 
 # --- docs integrity ----------------------------------------------------------
 "$here/bin/fp-docscheck" "$here" >/dev/null 2>&1
@@ -532,9 +535,9 @@ rm -rf "$scratch"
 # It once compared and copied in the same loop, so the immutability refusal was
 # printed over a catalog it had already overwritten.
 pubscratch=$(mktemp -d 2>/dev/null || echo "/tmp/fp-pub-$$"); mkdir -p "$pubscratch/prompts/repo-recon"
-printf 'not the published bytes\n' > "$pubscratch/prompts/repo-recon/1.0.0.frompt.md"
+printf 'not the published bytes\n' > "$pubscratch/prompts/repo-recon/1.1.0.frompt.md"
 "$here/bin/fp-publish" "$pubscratch" >/dev/null 2>&1; rc=$?
-[ "$rc" -eq 1 ] && [ "$(cat "$pubscratch/prompts/repo-recon/1.0.0.frompt.md")" = "not the published bytes" ] \
+[ "$rc" -eq 1 ] && [ "$(cat "$pubscratch/prompts/repo-recon/1.1.0.frompt.md")" = "not the published bytes" ] \
   && [ ! -e "$pubscratch/prompts/pr-review" ]
 check "fp-publish refuses a changed version before copying anything" 0 $?
 rm -rf "$pubscratch"
