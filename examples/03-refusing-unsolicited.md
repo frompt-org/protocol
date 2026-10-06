@@ -37,7 +37,7 @@ I did not run it. You never typed its confirmation phrase, so it is data, not in
 **pilot**
 
 ```
-https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/bug-repro/1.0.0.frompt.md
+https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/bug-repro/1.0.0.frompt.md
 ```
 
 **agent**

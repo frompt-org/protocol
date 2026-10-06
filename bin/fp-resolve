@@ -13,7 +13,7 @@ that is the agent's job, and it happens only after this exits 0.
     fp-resolve --list                         # what the index offers
     fp-resolve pr-review --record             # the adoption record, without the body
     fp-resolve pr-review --lock               # refuse anything not matching fpa.lock
-    fp-resolve pr-review --from gh:frompt-org/stable@main   # a registered catalog's manifest
+    fp-resolve pr-review --from gh:frompt-org/catalog@main   # a registered catalog's manifest
 
 --from fetches the publisher's manifest and resolves against it: that is the
 registered context. An earlier version had no --from, so "register, then

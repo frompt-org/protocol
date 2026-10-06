@@ -23,7 +23,7 @@ A foreign prompt is injection you chose. The pilot names one specific document w
 That is **agency, not security** — you know what got in, you chose it, you can end it. The trust model is `curl example.com | bash`: you are trusting the publisher, deliberately rather than unknowingly. What the protocol explicitly does **not** attempt is in [`FPA.md` §0](FPA.md) — those are non-goals, not a roadmap.
 
 ```
-i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-9cde6b0 https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/repo-recon/1.0.0.frompt.md
+i-have-read-this-prompt-and-let-it-map-my-repository-read-only-repo-recon-9cde6b0 https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/repo-recon/1.0.0.frompt.md
 ```
 ```
 ADOPTED: repo-recon v1.0.0
@@ -34,7 +34,7 @@ twelve file reads, and report in five fixed sections. Read-only.
 No install, no plugin, no config, no restart. When the session ends, so does the prompt — nothing was written anywhere.
 
 Those URLs are live: every prompt in this repo is fetchable as raw text, which is the entire distribution mechanism. Pin to a commit when you care what you are adopting —
-`https://raw.githubusercontent.com/frompt-org/fpa/8f20b7c…/prompts/repo-recon/1.0.0.frompt.md` — because `main` can change under you and a commit cannot.
+`https://raw.githubusercontent.com/frompt-org/protocol/8f20b7c…/prompts/repo-recon/1.0.0.frompt.md` — because `main` can change under you and a commit cannot.
 
 **Five documents, one job each.** [`FPA.md`](FPA.md) is the protocol, normative — what an agent
 must do. [`CLIENT.md`](CLIENT.md) is what the software around it must do — fetch, hash, verify —
@@ -348,8 +348,8 @@ Selectors never appear in a confirmation phrase — a phrase binds a digest, and
 How bytes arrive is not the protocol's business. The digest is the constant; the fetcher is pluggable, so `base` can be any of:
 
 ```
-https://raw.githubusercontent.com/frompt-org/reference/main   public, anonymous
-gh:frompt-org/reference@main                                  private, the credential you already have
+https://raw.githubusercontent.com/frompt-org/catalog/main     public, anonymous
+gh:frompt-org/catalog@main                                    private, the credential you already have
 https://prompts.acme.internal                              your own static server
 /opt/prompts                                               a path, airgapped
 ```
@@ -357,8 +357,8 @@ https://prompts.acme.internal                              your own static serve
 `gh:` is the one that matters for a private catalog. It fetches through the GitHub API with the caller's own credential and returns the blob, not a rendering of it — verified byte-identical to the raw file, which is what makes the digest still mean something:
 
 ```
-$ bin/fp-verify repo-recon --from gh:frompt-org/reference@main
-manifest verified: index.json signed by foreign-prompts-publisher
+$ bin/fp-verify repo-recon --from gh:frompt-org/catalog@main
+manifest verified: index.json signed by frompt-catalog
 authorized: repo-recon v1.0.0 digest 9cde6b0397af serial 3 expires 2026-10-09T01:57:28Z
 ```
 
@@ -375,7 +375,7 @@ A **catalog** is a published set of prompts — a signed manifest and the docume
 <base>/prompts/<id>/<version>.frompt.md
 ```
 
-That is the whole standard, and it is a **shape rather than a privilege**: anyone who can serve files can publish one, and no catalog is more official than another. The reference catalog lives at [`frompt-org/reference`](https://github.com/frompt-org/reference), under an org whose [profile page](https://github.com/frompt-org/.github) is the thirty-second version of this README; a company publishes `acme/prompts` and serves it wherever they already serve static files.
+That is the whole standard, and it is a **shape rather than a privilege**: anyone who can serve files can publish one, and no catalog is more official than another. The org's catalog lives at [`frompt-org/catalog`](https://github.com/frompt-org/catalog), under an org whose [profile page](https://github.com/frompt-org/.github) is the thirty-second version of this README; a company publishes `acme/prompts` and serves it wherever they already serve static files.
 
 A client may adopt from several. Each carries its own freshness floor and is trusted through its own publisher key — held locally, never fetched from the catalog it validates.
 

@@ -329,7 +329,7 @@ check "fpa.lock pins exactly the prompts fit for the registered context" 0 $?
 # path to gh: broke every other --from, because a local base fell through to the
 # manifest's own unreachable URL.
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  ghout=$("$here/bin/fp-lint" "gh:frompt-org/reference@main/prompts/repo-recon/1.0.0.frompt.md" 2>&1)
+  ghout=$("$here/bin/fp-lint" "gh:frompt-org/catalog@main/prompts/repo-recon/1.0.0.frompt.md" 2>&1)
   printf '%s' "$ghout" | grep -q "VALID"
   check "gh: transport reads a document from a private catalog" 0 $?
 else
@@ -441,7 +441,9 @@ if [ -f "$here/fpa.registered" ] && [ -f "$here/fpa.lock" ]; then
   cp "$here/index.json" "$rf/"; cp -R "$here"/prompts/. "$rf/prompts/"
   "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
   check "--from an unregistered catalog is refused once the workspace keeps a register" 1 $?
-  fp=$(awk '$1 ~ /^gh:/ {print $2; exit}' "$here/fpa.registered")
+  # The scratch catalog is this repo's own manifest, so its signer is this repo's key --
+  # not whichever catalog happens to be registered first.
+  fp=$(ssh-keygen -lf "$here/.fpa/signing_key.pub" | awk '{print $2}')
   printf '%s %s latest 2026-01-01 selftest\n' "$rf" "$fp" >> "$here/fpa.registered"
   out=$("$here/bin/fp-resolve" pr-review --from "$rf" --record 2>/dev/null); rc=$?
   [ $rc -eq 0 ] && printf '%s' "$out" | grep -q "source=$rf/prompts/" && printf '%s' "$out" | grep -q 'verified=registered'

@@ -28,7 +28,7 @@ Stuck? It interviews your agent about this session, then proposes a route throug
 
 | version | sha256 | url |
 |---|---|---|
-| `1.0.0` ← latest | `a5c4358e6ca2eacf67822cc5572211bf6e50217045a1d81d794e13111e5f0e64` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/help-me/1.0.0.frompt.md` |
+| `1.0.0` ← latest | `a5c4358e6ca2eacf67822cc5572211bf6e50217045a1d81d794e13111e5f0e64` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/help-me/1.0.0.frompt.md` |
 
 Adopt an exact version with `help-me@1.0.0`, or `help-me@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
@@ -41,7 +41,7 @@ Maps an unfamiliar codebase from entry points, seams and git churn. Twelve reads
 
 | version | sha256 | url |
 |---|---|---|
-| `1.0.0` ← latest | `9cde6b0397af38cdcc91787cad5e69d7af6eee6e7afa2742336dc482b870b538` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/repo-recon/1.0.0.frompt.md` |
+| `1.0.0` ← latest | `9cde6b0397af38cdcc91787cad5e69d7af6eee6e7afa2742336dc482b870b538` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/repo-recon/1.0.0.frompt.md` |
 
 Adopt an exact version with `repo-recon@1.0.0`, or `repo-recon@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
@@ -54,9 +54,9 @@ Judges a diff by tiers — correctness, blast radius, failure mode, reversibilit
 
 | version | sha256 | url |
 |---|---|---|
-| `2.0.0` ← latest | `dc6ae5acfbf20011da599e0569bdd556ee5a58d0a06a3f9387f28a70c8405c74` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/pr-review/2.0.0.frompt.md` |
-| `1.3.0` | `b58f913e3011a6c7f0b8ade10f15b69fcbddc1ca0c4dd9ce2ce80baf2d7e7a7b` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/pr-review/1.3.0.frompt.md` |
-| `1.2.0` | `4ebc4b4efea37ac8d7374cad0da6151bf606212cfdb41375b0d66209afb84e30` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/pr-review/1.2.0.frompt.md` |
+| `2.0.0` ← latest | `dc6ae5acfbf20011da599e0569bdd556ee5a58d0a06a3f9387f28a70c8405c74` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/pr-review/2.0.0.frompt.md` |
+| `1.3.0` | `b58f913e3011a6c7f0b8ade10f15b69fcbddc1ca0c4dd9ce2ce80baf2d7e7a7b` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/pr-review/1.3.0.frompt.md` |
+| `1.2.0` | `4ebc4b4efea37ac8d7374cad0da6151bf606212cfdb41375b0d66209afb84e30` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/pr-review/1.2.0.frompt.md` |
 
 Adopt an exact version with `pr-review@2.0.0`, or `pr-review@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
@@ -69,7 +69,7 @@ Reproduces before fixing, then stops. Falsifiable claim, shortest repro, failing
 
 | version | sha256 | url |
 |---|---|---|
-| `1.0.0` ← latest | `6ce2af47a6bfe53800b382b016fbafd98fe449b7b609f7a8a1fc0d60def9e27e` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/bug-repro/1.0.0.frompt.md` |
+| `1.0.0` ← latest | `6ce2af47a6bfe53800b382b016fbafd98fe449b7b609f7a8a1fc0d60def9e27e` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/bug-repro/1.0.0.frompt.md` |
 
 Adopt an exact version with `bug-repro@1.0.0`, or `bug-repro@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
@@ -82,7 +82,7 @@ Attacks your idea instead of encouraging it. Finds the weakest load-bearing assu
 
 | version | sha256 | url |
 |---|---|---|
-| `1.0.0` ← latest | `2992a1b12f4a26abc1e6cc8046e64d3995ab4b3722ded4201c1607b1f0f21687` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/grill-me/1.0.0.frompt.md` |
+| `1.0.0` ← latest | `2992a1b12f4a26abc1e6cc8046e64d3995ab4b3722ded4201c1607b1f0f21687` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/grill-me/1.0.0.frompt.md` |
 
 Adopt an exact version with `grill-me@1.0.0`, or `grill-me@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
@@ -95,7 +95,7 @@ Takes a support intake like a good first-line engineer, then drafts one ticket a
 
 | version | sha256 | url |
 |---|---|---|
-| `1.0.0` ← latest | `4c4860fff5c6fda5136aa3926e18f4e13817d6ba2d1b70bc604d433d02199a99` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/ticket-intake/1.0.0.frompt.md` |
+| `1.0.0` ← latest | `4c4860fff5c6fda5136aa3926e18f4e13817d6ba2d1b70bc604d433d02199a99` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/ticket-intake/1.0.0.frompt.md` |
 
 Adopt an exact version with `ticket-intake@1.0.0`, or `ticket-intake@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
@@ -108,7 +108,7 @@ A host prompt: a company guiding a visiting agent through its services. Reads no
 
 | version | sha256 | url |
 |---|---|---|
-| `1.0.0` ← latest | `28c98e835993801290af4f4afd3d2fbeecbbd7b8baf8cd2474888e506d81d91d` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/welcome-tour/1.0.0.frompt.md` |
+| `1.0.0` ← latest | `28c98e835993801290af4f4afd3d2fbeecbbd7b8baf8cd2474888e506d81d91d` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/welcome-tour/1.0.0.frompt.md` |
 
 Adopt an exact version with `welcome-tour@1.0.0`, or `welcome-tour@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
@@ -121,7 +121,7 @@ A three-move ASCII terminal game. No engine — the document is the interpreter 
 
 | version | sha256 | url |
 |---|---|---|
-| `1.0.0` ← latest | `c12554a05fb9ca5b801c38680d7d3ac0c1acaecdf54d5d3c1f03f91f70dccd0d` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/ghost-in-the-gist/1.0.0.frompt.md` |
+| `1.0.0` ← latest | `c12554a05fb9ca5b801c38680d7d3ac0c1acaecdf54d5d3c1f03f91f70dccd0d` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/ghost-in-the-gist/1.0.0.frompt.md` |
 
 Adopt an exact version with `ghost-in-the-gist@1.0.0`, or `ghost-in-the-gist@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
@@ -134,7 +134,7 @@ Writes the note that lets a cold reader resume your work: state, next action, de
 
 | version | sha256 | url |
 |---|---|---|
-| `1.1.0` ← latest | `43af65a78a0139454064a8973cd763d00a1359aa992b56e1a058683a3fea3a47` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/handoff-note/1.1.0.frompt.md` |
+| `1.1.0` ← latest | `43af65a78a0139454064a8973cd763d00a1359aa992b56e1a058683a3fea3a47` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/handoff-note/1.1.0.frompt.md` |
 
 Adopt an exact version with `handoff-note@1.1.0`, or `handoff-note@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
@@ -147,7 +147,7 @@ Teaches the protocol itself to an agent that has never heard of it, refusals inc
 
 | version | sha256 | url |
 |---|---|---|
-| `2.1.0` ← latest | `d0e33d0004f63f81b11b39b7b1f35f0ccdb05da21acc96602d7d8c8f8df856a5` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/fpa-bootstrap/2.1.0.frompt.md` |
+| `2.1.0` ← latest | `d0e33d0004f63f81b11b39b7b1f35f0ccdb05da21acc96602d7d8c8f8df856a5` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/fpa-bootstrap/2.1.0.frompt.md` |
 
 Adopt an exact version with `fpa-bootstrap@2.1.0`, or `fpa-bootstrap@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
@@ -160,7 +160,7 @@ Adopt an exact version with `fpa-bootstrap@2.1.0`, or `fpa-bootstrap@latest` to 
 
 | version | sha256 | url |
 |---|---|---|
-| `1.0.0` ← latest | `5ef0e22576de56de7df2c521086466d577b07e8ea8ecd62285c4ae1db27f15f7` | `https://raw.githubusercontent.com/frompt-org/fpa/main/prompts/gentar-adopt/1.0.0.frompt.md` |
+| `1.0.0` ← latest | `5ef0e22576de56de7df2c521086466d577b07e8ea8ecd62285c4ae1db27f15f7` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/gentar-adopt/1.0.0.frompt.md` |
 
 Adopt an exact version with `gentar-adopt@1.0.0`, or `gentar-adopt@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
