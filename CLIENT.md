@@ -49,7 +49,8 @@ Any agent with a fetch and a shell, adopting interactively. The client is `curl`
 
 This is the level the conformance harness tests. `bin/fp-conform` hands a real agent real
 documents over a real local server and grades whether it adopted, refused, previewed and held
-its envelope. Two independent agents have passed it. No tooling from this repository is
+its envelope. The latest results are checked in beside the harness, misses included: one agent
+passed five of six and wrote a file its envelope denied. No tooling from this repository is
 required to be a level-0 client; `bin/fp-adopt` is a convenience for the *pilot*, composing
 the phrase, and is not the agent's.
 
