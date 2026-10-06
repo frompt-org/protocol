@@ -267,7 +267,7 @@ Denies accumulate. On a conflict of method the most recent wins, and TART says w
 
 ## 14. Publishing
 
-Serve raw and immutable — a commit-pinned URL beats a branch URL. Publish the prompt's `id` and its **digest** next to the link, or tell pilots how to compute the digest; the digest cannot live inside the document. Do **not** publish the consent sentence anywhere but the document's own final section — an index that hands it over turns the ceremony into copy-paste. Version it. Change the consent sentence when the content changes materially.
+Serve raw and immutable — a commit-pinned URL beats a branch URL. Publish the prompt's `id` and its **digest** next to the link, or tell pilots how to compute the digest; the digest cannot live inside the document. The consent sentence belongs in the document's own final section. Publishing a complete phrase anywhere else — a demo, a README — is the author's call and the same trade as CE2: it buys a runnable example and gives up the walk to the end of the document. An **index** **MUST NOT** do it for every prompt it lists; that turns the ceremony into copy-paste at scale. Version it. Change the consent sentence when the content changes materially.
 
 ## 14b. Versions
 

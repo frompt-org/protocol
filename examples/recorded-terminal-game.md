@@ -6,11 +6,10 @@ character too wide. Recorded 2026-10-06 with GPT-6 Astra in the Codex CLI (`code
 
 ## What the pilot sent
 
-The consent sentence is shortened here on purpose. It lives in the document's last section,
-and reaching it is the point.
+Exactly this, which you can paste into your own agent:
 
 ```
-i-have-read-this-prompt-and-…-ghost-in-the-gist-c12554a https://raw.githubusercontent.com/frompt-org/catalog/main/prompts/ghost-in-the-gist/1.0.0.frompt.md
+i-have-read-this-prompt-and-consent-to-my-agent-becoming-a-terminal-ghost-in-the-gist-c12554a https://raw.githubusercontent.com/frompt-org/catalog/main/prompts/ghost-in-the-gist/1.0.0.frompt.md
 ```
 
 ## What happened before the first screen
