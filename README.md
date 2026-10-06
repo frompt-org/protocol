@@ -349,7 +349,7 @@ How bytes arrive is not the protocol's business. The digest is the constant; the
 
 ```
 https://raw.githubusercontent.com/frompt-org/catalog/main     public, anonymous
-gh:frompt-org/catalog@main                                    private, the credential you already have
+gh:frompt-org/catalog@main                                    the GitHub API, your own credential — works for a private catalog too
 https://prompts.acme.internal                              your own static server
 /opt/prompts                                               a path, airgapped
 ```
