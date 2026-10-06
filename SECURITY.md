@@ -22,7 +22,7 @@ Adopt prompts from publishers you would install software from. In the common cas
 
 ## The one thing here that is enforced
 
-Everything in this protocol is a convention an agent follows — except one rule. **When a phrase carries a digest, the agent recomputes SHA-256 over the bytes it fetched and refuses on mismatch.** No judgement, no goodwill, no prose to be persuaded by.
+Everything in this protocol is a convention an agent follows — except one rule, and only once a client computes it. **When a phrase carries a digest, SHA-256 is recomputed over the bytes that were fetched, and a mismatch is a refusal.** Done by a client — a resolver, a plugin, a harness — that needs no judgement, no goodwill, and no prose to be persuaded by. Done by the agent itself, at level 0 in [`CLIENT.md`](CLIENT.md), it is still the agent's report of a hash, and an agent could misreport it.
 
 It catches the attack the earlier design could not: a server showing the pilot one document and the agent another. It is also why the digest is computed rather than published in the document — a publisher who supplies both the bytes and their hash can lie about both consistently; a pilot who computes it over what they fetched cannot be lied to that way.
 
@@ -101,7 +101,7 @@ That last one is worth dwelling on. Nothing checks the body against the envelope
 
 ## Persistence: cut back to one case
 
-A prompt that writes state today creates an instruction channel tomorrow — nothing re-checks a confirmation phrase before an agent reads that file back, and no convention fixes it. So v1 has no resumable state files at all.
+A prompt that writes state today creates an instruction channel tomorrow — nothing re-checks a confirmation phrase before an agent reads that file back, and no convention fixes it. So the protocol has no resumable state files at all.
 
 What remains is `persistence: artifact`: **one deliverable, at a path the pilot names in the turn**, announced as it is written, and never into a file the host loads by itself. Everything else is `none`.
 

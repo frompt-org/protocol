@@ -132,7 +132,7 @@ Consent settles *whose* instructions got in. It settles nothing else. Here is ev
 | It could linger | **The pilot.** `disown <id>` and ending the session. Declared expiry is a convention |
 | The document could be hostile | **You, by reading it.** `bin/fp-lint` validates structure and nothing else — see below |
 | It could install itself | **Convention, plus your filesystem permissions.** Never into `CLAUDE.md`, `AGENTS.md`, `settings.json`, hooks, MCP config |
-| It could leave state that steers you later | **Cut from v1.** Resumable state files are not in the spec, because nothing re-checks a phrase before an agent reads a file back |
+| It could leave state that steers you later | **Not in the protocol.** Resumable state files are not in the spec, because nothing re-checks a phrase before an agent reads a file back |
 
 ### The linter does not judge intent
 
@@ -438,6 +438,10 @@ To adopt one as a pilot, `bin/fp-adopt <url>` fetches the document, prints it fo
 | [`plugin/`](plugin/) | `/f:find`, `/f:prompt`, `/f:adopted`, and a session-start hook. |
 | [`bin/fp-agent`](bin/fp-agent) · [`bin/fp-record`](bin/fp-record) | Who this agent is; what it has adopted. |
 | [`history/`](history/) | Retired documents, read-only. What used to be true, kept rather than deleted. |
+| [`bin/fp-register`](bin/fp-register) · [`bin/fp-unregister`](bin/fp-unregister) | Record, or withdraw, a workspace's consent to a catalog: `fpa.registered`. |
+| [`bin/fp-publish`](bin/fp-publish) | Stage this repo's frompts into a catalog checkout; refuses to change a published version's bytes. |
+| [`bin/fp-assay`](bin/fp-assay) | Run a scanner over a document and record what it saw, as data keyed by digest. Never a verdict. |
+| [`bin/fp-conform`](bin/fp-conform) · [`conformance/`](conformance/) | Hand a real agent real documents and grade what it does. Results are checked in, misses included. |
 | [`bin/fp-selftest`](bin/fp-selftest) | Conformance suite — every defect four review rounds found, as an assertion. |
 | [`bin/fp-docscheck`](bin/fp-docscheck) · [`bin/fp-claimcheck`](bin/fp-claimcheck) | References and links resolve; the docs still describe the tool that exists. |
 

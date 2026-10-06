@@ -562,5 +562,12 @@ else
   echo "skip fp-assay: skillspector not installed"
 fi
 
+# --- fp-publish --only publishes what was named and nothing else ---------------
+onlycat=$(mktemp -d 2>/dev/null || echo "/tmp/fp-only-$$")
+"$here/bin/fp-publish" "$onlycat" --only grill-me >/dev/null 2>&1
+[ -d "$onlycat/prompts/grill-me" ] && [ "$(ls "$onlycat/prompts" | wc -l | tr -d ' ')" = "1" ]
+check "fp-publish --only stages the named frompts and no others" 0 $?
+rm -rf "$onlycat"
+
 [ "$fails" -eq 0 ] && { echo "all checks passed"; exit 0; }
 echo "$fails check(s) failed"; exit 1

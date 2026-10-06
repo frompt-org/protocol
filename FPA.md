@@ -314,7 +314,7 @@ An **authority** publishes what it observed about a document. An attestation is 
 - **AT5.** `kind: run` — the document was adopted in isolation and behaviour was observed: capability footprint, whether it fetched further sources, whether it matched its declared envelope, whether it wrote outside its declared scope. **Reserved.** The seam is the schema above; the service is not built.
 - **AT6.** A scanner's own claim about itself is not evidence. `coverage_percent` below 100, or a scan the scanner reports as unsuccessful, **MUST NOT** produce an attestation.
 
-Plural by design: many authorities, pilots choose whose observations they value, append-only so a stamp cannot be quietly revised. What the first realized authority observed on this repo's own documents is recorded in `VISION.md`: it scored the hostile fixture 100 and every legitimate document between 6 and 39, which is the case for AT2 in one line.
+Plural by design: many authorities, pilots choose whose observations they value, append-only so a stamp cannot be quietly revised. What the first realized authority observed on this repo's own documents is recorded in `VISION.md`: it scored the hostile fixture 100 and every legitimate document between 6 and 57 — the 57 being `fpa-bootstrap`, the document that teaches what to refuse and so names every rule a scanner looks for. That is the case for AT2 in one line.
 
 ## 16. Versioning
 

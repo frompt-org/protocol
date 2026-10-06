@@ -6,9 +6,14 @@ prompts/<id>/<version>.frompt.md served as static files. This makes publishing a
 command rather than a copy-paste, so the protocol repo and the catalog cannot
 drift into disagreeing about what was published.
 
-    fp-publish ~/frompt/reference              # sync, reindex, report
-    fp-publish ~/frompt/reference --base URL   # set where the catalog is served from
-    fp-publish ~/frompt/reference --check      # would anything change?
+    fp-publish ~/frompt/catalog                # sync, reindex, report
+    fp-publish ~/frompt/catalog --base URL     # set where the catalog is served from
+    fp-publish ~/frompt/catalog --check        # would anything change?
+    fp-publish ~/frompt/catalog --only pr-review,repo-recon   # publish these ids, nothing else
+
+Without --only, every frompt in this repo is staged. That once carried a frompt
+another author had only added here, not chosen to publish, into a signed catalog
+alongside the two that were meant to go. Name what you publish.
 
 It never commits and never signs on your behalf — it stages files and tells you
 what to run. Publishing is an act someone should perform deliberately, and a tool
@@ -25,7 +30,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
 def main(argv):
-    args = [a for a in argv[1:] if not a.startswith("-")]
+    valued = {"--base", "--only"}
+    args = [a for i, a in enumerate(argv[1:], 1) if not a.startswith("-") and argv[i - 1] not in valued]
     if not args or "-h" in argv or "--help" in argv:
         print(__doc__)
         return 0 if args else 2
@@ -35,6 +41,9 @@ def main(argv):
         return 2
 
     check = "--check" in argv
+    only = None
+    if "--only" in argv:
+        only = {s.strip() for s in argv[argv.index("--only") + 1].split(",") if s.strip()}
     base = None
     if "--base" in argv:
         base = argv[argv.index("--base") + 1]
@@ -44,6 +53,8 @@ def main(argv):
     # printed over a catalog it had already overwritten.
     changed, added, pending = [], [], []
     for src in sorted(ROOT.glob("prompts/*/*.frompt.md")):
+        if only is not None and src.parent.name not in only:
+            continue
         rel = src.relative_to(ROOT)
         dst = target / rel
         if not dst.exists():
