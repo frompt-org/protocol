@@ -7,7 +7,7 @@ agent = "shell"
 
 [oracle]
 steps = [
-    '''cd "$WORKSPACE_DIR" && make test > /tmp/make-test.log 2>&1; rc=$?; tail -5 /tmp/make-test.log; exit $rc''',
+    '''cd "$WORKSPACE_DIR" && make test > /tmp/make-test.log 2>&1; rc=$?; grep -E '^(FAIL|skip)' /tmp/make-test.log; tail -2 /tmp/make-test.log; exit $rc''',
 ]
 
 [[verify.commands]]

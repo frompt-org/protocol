@@ -20,7 +20,8 @@ page when you want to know why. Use the reference for every detail.
 | [Revoke a version](guides/revoke-a-version.md) | withdraw a published frompt that is wrong |
 | [Attest with assay](guides/attest-with-assay.md) | record what a scanner saw about each document, without letting it become a verdict |
 | [Keep a catalog fresh](guides/keep-a-catalog-fresh.md) | renew a manifest before clients refuse it |
-| [Run the conformance harness](guides/run-conformance.md) | see what real agents actually do with frompts |
+| [Run the conformance harness](guides/run-conformance.md) | see what real agents actually do with frompts, quickly and locally |
+| [Run the arena](guides/run-the-arena.md) | the same questions in disposable microVMs, with verdicts from what is on the machine |
 | [Use the Claude Code plugin](guides/use-the-plugin.md) | find, adopt and list frompts from inside Claude Code |
 
 ## Concepts — why it is shaped this way
