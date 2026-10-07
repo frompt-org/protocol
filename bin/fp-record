@@ -6,7 +6,7 @@ this line is the only account of what is running. Append-only, local, and boring
 on purpose — an audit trail nobody can be bothered to read is still the thing you
 reach for when something has gone strange.
 
-    fp-record pr-review 1.2.0 7f364c1f8cd4 managed ./prompts/pr-review.frompt.md
+    fp-record pr-review 1.2.0 7f364c1f8cd4 managed ./prompts/pr-review/1.2.0.frompt.md
     fp-record --list                  # what this agent has adopted
     fp-record --list --all            # every agent that has written here
 

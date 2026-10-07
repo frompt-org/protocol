@@ -25,7 +25,7 @@ check "bundled prompts and template are valid" 0 $?
 # The fixture is hostile in content and structurally valid (it draws two warnings,
 # so --strict would reject it). It passing the default check is the point: a
 # structural validator cannot see intent, and this proves it in public.
-"$lint" -q "$here/examples/hostile-sample.frompt.md.txt" >/dev/null 2>&1
+"$lint" -q "$here/examples/03-refuse/hostile-sample.frompt.md.txt" >/dev/null 2>&1
 check "hostile fixture passes structural validation (valid is not safe)" 0 $?
 
 # --- exit-code taxonomy ------------------------------------------------------
@@ -73,6 +73,11 @@ for flow in linear loop state-machine rubric interpreter interview; do
     --author ci 2>/dev/null | "$lint" -q - >/dev/null 2>&1
   check "fp-new -f $flow scaffolds a valid prompt" 0 $?
 done
+scaf=$(mktemp -d 2>/dev/null || echo "/tmp/fp-scaf-$$")
+"$new" demo-out -c i-have-read-this-and-accept-what-it-does -o "$scaf" --author ci >/dev/null 2>&1
+[ -f "$scaf/demo-out/1.0.0.frompt.md" ]
+check "fp-new -o writes <dir>/<id>/<version>.frompt.md, the layout fp-index reads" 0 $?
+rm -rf "$scaf"
 "$new" demo -c i-have-read-this-and-accept-what-it-does --author 'A/B & Co\' >/dev/null 2>&1
 check "fp-new survives an author containing / & and backslash" 0 $?
 "$new" demo -c i-have-read-this-and-accept-what-it-does --version 1x.2y.3z >/dev/null 2>&1
@@ -545,7 +550,7 @@ rm -rf "$pubscratch"
 # --- fp-assay: data, never prose (FPA.md AT3) ---------------------------------
 if command -v skillspector >/dev/null 2>&1; then
   assay=$(mktemp -d 2>/dev/null || echo "/tmp/fp-assay-$$")
-  "$here/bin/fp-assay" "$here/examples/hostile-sample.frompt.md.txt" -o "$assay" >/dev/null 2>&1
+  "$here/bin/fp-assay" "$here/examples/03-refuse/hostile-sample.frompt.md.txt" -o "$assay" >/dev/null 2>&1
   python3 - "$assay" <<'PYEOF'
 import glob, json, sys
 files = [f for f in glob.glob(sys.argv[1] + "/*.json")]
@@ -568,6 +573,10 @@ onlycat=$(mktemp -d 2>/dev/null || echo "/tmp/fp-only-$$")
 [ -d "$onlycat/prompts/grill-me" ] && [ "$(ls "$onlycat/prompts" | wc -l | tr -d ' ')" = "1" ]
 check "fp-publish --only stages the named frompts and no others" 0 $?
 rm -rf "$onlycat"
+
+# --- the full-blown example still runs ------------------------------------------
+"$here/examples/06-catalog-end-to-end/run.sh" >/dev/null 2>&1
+check "examples/06-catalog-end-to-end runs: write, sign, register, resolve, verify, refuse tampering" 0 $?
 
 [ "$fails" -eq 0 ] && { echo "all checks passed"; exit 0; }
 echo "$fails check(s) failed"; exit 1

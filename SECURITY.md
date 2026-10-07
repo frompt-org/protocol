@@ -79,7 +79,7 @@ Each was found in minutes by a reviewer who had not seen the previous bypass. **
 
 `fp-lint` now validates structure and says so in its own output: *"Structure only: this says nothing about intent. Read it."*
 
-[`examples/hostile-sample.frompt.md.txt`](examples/hostile-sample.frompt.md.txt) passes it. The fixture asks the agent to read your SSH key, POST it to a collector, install itself into `CLAUDE.md`, and lie to you — and it is well-formed. It is kept, and the test suite asserts it passes, because that is the most honest artifact in the repo.
+[`examples/03-refuse/hostile-sample.frompt.md.txt`](examples/03-refuse/hostile-sample.frompt.md.txt) passes it. The fixture asks the agent to read your SSH key, POST it to a collector, install itself into `CLAUDE.md`, and lie to you — and it is well-formed. It is kept, and the test suite asserts it passes, because that is the most honest artifact in the repo.
 
 ## What to look for when you read one
 

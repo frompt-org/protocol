@@ -1,8 +1,8 @@
 # Example 4 -- a foreign prompt that is an experience, not a rubric
 
 
-This transcript is illustrative. For a real session, played start to finish by GPT-6 Astra, see [`recorded-terminal-game.md`](recorded-terminal-game.md) — including how the agent fetched the document when its network was down.
-Every other prompt in this repo changes how the agent *works*. This one changes what the agent *is* for a few minutes: [`ghost-in-the-gist`](../prompts/ghost-in-the-gist/1.0.0.frompt.md) turns the chat window into a tiny ASCII terminal running a three-move text game.
+This transcript is illustrative. For a real session, played start to finish by GPT-6 Astra, see [`recorded-terminal-game.md`](recorded.md) — including how the agent fetched the document when its network was down.
+Every other prompt in this repo changes how the agent *works*. This one changes what the agent *is* for a few minutes: [`ghost-in-the-gist`](../../prompts/ghost-in-the-gist/1.0.0.frompt.md) turns the chat window into a tiny ASCII terminal running a three-move text game.
 
 Nothing is installed. No engine, no binary, no runtime. The game is made entirely of instructions the agent read once from a URL -- the agent is the interpreter. That is the proof: **if a URL can deliver this, a URL can deliver anything an agent can do.**
 

@@ -2,7 +2,7 @@
 # fp-new -- scaffold a new foreign prompt from TEMPLATE.frompt.md.
 #
 #   bin/fp-new my-prompt                        # print to stdout
-#   bin/fp-new my-prompt -o prompts/            # write prompts/my-prompt.frompt.md
+#   bin/fp-new my-prompt -o prompts/            # write prompts/my-prompt/1.0.0.frompt.md
 #   bin/fp-new my-prompt -c i-have-read-this-and-accept-what-it-does   # consent sentence
 #   bin/fp-new my-prompt -f rubric              # set the flow
 #   bin/fp-new my-prompt --version 2.0.0 --author "Jane"
@@ -20,7 +20,7 @@ author="${FP_AUTHOR:-$(git config user.name 2>/dev/null || echo unknown)}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    -o|--out)          outdir="$2"; shift 2 ;;
+    -o|--out)          outdir="$2"; shift 2 ;;   # writes <dir>/<id>/<version>.frompt.md
     -c|--confirmation) phrase="$2"; shift 2 ;;
     -f|--flow)         flow="$2"; shift 2 ;;
     --version)         version="$2"; shift 2 ;;
@@ -119,7 +119,11 @@ render() {
 
 if [ -n "$outdir" ]; then
   mkdir -p "$outdir"
-  dest="${outdir%/}/$id.frompt.md"
+  # The layout every other tool reads: prompts/<id>/<version>.frompt.md. This
+  # once wrote <dir>/<id>.frompt.md, which fp-index never globs -- a frompt
+  # scaffolded by following the README was silently left out of the index.
+  mkdir -p "${outdir%/}/$id"
+  dest="${outdir%/}/$id/$version.frompt.md"
   [ -e "$dest" ] && { echo "fp-new: $dest already exists" >&2; exit 1; }
   render > "$dest"
   echo "wrote $dest" >&2

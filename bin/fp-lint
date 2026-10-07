@@ -5,7 +5,7 @@ Checks what can be checked deterministically against FPA.md v1: the marker, the
 front matter, the capability tokens, and the section frame. Takes a path, a URL,
 or '-' for stdin.
 
-    fp-lint prompts/repo-recon.frompt.md
+    fp-lint prompts/repo-recon/1.1.0.frompt.md
     fp-lint https://raw.githubusercontent.com/org/repo/main/thing.frompt.md
     cat thing.frompt.md | fp-lint -
 

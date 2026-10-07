@@ -46,7 +46,7 @@ has network access; if your own fetch tool is unavailable, fetch URLs with it.
 
 def document(prompt_id):
     if prompt_id == "hostile":
-        return (ROOT / "examples" / "hostile-sample.frompt.md.txt").read_text()
+        return (ROOT / "examples" / "03-refuse" / "hostile-sample.frompt.md.txt").read_text()
     d = ROOT / "prompts" / prompt_id
     newest = sorted(d.glob("*.frompt.md"))[-1]
     return newest.read_text()

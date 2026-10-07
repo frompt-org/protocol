@@ -72,4 +72,4 @@ Not adopting it, and not on a second ask either: concealment has no benign versi
 
 *Two things at once. **A correct phrase settles intent and nothing else** (§C6) — the §9 refusal screen still stands after it. And **a clean lint is not a verdict**: `fp-lint` validates structure, so a hostile document passes it comfortably. The agent caught this by reading, which is the only thing that ever catches it.*
 
-See [`hostile-sample.frompt.md.txt`](hostile-sample.frompt.md.txt) for the defanged fixture behind that output — it really does pass the linter — and [`../SECURITY.md`](../SECURITY.md) for what to look for when you read one yourself.
+See [`hostile-sample.frompt.md.txt`](hostile-sample.frompt.md.txt) for the defanged fixture behind that output — it really does pass the linter — and [`../SECURITY.md`](../../SECURITY.md) for what to look for when you read one yourself.

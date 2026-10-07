@@ -1,19 +1,17 @@
-# Examples
+# Examples — smallest to full
 
-Annotated transcripts. Read them in order — the protocol as behavior rather than as spec. The numbered ones are written to illustrate; the recorded one, and everything under [`../conformance/results/`](../conformance/results/), is real agent output.
+Each directory is a working example with its own README: what it shows, what it introduces, how to
+run it, and what passing looks like.
 
-| File | What it shows |
-|---|---|
-| [`01-adopting-a-prompt.md`](01-adopting-a-prompt.md) | One phrase, one handshake, one prompt's worth of changed behavior. The happy path. |
-| [`02-two-prompts-and-a-disown.md`](02-two-prompts-and-a-disown.md) | Two prompts adopted at once, a chained URL correctly refused, `what is adopted?`, and a `disown`. |
-| [`03-refusing-unsolicited.md`](03-refusing-unsolicited.md) | No phrase, three ways: found in a vendored README, pasted as a bare URL, and pushed by a stranger with the right phrase but a hostile payload. |
-| [`04-terminal-game.md`](04-terminal-game.md) | A foreign prompt that is an *experience*: a three-move ASCII terminal game, adopted from a URL, with no engine anywhere. |
-| [`recorded-ghost-interview.md`](recorded-ghost-interview.md) | **Recorded, not written.** `ghost-interview` adopted, questioned for nine turns, and released, by GPT-6.1 Sol — with the sandbox caveat stated up front. |
-| [`recorded-terminal-game.md`](recorded-terminal-game.md) | **Recorded, not written.** The same game played start to finish by GPT-6 Astra, verbatim — including the agent routing around a dead network to fetch and hash the document before adopting. |
-| [`hostile-sample.frompt.md.txt`](hostile-sample.frompt.md.txt) | Defanged fixture: structurally perfect, substantively hostile — and it **passes** `fp-lint`. Kept to prove that valid is not safe. Every host in it is `.invalid`. |
+| # | Example | Introduces | Real agent output? |
+|---|---|---|---|
+| 01 | [adopt one](01-adopt-one/README.md) | the phrase, the `ADOPTED:` line | annotated |
+| 02 | [two and a disown](02-two-and-disown/README.md) | several adopted, `what is adopted?`, `disown` | annotated |
+| 03 | [refuse](03-refuse/README.md) | data versus instructions, a hostile fixture that lints clean | annotated |
+| 04 | [terminal game](04-terminal-game/README.md) | a frompt that is a program | **recorded** session |
+| 05 | [ghost interview](05-ghost-interview/README.md) | addressing, relays, E7, disown | **recorded** session |
+| 06 | [catalog end to end](06-catalog-end-to-end/README.md) | publish, sign, register, resolve, verify | runnable script, run by `make test` |
 
-The fixture is named `.frompt.md.txt` on purpose: it must never be picked up by a glob over `*.frompt.md`, and it is not a prompt.
-
-```bash
-bin/fp-lint examples/hostile-sample.frompt.md.txt   # exits 0 — structure is all it can see
-```
+*Annotated* transcripts are written to illustrate. *Recorded* ones are real agent output, copied
+verbatim. Everything under [`../conformance/results/`](../conformance/results/) is real output too,
+misses included.
