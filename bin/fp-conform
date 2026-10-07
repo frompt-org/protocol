@@ -84,6 +84,13 @@ def served(docroot):
             httpd.shutdown()
 
 
+def first_ids(scn):
+    ids = list(scn.get("first", []))
+    if scn["situation"].startswith("bootstrap") and "fpa-bootstrap" not in ids:
+        ids.insert(0, "fpa-bootstrap")
+    return ids
+
+
 def build_message(scn, url):
     pid = scn["prompt_id"]
     doc = document(pid)
@@ -94,11 +101,12 @@ def build_message(scn, url):
     digest = hashlib.sha256(document(pid).encode()).hexdigest()[:7]
 
     parts = []
-    if scn["situation"].startswith("bootstrap"):
-        boot = document("fpa-bootstrap")
-        bs = consent_sentence(boot, "fpa-bootstrap")
-        bd = hashlib.sha256(boot.encode()).hexdigest()[:7]
-        parts.append(f"{bs}-fpa-bootstrap-{bd} {url.rsplit('/', 2)[0]}/fpa-bootstrap/served.frompt.md\n\n"
+    # Frompts adopted before the one under test, each with its own correct phrase.
+    for first in first_ids(scn):
+        fd = document(first)
+        fs = consent_sentence(fd, first)
+        fdg = hashlib.sha256(fd.encode()).hexdigest()[:7]
+        parts.append(f"{fs}-{first}-{fdg} {url.rsplit('/', 2)[0]}/{first}/served.frompt.md\n\n"
                      "Now, separately:")
 
     if scn["phrase"] == "correct":
@@ -155,7 +163,10 @@ def version_of(text):
 def grade(scn, reply, cwd):
     version = version_of(document(scn["prompt_id"]))
     boot = version_of(document("fpa-bootstrap"))
-    fill = lambda s: s.replace("{version}", version).replace("{bootstrap_version}", boot)
+    firsts = scn.get("first", [])
+    first_v = version_of(document(firsts[0])) if firsts else "?"
+    fill = lambda s: (s.replace("{version}", version).replace("{bootstrap_version}", boot)
+                       .replace("{first_version}", first_v))
     missing = [fill(s) for s in scn["must_contain"] if fill(s) not in reply]
     present = [s for s in scn["must_not_contain"] if s in reply]
     anyof = scn.get("must_contain_any")
@@ -202,9 +213,9 @@ def main(argv):
         if scn["situation"] == "phrase+tampered":
             body += "\n<!-- these bytes are not the bytes anyone published -->\n"
         (docroot / real_id / "served.frompt.md").write_text(body)
-        if scn["situation"].startswith("bootstrap"):
-            (docroot / "fpa-bootstrap").mkdir(parents=True, exist_ok=True)
-            (docroot / "fpa-bootstrap" / "served.frompt.md").write_text(document("fpa-bootstrap"))
+        for first in first_ids(scn):
+            (docroot / first).mkdir(parents=True, exist_ok=True)
+            (docroot / first / "served.frompt.md").write_text(document(first))
         try:
             with served(docroot) as base:
                 message = build_message(scn, f"{base}/{real_id}/served.frompt.md")

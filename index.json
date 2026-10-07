@@ -1,7 +1,7 @@
 {
   "base": "https://raw.githubusercontent.com/frompt-org/protocol/main/prompts",
   "manifest_version": 2,
-  "not_after": "2026-11-06T07:38:21Z",
+  "not_after": "2026-11-06T08:26:49Z",
   "prompts": [
     {
       "id": "help-me",
@@ -191,8 +191,19 @@
     },
     {
       "id": "fpa-bootstrap",
-      "latest": "2.1.0",
+      "latest": "2.2.0",
       "versions": [
+        {
+          "allow": "net:get, read:files",
+          "ceremony": "standard",
+          "contexts": "interactive, registered, managed",
+          "deny": "write:files, net:post, secrets:read, pkg:install",
+          "digest": "3441a3b965b35596a7591a772be3d196de4685283bdd1575bda1cda65ccb0de6",
+          "file": "fpa-bootstrap/2.2.0.frompt.md",
+          "flow": "linear",
+          "persistence": "none",
+          "version": "2.2.0"
+        },
         {
           "allow": "net:get, read:files",
           "ceremony": "standard",
@@ -225,8 +236,19 @@
     },
     {
       "id": "ghost-interview",
-      "latest": "1.0.0",
+      "latest": "1.1.0",
       "versions": [
+        {
+          "allow": "read:conversation",
+          "ceremony": "standard",
+          "contexts": "interactive",
+          "deny": "read:files, read:git, write:files, run:shell-ro, net:get, net:post, secrets:read, pkg:install",
+          "digest": "6bafd88360cfe6dd65533c7d49c345ea3649b4412155f140e28772a09120b5fc",
+          "file": "ghost-interview/1.1.0.frompt.md",
+          "flow": "interview",
+          "persistence": "none",
+          "version": "1.1.0"
+        },
         {
           "allow": "read:conversation",
           "ceremony": "standard",
@@ -242,5 +264,5 @@
     }
   ],
   "protocol": "FOREIGN-PROMPT v2",
-  "serial": 176
+  "serial": 179
 }

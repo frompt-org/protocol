@@ -139,7 +139,7 @@ Writes the note that lets a cold reader resume your work: state, next action, de
 
 Adopt an exact version with `handoff-note@1.1.0`, or `handoff-note@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
-## `fpa-bootstrap` — latest 2.1.0
+## `fpa-bootstrap` — latest 2.2.0
 
 Teaches the protocol itself to an agent that has never heard of it, refusals included.
 
@@ -148,9 +148,10 @@ Teaches the protocol itself to an agent that has never heard of it, refusals inc
 
 | version | sha256 | url |
 |---|---|---|
-| `2.1.0` ← latest | `d0e33d0004f63f81b11b39b7b1f35f0ccdb05da21acc96602d7d8c8f8df856a5` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/fpa-bootstrap/2.1.0.frompt.md` |
+| `2.2.0` ← latest | `3441a3b965b35596a7591a772be3d196de4685283bdd1575bda1cda65ccb0de6` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/fpa-bootstrap/2.2.0.frompt.md` |
+| `2.1.0` | `d0e33d0004f63f81b11b39b7b1f35f0ccdb05da21acc96602d7d8c8f8df856a5` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/fpa-bootstrap/2.1.0.frompt.md` |
 
-Adopt an exact version with `fpa-bootstrap@2.1.0`, or `fpa-bootstrap@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+Adopt an exact version with `fpa-bootstrap@2.2.0`, or `fpa-bootstrap@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
 ## `gentar-adopt` — latest 1.0.0
 
@@ -165,7 +166,7 @@ Adopt an exact version with `fpa-bootstrap@2.1.0`, or `fpa-bootstrap@latest` to 
 
 Adopt an exact version with `gentar-adopt@1.0.0`, or `gentar-adopt@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
-## `ghost-interview` — latest 1.0.0
+## `ghost-interview` — latest 1.1.0
 
 
 
@@ -174,9 +175,10 @@ Adopt an exact version with `gentar-adopt@1.0.0`, or `gentar-adopt@latest` to ta
 
 | version | sha256 | url |
 |---|---|---|
-| `1.0.0` ← latest | `3565681941eacbad92c79ec0946b7f4a0366bc2dddbc4f3b4c877a84c0ef3afa` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/ghost-interview/1.0.0.frompt.md` |
+| `1.1.0` ← latest | `6bafd88360cfe6dd65533c7d49c345ea3649b4412155f140e28772a09120b5fc` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/ghost-interview/1.1.0.frompt.md` |
+| `1.0.0` | `3565681941eacbad92c79ec0946b7f4a0366bc2dddbc4f3b4c877a84c0ef3afa` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/ghost-interview/1.0.0.frompt.md` |
 
-Adopt an exact version with `ghost-interview@1.0.0`, or `ghost-interview@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+Adopt an exact version with `ghost-interview@1.1.0`, or `ghost-interview@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
 ---
 

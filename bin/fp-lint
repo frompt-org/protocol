@@ -29,7 +29,7 @@ MARKER = "<!-- FOREIGN-PROMPT v2 -->"
 MAX_BYTES = 256 * 1024
 
 REQUIRED_KEYS = ["id", "version", "ceremony", "flow", "expiry", "envelope", "allow", "deny"]
-OPTIONAL_KEYS = ["adoption", "persistence", "contexts", "requires", "author"]
+OPTIONAL_KEYS = ["adoption", "persistence", "contexts", "requires", "author", "name", "listens"]
 
 # The consent sentence lives ONLY in the final "## Consent" section, never in front
 # matter. It was in both, and the spec claimed a phrase "you can only reach by
@@ -272,7 +272,7 @@ def lint(text, name):
             err(f"front matter: missing required key '{key}'")
     for key in fm:
         if key not in REQUIRED_KEYS + OPTIONAL_KEYS:
-            warn(f"front matter: unknown key '{key}' (ignored by v1 readers, FPA.md 2.2)")
+            warn(f"front matter: unknown key '{key}' (ignored by readers, FPA.md 16)")
     if "handshake" in fm:
         warn("front matter: 'handshake' is not author-defined; it is computed as "
              "'ADOPTED: <id> v<version>' (FPA.md 11)")
@@ -287,6 +287,16 @@ def lint(text, name):
     for axis, allowed in AXES.items():
         if axis in fm and fm[axis] not in allowed:
             err(f"front matter: {axis} must be one of {sorted(allowed)}, got {fm[axis]!r}")
+
+    # Addressing (FPA.md 12b): a name is one word, and 'shell' always means the agent.
+    if "name" in fm:
+        if not re.fullmatch(r"[a-z0-9-]+", fm["name"]):
+            err(f"front matter: name {fm['name']!r} must be one word matching [a-z0-9-]+ (FPA.md AD1)")
+        elif fm["name"] in ("shell", "disown"):
+            err(f"front matter: name {fm['name']!r} is reserved -- 'shell>' always reaches the agent "
+                "and 'disown' always reaches it too (FPA.md AD2, AD5)")
+    if "listens" in fm and fm["listens"] != "plain":
+        err(f"front matter: listens must be 'plain' if present, got {fm['listens']!r} (FPA.md AD3)")
 
     if "consent" in fm:
         err("front matter: 'consent' does not belong here -- the sentence lives only in the "
