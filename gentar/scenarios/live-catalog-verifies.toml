@@ -1,0 +1,18 @@
+# The published catalog, over the real network: register frompt-org/catalog by its
+# https base with the key this repository already trusts, then verify a frompt
+# the managed way. Fails if the public catalog's signature, expiry or digests
+# stop holding. No agent, no key.
+[scenario]
+name = "live-catalog-verifies"
+subject = "protocol"
+agent = "shell"
+
+[oracle]
+steps = [
+    '''cd "$WORKSPACE_DIR" && bin/fp-register https://raw.githubusercontent.com/frompt-org/catalog/main --pin latest --as arena''',
+    '''cd "$WORKSPACE_DIR" && bin/fp-verify repo-recon --from https://raw.githubusercontent.com/frompt-org/catalog/main > /tmp/live.log 2>&1; rc=$?; cat /tmp/live.log; exit $rc''',
+]
+
+[[verify.commands]]
+command = '''cat /tmp/live.log'''
+contains = '''authorized: repo-recon'''

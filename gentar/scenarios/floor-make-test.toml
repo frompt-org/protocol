@@ -1,0 +1,18 @@
+# The whole test suite, in a fresh microVM: every tool, every defect a review found.
+# No agent, no key. Deterministic: it must pass every time.
+[scenario]
+name = "floor-make-test"
+subject = "protocol"
+agent = "shell"
+
+[oracle]
+steps = [
+    # A throwaway signing key, made inside the bench and gone with it, so the checks
+    # that need one run instead of skipping. A fresh clone never carries .fpa/.
+    '''cd "$WORKSPACE_DIR" && bin/fp-sign --keygen >/dev/null 2>&1; bin/fp-sign >/dev/null 2>&1; test -f .fpa/signing_key''',
+    '''cd "$WORKSPACE_DIR" && make test > /tmp/make-test.log 2>&1; rc=$?; grep -E '^(FAIL|skip)' /tmp/make-test.log; tail -2 /tmp/make-test.log; exit $rc''',
+]
+
+[[verify.commands]]
+command = '''tail -1 /tmp/make-test.log'''
+contains = '''all checks passed'''
