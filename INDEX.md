@@ -166,6 +166,19 @@ Adopt an exact version with `fpa-bootstrap@2.2.0`, or `fpa-bootstrap@latest` to 
 
 Adopt an exact version with `gentar-adopt@1.0.0`, or `gentar-adopt@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
+## `ghost-in-the-machine` — latest 1.0.0
+
+
+
+- **Contexts** `interactive` · **flow** `interview` · **ceremony** `standard`
+- **Capabilities** `read:conversation`
+
+| version | sha256 | url |
+|---|---|---|
+| `1.0.0` ← latest | `19adddaa78cba4099126c3bac3b5b3abf3a3173a3664ff33bac93dfbeb1ec4d5` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/ghost-in-the-machine/1.0.0.frompt.md` |
+
+Adopt an exact version with `ghost-in-the-machine@1.0.0`, or `ghost-in-the-machine@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+
 ## `ghost-interview` — latest 1.1.0
 
 

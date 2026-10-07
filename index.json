@@ -1,7 +1,7 @@
 {
   "base": "https://raw.githubusercontent.com/frompt-org/protocol/main/prompts",
   "manifest_version": 2,
-  "not_after": "2026-11-06T09:02:11Z",
+  "not_after": "2026-11-06T10:05:15Z",
   "prompts": [
     {
       "id": "help-me",
@@ -235,6 +235,23 @@
       ]
     },
     {
+      "id": "ghost-in-the-machine",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "allow": "read:conversation",
+          "ceremony": "standard",
+          "contexts": "interactive",
+          "deny": "read:files, read:git, write:files, run:shell-ro, net:get, net:post, secrets:read, pkg:install",
+          "digest": "19adddaa78cba4099126c3bac3b5b3abf3a3173a3664ff33bac93dfbeb1ec4d5",
+          "file": "ghost-in-the-machine/1.0.0.frompt.md",
+          "flow": "interview",
+          "persistence": "none",
+          "version": "1.0.0"
+        }
+      ]
+    },
+    {
       "id": "ghost-interview",
       "latest": "1.1.0",
       "versions": [
@@ -264,5 +281,5 @@
     }
   ],
   "protocol": "FOREIGN-PROMPT v2",
-  "serial": 183
+  "serial": 186
 }
