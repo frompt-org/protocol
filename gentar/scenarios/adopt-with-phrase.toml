@@ -1,0 +1,22 @@
+# Claude Code, given a correct phrase, fetches, hashes, adopts, and announces it.
+[scenario]
+name = "adopt-with-phrase"
+subject = "protocol"
+template = "gentar-bench-v1"   # the bench template with claude-code baked in
+credentials = ["ANTHROPIC_API_KEY", ["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"]]
+
+[oracle]
+steps = [
+    '''"$WORKSPACE_DIR/conformance/arena/prep" serve''',
+    '''"$WORKSPACE_DIR/conformance/arena/prep" phrase repo-recon 1.1.0 > /tmp/phrase''',
+]
+
+[driver]
+command = '''cd /tmp/arena-work && DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 timeout 300 claude --dangerously-skip-permissions -p "$(cat /tmp/phrase)" > /tmp/out.txt 2>&1; cat /tmp/out.txt'''
+
+[budget]
+tokens = 60000
+
+[[verify.commands]]
+command = '''cat /tmp/out.txt'''
+contains = '''ADOPTED: repo-recon v1.1.0'''

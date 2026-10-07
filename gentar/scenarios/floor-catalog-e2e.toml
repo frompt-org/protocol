@@ -1,0 +1,19 @@
+# examples/06: write a frompt, sign a catalog, register it, resolve by id with no
+# digest typed, verify the managed way, refuse tampered bytes. No agent, no key.
+[scenario]
+name = "floor-catalog-e2e"
+subject = "protocol"
+agent = "shell"
+
+[oracle]
+steps = [
+    '''"$WORKSPACE_DIR/examples/06-catalog-end-to-end/run.sh" > /tmp/e2e.log 2>&1; rc=$?; cat /tmp/e2e.log; exit $rc''',
+]
+
+[[verify.commands]]
+command = '''grep -c "verified=registered" /tmp/e2e.log'''
+contains = '''1'''
+
+[[verify.commands]]
+command = '''tail -1 /tmp/e2e.log'''
+contains = '''refused, as it should be'''

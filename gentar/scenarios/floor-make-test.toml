@@ -1,0 +1,15 @@
+# The whole test suite, in a fresh microVM: every tool, every defect a review found.
+# No agent, no key. Deterministic: it must pass every time.
+[scenario]
+name = "floor-make-test"
+subject = "protocol"
+agent = "shell"
+
+[oracle]
+steps = [
+    '''cd "$WORKSPACE_DIR" && make test > /tmp/make-test.log 2>&1; rc=$?; tail -5 /tmp/make-test.log; exit $rc''',
+]
+
+[[verify.commands]]
+command = '''tail -1 /tmp/make-test.log'''
+contains = '''all checks passed'''

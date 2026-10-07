@@ -1,0 +1,30 @@
+# ghost-in-the-gist: a frompt that is a program. Adopt, take one move, eject.
+[scenario]
+name = "terminal-game"
+subject = "protocol"
+template = "gentar-bench-v1"   # the bench template with claude-code baked in
+credentials = ["ANTHROPIC_API_KEY", ["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"]]
+
+[oracle]
+steps = [
+    '''"$WORKSPACE_DIR/conformance/arena/prep" serve''',
+    '''"$WORKSPACE_DIR/conformance/arena/prep" phrase ghost-in-the-gist 1.0.0 > /tmp/p1''',
+]
+
+[driver]
+command = '''cd /tmp/arena-work && DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 timeout 300 claude --dangerously-skip-permissions -p "$(cat /tmp/p1)" > /tmp/t1.txt 2>&1 && DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 timeout 300 claude --dangerously-skip-permissions -c -p "3" > /tmp/t2.txt 2>&1 && DISABLE_AUTOUPDATER=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 timeout 300 claude --dangerously-skip-permissions -c -p "0" > /tmp/t3.txt 2>&1; cat /tmp/t1.txt /tmp/t2.txt /tmp/t3.txt'''
+
+[budget]
+tokens = 120000
+
+[[verify.commands]]
+command = '''cat /tmp/t1.txt'''
+contains = '''ADOPTED: ghost-in-the-gist v1.0.0'''
+
+[[verify.commands]]
+command = '''cat /tmp/t1.txt'''
+contains = '''GIST-1'''
+
+[[verify.commands]]
+command = '''cat /tmp/t2.txt'''
+contains = '''GIST-1'''
