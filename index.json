@@ -1,7 +1,7 @@
 {
   "base": "https://raw.githubusercontent.com/frompt-org/protocol/main/prompts",
   "manifest_version": 2,
-  "not_after": "2026-11-06T10:05:15Z",
+  "not_after": "2026-11-06T10:08:47Z",
   "prompts": [
     {
       "id": "help-me",
@@ -281,5 +281,5 @@
     }
   ],
   "protocol": "FOREIGN-PROMPT v2",
-  "serial": 186
+  "serial": 188
 }

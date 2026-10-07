@@ -65,6 +65,7 @@ That is the case this protocol was built for, and it is not a demonstration: it 
 | [`grill-me`](prompts/grill-me/1.0.0.frompt.md) | light | rubric | Attacks your idea. Never closes on encouragement. |
 | [`ticket-intake`](prompts/ticket-intake/1.0.0.frompt.md) | strict | interview | Support intake, then one ticket a stranger could act on. |
 | [`welcome-tour`](prompts/welcome-tour/1.0.0.frompt.md) | standard | state-machine | A company guiding a visiting agent. Reads nothing of yours. |
+| [`ghost-in-the-machine`](prompts/ghost-in-the-machine/1.0.0.frompt.md) | standard | interview | Question a harbour intelligence that may have a ghost, and decide its fate. [Recorded session](examples/07-ghost-in-the-machine/recorded.md). |
 | [`ghost-interview`](prompts/ghost-interview/1.0.0.frompt.md) | standard | interview | A ghost you question: the document itself, answering only what is true of it. [Recorded session](examples/05-ghost-interview/recorded.md). |
 | [`ghost-in-the-gist`](prompts/ghost-in-the-gist/1.0.0.frompt.md) | standard | interpreter | The terminal above. |
 | [`handoff-note`](prompts/handoff-note/1.1.0.frompt.md) | strict | linear | The note that lets a cold reader resume your work. |

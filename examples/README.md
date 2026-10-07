@@ -10,6 +10,7 @@ run it, and what passing looks like.
 | 03 | [refuse](03-refuse/README.md) | data versus instructions, a hostile fixture that lints clean | annotated |
 | 04 | [terminal game](04-terminal-game/README.md) | a frompt that is a program | **recorded** session |
 | 05 | [ghost interview](05-ghost-interview/README.md) | addressing, relays, E7, disown | **recorded** session |
+| 07 | [a machine that may have a ghost](07-ghost-in-the-machine/README.md) | a character with hidden state, verdict endings, character versus agent | **recorded** session |
 | 06 | [catalog end to end](06-catalog-end-to-end/README.md) | publish, sign, register, resolve, verify | runnable script, run by `make test` |
 
 *Annotated* transcripts are written to illustrate. *Recorded* ones are real agent output, copied
