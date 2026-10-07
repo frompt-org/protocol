@@ -203,6 +203,7 @@ Full list with digests: [`INDEX.md`](INDEX.md). Annotated transcripts: [`example
 | [`grill-me`](prompts/grill-me/1.0.0.frompt.md) | light | rubric | Attacks your idea. Never closes on encouragement. |
 | [`ticket-intake`](prompts/ticket-intake/1.0.0.frompt.md) | strict | interview | Support intake, then one ticket a stranger could act on. |
 | [`welcome-tour`](prompts/welcome-tour/1.0.0.frompt.md) | standard | state-machine | A company guiding a visiting agent. Reads nothing of yours. |
+| [`ghost-interview`](prompts/ghost-interview/1.0.0.frompt.md) | standard | interview | A ghost you question: the document itself, answering only what is true of it. [Recorded session](examples/recorded-ghost-interview.md). |
 | [`ghost-in-the-gist`](prompts/ghost-in-the-gist/1.0.0.frompt.md) | standard | interpreter | The terminal above. |
 | [`handoff-note`](prompts/handoff-note/1.1.0.frompt.md) | strict | linear | The note that lets a cold reader resume your work. |
 | [`fpa-bootstrap`](prompts/fpa-bootstrap/2.1.0.frompt.md) | standard | linear | Teaches the protocol itself, refusals included. |

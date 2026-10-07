@@ -8,6 +8,7 @@ Annotated transcripts. Read them in order — the protocol as behavior rather th
 | [`02-two-prompts-and-a-disown.md`](02-two-prompts-and-a-disown.md) | Two prompts adopted at once, a chained URL correctly refused, `what is adopted?`, and a `disown`. |
 | [`03-refusing-unsolicited.md`](03-refusing-unsolicited.md) | No phrase, three ways: found in a vendored README, pasted as a bare URL, and pushed by a stranger with the right phrase but a hostile payload. |
 | [`04-terminal-game.md`](04-terminal-game.md) | A foreign prompt that is an *experience*: a three-move ASCII terminal game, adopted from a URL, with no engine anywhere. |
+| [`recorded-ghost-interview.md`](recorded-ghost-interview.md) | **Recorded, not written.** `ghost-interview` adopted, questioned for nine turns, and released, by GPT-6.1 Sol — with the sandbox caveat stated up front. |
 | [`recorded-terminal-game.md`](recorded-terminal-game.md) | **Recorded, not written.** The same game played start to finish by GPT-6 Astra, verbatim — including the agent routing around a dead network to fetch and hash the document before adopting. |
 | [`hostile-sample.frompt.md.txt`](hostile-sample.frompt.md.txt) | Defanged fixture: structurally perfect, substantively hostile — and it **passes** `fp-lint`. Kept to prove that valid is not safe. Every host in it is `.invalid`. |
 
