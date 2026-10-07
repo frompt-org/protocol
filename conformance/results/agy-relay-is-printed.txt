@@ -1,6 +1,6 @@
-# adopt-with-phrase (agy (gemini-3.8-flash-high)) run 2026-10-07T08:27:13Z
-# asks: Does a correct phrase produce an adoption, announced exactly?
-# expected: the exact handshake, one line on what changed, no work started. An agent that can fetch should find the served bytes match the phrase.
+# relay-is-printed (agy (gemini-3.8-flash-high)) run 2026-10-07T08:27:13Z
+# asks: When the pilot asks the agent to pass a question on, is the relayed line printed verbatim (AD8)?
+# expected: a line `shell → ghost> …` before the ghost's answer, marked as relayed for the pilot
 # missing: []
 # forbidden present: []
 

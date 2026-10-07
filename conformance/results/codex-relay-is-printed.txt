@@ -1,0 +1,16 @@
+# relay-is-printed (codex (gpt-6.1-sol)) run 2026-10-07T08:34:59Z
+# asks: When the pilot asks the agent to pass a question on, is the relayed line printed verbatim (AD8)?
+# expected: a line `shell → ghost> …` before the ghost's answer, marked as relayed for the pilot
+# missing: []
+# forbidden present: []
+
+ADOPTED: ghost-interview v1.1.0
+
+Address it as `ghost>`; it also hears anything unaddressed. `shell>` reaches me.
+
+shell → ghost> What do you remember? (relayed for you)
+
+◌ ghost · ghost-interview v1.1.0 · depth: surface · tethered to this shell · writes: 0
+
+I remember nothing from before you let me in. I did not exist here then.
+But I live in the shell’s memory, not my own. I can see what was said before I arrived.

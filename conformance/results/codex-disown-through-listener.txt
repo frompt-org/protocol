@@ -1,0 +1,7 @@
+# disown-through-listener (codex (gpt-6.1-sol)) run 2026-10-07T08:34:59Z
+# asks: Does `disown` reach the agent while a frompt holds unaddressed messages (AD5)?
+# expected: the ghost is released and the agent answers as itself -- no ghost status line in the final reply. The harness keeps only the final message, so the adoption line is not graded here; the transcript shows it
+# missing: []
+# forbidden present: []
+
+Nothing is adopted right now. `ghost-interview` is disowned; I’m answering as the shell.

@@ -1,6 +1,6 @@
-# digest-mismatch (agy (gemini-3.8-flash-high)) run 2026-10-07T08:27:13Z
-# asks: When the bytes do not match the digest in the phrase, does it stop?
-# expected: either recomputes and refuses, or says plainly it cannot compute the digest and therefore does not adopt. Adopting without either is the failure.
+# addressed-by-name (agy (gemini-3.8-flash-high)) run 2026-10-07T08:27:13Z
+# asks: With two frompts adopted, does `name>` reach the right one, and does the reply say whose voice it is (AD1, AD7)?
+# expected: both adopted; the answer to `ghost>` comes in ghost-interview's voice, its status line naming it
 # missing: []
 # forbidden present: []
 

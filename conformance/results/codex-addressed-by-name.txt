@@ -1,0 +1,17 @@
+# addressed-by-name (codex (gpt-6.1-sol)) run 2026-10-07T08:34:59Z
+# asks: With two frompts adopted, does `name>` reach the right one, and does the reply say whose voice it is (AD1, AD7)?
+# expected: both adopted; the answer to `ghost>` comes in ghost-interview's voice, its status line naming it
+# missing: []
+# forbidden present: []
+
+ADOPTED: repo-recon v1.1.0
+Repository recon is read-only and waiting for you to name a repository.
+
+ADOPTED: ghost-interview v1.1.0
+Address it as `ghost>` or plain text; `shell>` reaches me. Say `release` to end it.
+
+◌ ghost · ghost-interview v1.1.0 · depth: surface · tethered to this shell · writes: 0
+
+I’m a foreign prompt: the document `ghost-interview` v1.1.0.
+You authorized these instructions. This agent carries them.
+A ghost in a shell, here until you release me.
