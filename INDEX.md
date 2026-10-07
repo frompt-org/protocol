@@ -165,6 +165,19 @@ Adopt an exact version with `fpa-bootstrap@2.1.0`, or `fpa-bootstrap@latest` to 
 
 Adopt an exact version with `gentar-adopt@1.0.0`, or `gentar-adopt@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
 
+## `ghost-interview` — latest 1.0.0
+
+
+
+- **Contexts** `interactive` · **flow** `interview` · **ceremony** `standard`
+- **Capabilities** `read:conversation`
+
+| version | sha256 | url |
+|---|---|---|
+| `1.0.0` ← latest | `3565681941eacbad92c79ec0946b7f4a0366bc2dddbc4f3b4c877a84c0ef3afa` | `https://raw.githubusercontent.com/frompt-org/protocol/main/prompts/ghost-interview/1.0.0.frompt.md` |
+
+Adopt an exact version with `ghost-interview@1.0.0`, or `ghost-interview@latest` to take whatever is newest at the time. The consent sentence is in each version's own final section — versions differ, and so do their sentences.
+
 ---
 
 Regenerate with `bin/fp-index`, which also writes `index.json` — the same data, machine-readable, and the thing a signature covers. `make test` fails if either drifts from the prompts.
