@@ -93,3 +93,8 @@ and [the guide](docs/guides/run-conformance.md) has the table.
 
 Protocol **v2.1** — v2 documents stay valid; v2.1 adds addressing (§12b) and E7. Public since
 2026-10-06.
+
+## License
+
+Apache License 2.0 — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). Copyright 2026 Ramazan Polat.
+Relicensed from MIT to Apache-2.0 from v2.1.2.
