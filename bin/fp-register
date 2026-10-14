@@ -6,9 +6,22 @@ represented that moment: fpa.lock said what was pinned, never that anyone had
 agreed to it. This is the missing artifact — one line per catalog, the shape apt
 has used for thirty years.
 
-    fp-register <base> [--pin latest|version|digest] [--as who]
+    fp-register <base> --key SHA256:...  [--pin latest|version|digest] [--as who]
+    fp-register <base> --trust <allowed_signers-file> [...]
+    fp-register <base>              (the key is already in the workspace trust root)
     fp-register --list
     fp-unregister <base>            (same tool, invoked by that name)
+
+--key is how a client trusts a catalog on someone's own domain. The publisher
+gives you a fingerprint by some route that is not the catalog -- their website,
+a colleague, a README you already trust -- and the key itself is then read from
+<base>/allowed_signers and accepted only if it has exactly that fingerprint. The
+fingerprint is the trust root; the fetched key is merely checked against it,
+which is what keeps this inside FPA.md M7.
+
+Everything is recorded in the workspace (bin/fpa_roots.py): FPA_WORKSPACE, else
+this tool checkout. Point FPA_WORKSPACE at ~/.config/frompt for one record per
+user, or at a directory your fleet tooling provisions for one per machine.
 
 Registering verifies the catalog first: a catalog you cannot verify is not one you
 can meaningfully accept. It records the signer's fingerprint, so a later key
@@ -27,8 +40,12 @@ import pathlib
 import subprocess
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-FILE = ROOT / "fpa.registered"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import fpa_roots  # noqa: E402
+
+ROOT = fpa_roots.TOOLS
+WS = fpa_roots.workspace()
+FILE = WS / "fpa.registered"
 HEADER = [
     "# fpa.registered -- catalogs this workspace has accepted, and on what terms.",
     "#",
@@ -60,9 +77,86 @@ def render(entries):
     return "\n".join(lines) + "\n"
 
 
+def key_of(line):
+    """(principal, "type base64") of an allowed_signers line, or None.
+
+    Options such as namespaces="..." may sit between the two, so the key is found
+    by its type rather than by position."""
+    parts = line.split()
+    if not parts or parts[0].startswith("#"):
+        return None
+    for i, tok in enumerate(parts[1:], 1):
+        if tok.startswith(("ssh-", "ecdsa-", "sk-")) and i + 1 < len(parts):
+            return parts[0], f"{tok} {parts[i + 1]}"
+    return None
+
+
+def fingerprint(key):
+    proc = subprocess.run(["ssh-keygen", "-lf", "-"], input=key + "\n", capture_output=True, text=True)
+    return proc.stdout.split()[1] if proc.returncode == 0 and proc.stdout.split() else None
+
+
+def fetch_signers(base):
+    """<base>/allowed_signers, through the same transports a catalog is read by."""
+    if base.startswith("gh:"):
+        lint = load_lint()
+        spec = base[len("gh:"):]
+        return lint.fetch_gh(f"gh:{spec}/allowed_signers")
+    if base.startswith(("http://", "https://")):
+        return load_lint().fetch(f"{base}/allowed_signers")
+    return pathlib.Path(base, "allowed_signers").read_text()
+
+
+def load_lint():
+    import importlib.machinery
+    import importlib.util
+    loader = importlib.machinery.SourceFileLoader("fp_lint", str(ROOT / "bin" / "fp-lint"))
+    spec = importlib.util.spec_from_loader("fp_lint", loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
+
+
+def extend_trust(lines, source):
+    """Add publisher keys to the workspace trust root. A principal is a name a
+    verification reports ("signed by X"), so two different keys may not share one:
+    the second is refused rather than silently skipped or silently added."""
+    local = WS / "allowed_signers"
+    have = {}
+    if local.exists():
+        for l in local.read_text().splitlines():
+            k = key_of(l)
+            if k:
+                have.setdefault(k[0], set()).add(k[1])
+    added = []
+    for line in lines:
+        k = key_of(line)
+        if not k:
+            continue
+        principal, key = k
+        if key in have.get(principal, set()):
+            continue
+        if principal in have:
+            print(f"fp-register: the principal {principal!r} already names a different key in "
+                  f"{local}.\n  Two publishers under one name would make 'signed by {principal}' "
+                  "mean either of them. Ask the publisher, or edit the trust root deliberately.",
+                  file=sys.stderr)
+            return None
+        WS.mkdir(parents=True, exist_ok=True)
+        with local.open("a") as f:
+            f.write(line.rstrip("\n") + "\n")
+        have.setdefault(principal, set()).add(key)
+        added.append(f"{principal} {fingerprint(key)}")
+    if added:
+        print(f"trust root {local} extended from {source}:\n  " + "\n  ".join(added))
+    return added
+
+
 def main(argv):
     invoked_as = pathlib.Path(argv[0]).name
-    args = [a for a in argv[1:] if not a.startswith("-")]
+    valued = {"--key", "--trust", "--pin", "--as"}
+    args = [a for i, a in enumerate(argv[1:], 1)
+            if not a.startswith("-") and argv[i - 1] not in valued]
     if "-h" in argv or "--help" in argv:
         print(__doc__)
         return 0
@@ -95,21 +189,37 @@ def main(argv):
                   "  every catalog is refused until one is registered. Delete the file to opt out.")
         return 0
 
-    # --trust <allowed_signers>: extend the local trust root with this publisher's
-    # key, obtained out of band. The trust root is never fetched from the catalog
-    # it validates (M7); registering is where the pilot brings the key themselves.
-    if "--trust" in argv:
-        src = pathlib.Path(argv[argv.index("--trust") + 1])
-        local = ROOT / "allowed_signers"
-        have = {l.split()[0] for l in local.read_text().splitlines() if l.strip()} if local.exists() else set()
-        added = []
-        for line in src.read_text().splitlines():
-            if line.strip() and line.split()[0] not in have:
-                with local.open("a") as f:
-                    f.write(line.rstrip("\n") + "\n")
-                added.append(line.split()[0])
-        if added:
-            print(f"trust root extended with {', '.join(added)} from {src} -- confirm that fingerprint out of band")
+    # The trust root is never fetched from the catalog it validates (M7). The pilot
+    # brings it: as a file obtained out of band (--trust), or as a fingerprint
+    # obtained out of band (--key), against which the catalog's published key is
+    # then checked. Either way the decision was made somewhere else.
+    want = argv[argv.index("--key") + 1] if "--key" in argv else None
+    if want is not None and not want.startswith("SHA256:"):
+        print("fp-register: --key takes a fingerprint, SHA256:..., as ssh-keygen -l prints it",
+              file=sys.stderr)
+        return 2
+    if "--trust" in argv or want:
+        if "--trust" in argv:
+            src = argv[argv.index("--trust") + 1]
+            text = pathlib.Path(src).read_text()
+        else:
+            src = f"{base}/allowed_signers"
+            try:
+                text = fetch_signers(base)
+            except Exception as exc:  # noqa: BLE001
+                print(f"fp-register: cannot read {src} -- {exc}", file=sys.stderr)
+                return 2
+        lines = [l for l in text.splitlines() if key_of(l)]
+        if want:
+            lines = [l for l in lines if fingerprint(key_of(l)[1]) == want]
+            if not lines:
+                print(f"fp-register: no key with fingerprint {want} in {src}.\n"
+                      "  Either the fingerprint you were given is not this catalog's, or the catalog "
+                      "is not serving the key its publisher gave you. Do not register it.",
+                      file=sys.stderr)
+                return 1
+        if extend_trust(lines, src) is None:
+            return 1
 
     verify = ROOT / "bin" / "fp-verify"
     # --registering: check the catalog itself, but not whether it is already
@@ -130,6 +240,11 @@ def main(argv):
             fp = line.split()[-1]
     if not fp:
         print("fp-register: fp-verify did not report the signing key's fingerprint", file=sys.stderr)
+        return 1
+
+    if want and fp != want:
+        print(f"fp-register: {base} is signed by {fp}, not by the key you were given ({want}).\n"
+              "  Do not register it.", file=sys.stderr)
         return 1
 
     pin = "latest"

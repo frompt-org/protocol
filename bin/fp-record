@@ -17,7 +17,10 @@ import pathlib
 import sys
 import time
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import fpa_roots  # noqa: E402
+
+ROOT = fpa_roots.workspace()
 LOG = ROOT / ".fpa" / "adoptions.log"
 AGENT = ROOT / ".fpa" / "agent.json"
 

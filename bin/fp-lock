@@ -8,6 +8,13 @@ file is where a team says which version of that freedom they want.
     fp-lock                     # write fpa.lock from the current index
     fp-lock --check             # exit 1 if a prompt no longer matches its pin
     fp-lock --update <id>       # re-pin one prompt, deliberately, as a reviewed diff
+    fp-lock --update <id> --from <base>   # pin one from a registered catalog you do not hold
+
+Without --from the pins come from the catalog bin/fpa_roots.py finds, hashed from
+its files. With --from they come from the publisher's manifest, verified first by
+fp-verify -- which also fetched the document and checked it against that manifest,
+so the digest pinned is the digest of bytes that actually arrived. fpa.lock lives
+in the workspace (FPA_WORKSPACE, else this checkout).
 
 The point is not that pinning is safer than floating. It is that the choice
 becomes a line in a file somebody reviews, instead of an event nobody sees.
@@ -17,10 +24,16 @@ Exit: 0 in sync · 1 drift · 2 unreadable.
 import hashlib
 import json
 import pathlib
+import subprocess
 import sys
+import tempfile
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-LOCK = ROOT / "fpa.lock"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import fpa_roots  # noqa: E402
+
+TOOLS = fpa_roots.TOOLS
+ROOT = fpa_roots.catalog()
+LOCK = fpa_roots.workspace() / "fpa.lock"
 HEADER = [
     "# fpa.lock -- pinned foreign prompts.",
     "#",
@@ -78,6 +91,25 @@ def semver_key(v):
     return nums + ((0, pre) if pre else (1, ""))
 
 
+def remote(pid, base):
+    """(version, digest, url) for the latest version of pid in a registered catalog,
+    from the manifest fp-verify just verified -- never a second fetch of it."""
+    with tempfile.TemporaryDirectory() as td:
+        out = pathlib.Path(td) / "index.json"
+        proc = subprocess.run([str(TOOLS / "bin" / "fp-verify"), pid, "--from", base,
+                               "--context", "registered", "--manifest-out", str(out)],
+                              capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        if proc.returncode != 0 or not out.exists():
+            sys.stderr.write(proc.stderr)
+            print(f"fp-lock: {pid} from {base} did not verify for the registered context -- "
+                  "nothing pinned", file=sys.stderr)
+            sys.exit(proc.returncode if proc.returncode in (1, 2) else 2)
+        m = json.loads(out.read_text())
+    entry = next(p for p in m["prompts"] if p["id"] == pid)
+    v = next(v for v in entry["versions"] if v["version"] == entry["latest"])
+    return v["version"], v["digest"], f"{m['base']}/{v['file']}"
+
+
 def registered_ids():
     """Only prompts declaring `registered` may be pinned. A pin is consent given
     once for unattended reuse, and a prompt that never offered itself for that
@@ -121,6 +153,19 @@ def main(argv):
             print("fp-lock: --update needs a prompt id\n" + __doc__.split("\n\n")[2], file=sys.stderr)
             return 2
         wanted = argv[at]
+        if "--from" in argv:
+            base = argv[argv.index("--from") + 1].rstrip("/")
+            pins = parse()
+            was = pins.get(wanted)
+            pins[wanted] = remote(wanted, base)
+            LOCK.parent.mkdir(parents=True, exist_ok=True)
+            LOCK.write_text(render(pins))
+            now_v, now_d, _ = pins[wanted]
+            if was and was[1] != now_d:
+                print(f"re-pinned {wanted}: {was[0]} {was[1][:12]} -> {now_v} {now_d[:12]}")
+            else:
+                print(f"pinned {wanted} {now_v} {now_d[:12]} from {base}")
+            return 0
         pins, now = parse(), current()
         if wanted not in now:
             print(f"fp-lock: {wanted!r} is not in the index", file=sys.stderr)
@@ -140,7 +185,12 @@ def main(argv):
             print("fp-lock: no fpa.lock -- nothing is pinned", file=sys.stderr)
             return 1
         drift = []
+        # A pin from another catalog is checked where it is resolved (fp-resolve
+        # --from compares bytes against it); this catalog's files say nothing about it.
+        local = manifest()["base"].rstrip("/") + "/"
         for pid, (version, digest, url) in sorted(pins.items()):
+            if not url.startswith(local):
+                continue
             if pid not in now:
                 drift.append(f"  {pid}: pinned, but no longer published")
                 continue
@@ -163,7 +213,10 @@ def main(argv):
     now = current()
     fit = {pid: v for pid, v in now.items() if pid in registered_ids()}
     skipped = sorted(set(now) - set(fit))
-    LOCK.write_text(render(fit))
+    # Pins taken from other catalogs (--from) are not this catalog's to rewrite.
+    base = manifest()["base"].rstrip("/") + "/"
+    kept = {pid: v for pid, v in parse().items() if not v[2].startswith(base) and pid not in fit}
+    LOCK.write_text(render({**kept, **fit}))
     print(f"wrote fpa.lock ({len(fit)} pinned)")
     if skipped:
         print("not pinned -- these do not declare the registered context (FPA.md AC1): "
