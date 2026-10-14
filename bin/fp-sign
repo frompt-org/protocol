@@ -10,6 +10,11 @@
 #   fp-sign --keygen               # create that key if it does not exist
 #   FPA_SIGNING_KEY=~/.ssh/id_ed25519 fp-sign
 #
+# It signs the catalog bin/fpa_roots.py finds: FPA_CATALOG, else the nearest
+# directory upward holding frompt-catalog.json, else this checkout. The identity
+# is FPA_SIGNING_IDENTITY, else the catalog's `identity`, else
+# foreign-prompts-publisher.
+#
 # Uses ssh-keygen -Y, which is present wherever OpenSSH is, needs no GPG
 # keyring, and verifies with a plain allowed_signers file.
 #
@@ -17,11 +22,15 @@
 # is index.json, index.json.sig and allowed_signers -- enough to verify, not
 # enough to forge.
 set -euo pipefail
-here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+tools=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+here=$(python3 "$tools/bin/fpa_roots.py" catalog)
 cd "$here"
 
 key="${FPA_SIGNING_KEY:-$here/.fpa/signing_key}"
-identity="${FPA_SIGNING_IDENTITY:-foreign-prompts-publisher}"
+configured=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("identity",""))' \
+  frompt-catalog.json 2>/dev/null || true)
+identity="${FPA_SIGNING_IDENTITY:-${configured:-foreign-prompts-publisher}}"
+case "$identity" in *[[:space:],]*|"") echo "fp-sign: identity '$identity' cannot contain spaces or commas -- it is an allowed_signers principal" >&2; exit 2;; esac
 
 if [ "${1:-}" = "--keygen" ]; then
   mkdir -p "$(dirname "$key")"
@@ -59,8 +68,12 @@ if ! ssh-keygen -Y verify -f allowed_signers -I "$identity" -n foreign-prompts \
   echo "fp-sign: wrote a signature that does not verify -- refusing to claim success" >&2
   exit 1
 fi
+fingerprint=$(ssh-keygen -lf "$key.pub" | awk '{print $2}')
 echo "signed index.json -> index.json.sig (verified)"
 echo "published allowed_signers for identity '$identity'"
+echo "key fingerprint $fingerprint"
 echo
 echo "The private key stays in $key and is gitignored. Commit index.json,"
 echo "index.json.sig and allowed_signers; a managed agent needs exactly those three."
+echo "Publish the fingerprint somewhere other than the catalog -- a client registers with"
+echo "  fp-register <url> --key $fingerprint"

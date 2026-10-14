@@ -50,7 +50,8 @@ That is the case this protocol was built for, and it is not a demonstration: it 
 - **The agent announces** the adoption, holds the declared limits, and lets go on `disown`. Those
   are conventions an agent honours; the digest check is the one rule a client can enforce.
 - **Publishers sign catalogs**: a manifest of frompts and digests, served as static files from
-  anywhere, verified against a key the client holds locally.
+  anywhere — your own domain included — verified against a key the client holds locally and
+  brought in by its fingerprint. [Tutorial 3](docs/tutorials/03-publish-a-catalog.md) hosts one.
 
 [Tutorial 1](docs/tutorials/01-adopt-your-first-frompt.md) walks through an adoption step by step.
 
@@ -84,9 +85,9 @@ and [the guide](docs/guides/run-conformance.md) has the table.
 
 | You want to | Go to |
 |---|---|
-| learn it by doing | [`docs/tutorials/`](docs/README.md) — adopt, write, publish, run unattended |
+| learn it by doing | [`docs/tutorials/`](docs/README.md) — adopt, write, host a catalog on your domain, run unattended |
 | do one job | [`docs/guides/`](docs/README.md) — talk to a ghost, revoke, attest, renew |
-| see it run | [`examples/`](examples/README.md) — smallest to full, two recorded sessions, one runnable catalog |
+| see it run | [`examples/`](examples/README.md) — smallest to full, recorded sessions, two runnable catalogs |
 | know exactly what an agent must do | [`FPA.md`](FPA.md), normative · [`CLIENT.md`](CLIENT.md) · [`SECURITY.md`](SECURITY.md) · [`TERMINOLOGY.md`](TERMINOLOGY.md) |
 | install, deploy, or release | [`AGENTS.md`](AGENTS.md) |
 | know where the project is going | [`VISION.md`](https://github.com/frompt-org/frompt/blob/main/VISION.md), in the [homepage repo](https://github.com/frompt-org/frompt) |

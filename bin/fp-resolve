@@ -22,6 +22,9 @@ the one just registered. With --from, a workspace that keeps fpa.registered
 refuses an unregistered catalog, and the pin mode it registered with is
 enforced: `latest` floats, `version` and `digest` require a matching fpa.lock.
 
+Without --from it resolves from the catalog bin/fpa_roots.py finds; registrations
+and pins are read from the workspace (FPA_WORKSPACE, else this checkout).
+
 Exit: 0 verified · 1 digest mismatch, unknown id, or refused · 2 unreachable.
 
 A mismatch is not a warning. If the bytes are not the bytes the index vouched
@@ -34,8 +37,12 @@ import json
 import re
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-INDEX = ROOT / "INDEX.md"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import fpa_roots  # noqa: E402
+
+ROOT = fpa_roots.TOOLS
+CATALOG = fpa_roots.catalog()
+WS = fpa_roots.workspace()
 
 
 def semver_key(v):
@@ -55,7 +62,7 @@ def entries(manifest):
 
 def local_manifest():
     try:
-        return json.loads((ROOT / "index.json").read_text())
+        return json.loads((CATALOG / "index.json").read_text())
     except OSError:
         return {}
 
@@ -63,7 +70,7 @@ def local_manifest():
 def registered(base):
     """The fpa.registered line for a base, or None. A workspace with no such file
     is not using the registered model and is unaffected."""
-    reg = ROOT / "fpa.registered"
+    reg = WS / "fpa.registered"
     if not reg.exists():
         return "unregistered-model"
     for line in reg.read_text().splitlines():
@@ -75,7 +82,7 @@ def registered(base):
 
 
 def pins():
-    lock = ROOT / "fpa.lock"
+    lock = WS / "fpa.lock"
     if not lock.exists():
         return None
     out = {}
@@ -150,7 +157,7 @@ def main(argv):
         if reg is None:
             print(f"fp-resolve: {origin} is not in fpa.registered.\n"
                   "  This workspace registers the catalogs it accepts. Register it deliberately:\n"
-                  f"    bin/fp-register {origin}", file=sys.stderr)
+                  f"    fp-register {origin} --key <the publisher's fingerprint>", file=sys.stderr)
             return 1
         # The manifest is used only as fp-verify verified it: signature against the
         # local trust root, the signing key against the registered one (AC2b),
@@ -245,6 +252,7 @@ def main(argv):
                   "context, so a pin does not authorize it (FPA.md AC1).", file=sys.stderr)
             return 1
         pv, pd, purl = locked[wanted]
+        repin = f"fp-lock --update {wanted}" + (f" --from {origin}" if origin else "")
         pub_base = manifest.get("base", "")
         if pub_base and not purl.startswith(pub_base.rstrip("/") + "/"):
             print(f"fp-resolve: {wanted} is pinned from a different publisher\n"
@@ -254,14 +262,14 @@ def main(argv):
             return 1
         if pin_mode != "digest" and pv != entry["version"]:
             print(f"fp-resolve: {wanted} is pinned at {pv}, the manifest offers {entry['version']}\n"
-                  "Re-pin deliberately with 'bin/fp-lock --update' if the bump is wanted (M5).",
+                  f"Re-pin deliberately with '{repin}' if the bump is wanted (M5).",
                   file=sys.stderr)
             return 1
         if pd != digest:
             print(f"fp-resolve: {wanted} has moved since it was pinned\n"
                   f"  pinned  {pv} {pd}\n"
                   f"  fetched {digest}\n"
-                  "Re-pin deliberately with 'bin/fp-lock --update' if that is what you want.",
+                  f"Re-pin deliberately with '{repin}' if that is what you want.",
                   file=sys.stderr)
             return 1
 

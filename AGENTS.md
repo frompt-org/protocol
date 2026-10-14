@@ -21,9 +21,13 @@ Requires `bash`, `python3`, `ssh-keygen`, `curl`. Optional: `gh` (the `gh:` tran
 catalogs), [SkillSpector](https://github.com/NVIDIA/SkillSpector) (`fp-assay`), `codex` or `agy`
 (`fp-conform`).
 
-**The checkout is the workspace.** `fpa.registered` (which catalogs this workspace consented to),
-`allowed_signers` (the keys it trusts) and `.fpa/` (signing key, freshness floors, adoption record)
-live beside the tools. One clone per set of agents that should share a consent record.
+**Two places, kept apart.** A **workspace** is what a client trusts: `allowed_signers` (the keys
+it trusts), `fpa.registered` (which catalogs it consented to), `fpa.lock` and `.fpa/` (freshness
+floors, adoption record). It is `FPA_WORKSPACE`, else this checkout; set `FPA_WORKSPACE=~/.config/frompt`
+for one per user. A **catalog** is what a publisher signs: `frompt-catalog.json`, `prompts/`, the
+manifest and its signature, the published key, and `.fpa/signing_key`. The tools use
+`FPA_CATALOG`, else the catalog you stand in (the nearest `frompt-catalog.json` upward), else this
+checkout, which is both.
 
 ## Adopt frompts correctly
 
@@ -44,22 +48,28 @@ If a pilot hands you a frompt, the rules are [`FPA.md`](FPA.md); the short versi
 
 ## Deploy a catalog
 
-A catalog is a git repository (or any static host) holding `index.json`, `index.json.sig`,
-`allowed_signers` and `prompts/<id>/<version>.frompt.md`.
+A catalog is a directory, usually a git repository, served as static files from any domain:
+`index.json`, `index.json.sig`, `allowed_signers` and `prompts/<id>/<version>.frompt.md`, plus
+`frompt-catalog.json` saying where it is served from.
+[Tutorial 3](docs/tutorials/03-publish-a-catalog.md) is the whole walk.
 
 ```
-bin/fp-publish <catalog> --only <id>[,<id>]    # from this repository; name what you publish
-cd <catalog>
-bin/fp-index && bin/fp-sign                    # fp-sign --keygen once, on first publish
-git add -A && git commit && git push
+fp-init-catalog <dir> --url https://frompts.example.com   # once: empty, signed, key in .fpa/
+cd <dir>
+fp-new <id> -c <consent-sentence> -o prompts/            # or: fp-publish <dir> --only <id>, from here
+fp-index && fp-sign
+git add -A && git commit && git push                     # then serve it byte for byte
 ```
 
 - **The signing key never leaves `.fpa/`**, which is gitignored. Never commit it, never print it.
+  Back it up: a lost key means every client registers a new one.
+- **Clients register by fingerprint** (`fp-register <url> --key SHA256:…`). Publish the
+  fingerprint `fp-sign` prints somewhere that is not the catalog.
 - **Published bytes never change.** A fix is a new version; a wrong version is revoked by removing it
   from the manifest — [guide](docs/guides/revoke-a-version.md).
-- **Manifests expire** after 30 days. Renew with `bin/fp-index --renew && bin/fp-sign` before
-  clients refuse — [guide](docs/guides/keep-a-catalog-fresh.md).
-- **Attest** each document with `bin/fp-assay`; never gate on its score —
+- **Manifests expire** after 30 days. Renew with `fp-index --renew && fp-sign`, or give the
+  catalog's `renew` workflow the key — [guide](docs/guides/keep-a-catalog-fresh.md).
+- **Attest** each document with `fp-assay`; never gate on its score —
   [guide](docs/guides/attest-with-assay.md).
 
 The org's catalog is [`frompt-org/catalog`](https://github.com/frompt-org/catalog); its `assay`

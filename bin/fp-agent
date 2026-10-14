@@ -21,7 +21,10 @@ import socket
 import sys
 import time
 
-STORE = pathlib.Path(__file__).resolve().parent.parent / ".fpa" / "agent.json"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import fpa_roots  # noqa: E402
+
+STORE = fpa_roots.workspace() / ".fpa" / "agent.json"
 
 
 def mint():

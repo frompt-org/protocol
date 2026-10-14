@@ -21,6 +21,8 @@
 | [`history/`](../../history/) | Retired documents, read-only. What used to be true, kept rather than deleted. |
 | [`bin/fp-register`](../../bin/fp-register) · [`bin/fp-unregister`](../../bin/fp-unregister) | Record, or withdraw, a workspace's consent to a catalog: `fpa.registered`. |
 | [`bin/fp-publish`](../../bin/fp-publish) | Stage this repo's frompts into a catalog checkout; refuses to change a published version's bytes. |
+| [`bin/fp-init-catalog`](../../bin/fp-init-catalog) · [`frompt-catalog.json`](../../frompt-catalog.json) | Start a catalog of your own, for your own domain; the file that says where a catalog is served from. |
+| [`bin/fpa_roots.py`](../../bin/fpa_roots.py) | Where every tool reads and writes: the catalog (`FPA_CATALOG`) and the workspace (`FPA_WORKSPACE`). |
 | [`bin/fp-assay`](../../bin/fp-assay) | Run a scanner over a document and record what it saw, as data keyed by digest. Never a verdict. |
 | [`bin/fp-conform`](../../bin/fp-conform) · [`conformance/`](../../conformance/) | Hand a real agent real documents and grade what it does. Results are checked in, misses included. |
 | [`bin/fp-selftest`](../../bin/fp-selftest) | Conformance suite — every defect four review rounds found, as an assertion. |

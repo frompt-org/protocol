@@ -8,6 +8,11 @@
 set -uo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# The suite tests this checkout as its own catalog and its own workspace. Run from
+# inside some other catalog, or with a workspace exported, the tools would find
+# those instead (bin/fpa_roots.py) -- so neither may leak in.
+unset FPA_CATALOG FPA_WORKSPACE FPA_SIGNING_IDENTITY
+cd "$here" || exit 2
 lint="$here/bin/fp-lint"
 new="$here/bin/fp-new"
 tmpl="$here/TEMPLATE.frompt.md"
@@ -216,7 +221,7 @@ if [ -f "$here/index.json.sig" ] && [ -f "$here/allowed_signers" ]; then
 
   tampered=$(mktemp -d 2>/dev/null || echo "/tmp/fp-tamper2-$$"); mkdir -p "$tampered/bin"
   cp "$here"/index.json "$here"/index.json.sig "$here"/allowed_signers "$tampered/"
-  cp "$here"/bin/fp-verify "$tampered/bin/"
+  cp "$here"/bin/fp-verify "$here"/bin/fpa_roots.py "$tampered/bin/"
   python3 - "$tampered/index.json" <<'PY'
 import json, sys
 p = sys.argv[1]
@@ -573,6 +578,79 @@ onlycat=$(mktemp -d 2>/dev/null || echo "/tmp/fp-only-$$")
 [ -d "$onlycat/prompts/grill-me" ] && [ "$(ls "$onlycat/prompts" | wc -l | tr -d ' ')" = "1" ]
 check "fp-publish --only stages the named frompts and no others" 0 $?
 rm -rf "$onlycat"
+
+# --- self-hosted catalogs: a catalog and a workspace are two different places ---
+# Every check here builds its own publishers with fresh keys, so none of them needs
+# this checkout's signing key, and none of them writes to this checkout.
+sh=$(mktemp -d 2>/dev/null || echo "/tmp/fp-sh-$$"); mkdir -p "$sh"
+reg_before=$(cat "$here/fpa.registered" "$here/allowed_signers" 2>/dev/null | shasum | cut -c1-12)
+mkcat() { # mkcat <dir> <url> [identity] -- an initialized catalog with one registered-fit frompt
+  "$here/bin/fp-init-catalog" "$1" --url "$2" ${3:+--identity "$3"} >/dev/null 2>&1 || return 1
+  "$new" hello -c i-have-read-this-prompt-and-want-my-agent-to-say-hello-once -o "$1/prompts" \
+    --author selftest >/dev/null 2>&1 || return 1
+  sed -i.bak 's/^flow:/contexts: interactive, registered, managed\
+flow:/' "$1/prompts/hello/1.0.0.frompt.md" && rm -f "$1/prompts/hello/1.0.0.frompt.md.bak"
+  (cd "$1" && "$here/bin/fp-index" >/dev/null && "$here/bin/fp-sign" </dev/null >/dev/null 2>&1)
+}
+keyof() { ssh-keygen -lf "$1/.fpa/signing_key.pub" | awk '{print $2}'; }
+
+mkcat "$sh/acme" https://catalog.acme.example
+check "fp-init-catalog makes a catalog that indexes and signs with no edits to any tool" 0 $?
+python3 -c "import json,sys; assert json.load(open(sys.argv[1]))['base']=='https://catalog.acme.example/prompts'" "$sh/acme/index.json" 2>/dev/null
+check "fp-index takes the catalog's base from frompt-catalog.json, not from its own source" 0 $?
+"$here/bin/fp-init-catalog" "$sh/acme" --url https://catalog.acme.example >/dev/null 2>&1
+check "fp-init-catalog refuses to overwrite a catalog -- a new key would orphan its clients" 1 $?
+[ -f "$sh/acme/.nojekyll" ] && grep -qx 'catalog.acme.example' "$sh/acme/CNAME" && grep -q '^.fpa/$' "$sh/acme/.gitignore"
+check "fp-init-catalog leaves .nojekyll, CNAME and a .gitignore that keeps the key out" 0 $?
+(cd "$sh/acme" && "$here/bin/fp-resolve" --list 2>/dev/null) | grep -q '^hello '
+check "standing in a catalog, the tools read that catalog, not this checkout" 0 $?
+
+export FPA_WORKSPACE="$sh/client"
+"$here/bin/fp-register" "$sh/acme" --key SHA256:0000000000000000000000000000000000000000000 >/dev/null 2>&1
+check "fp-register --key refuses a catalog that serves no key with that fingerprint" 1 $?
+"$here/bin/fp-register" "$sh/acme" --key "$(keyof "$sh/acme")" --pin version >/dev/null 2>&1 \
+  && grep -q "^$sh/acme $(keyof "$sh/acme") version " "$sh/client/fpa.registered"
+check "fp-register --key trusts the catalog's published key only because its fingerprint matched" 0 $?
+reg_after=$(cat "$here/fpa.registered" "$here/allowed_signers" 2>/dev/null | shasum | cut -c1-12)
+check "with FPA_WORKSPACE set, nothing is registered in the tool checkout" "$reg_before" "$reg_after"
+"$here/bin/fp-lock" --update hello --from "$sh/acme" >/dev/null 2>&1 \
+  && "$here/bin/fp-resolve" hello --from "$sh/acme" --record 2>/dev/null | grep -q 'verified=pinned'
+check "fp-lock --from pins a version from a catalog the client does not hold" 0 $?
+FPA_CATALOG="$here" "$here/bin/fp-lock" >/dev/null 2>&1; grep -q '^hello 1.0.0 ' "$sh/client/fpa.lock"
+check "re-locking one catalog keeps the pins taken from another" 0 $?
+
+# A second publisher this client trusts signs a manifest that names acme's catalog,
+# at a serial acme will not reach for years. Keyed by base alone, that floor was
+# acme's, and every real acme manifest after it was refused as a rollback.
+mkcat "$sh/globex" https://catalog.globex.example
+"$here/bin/fp-register" "$sh/globex" --key "$(keyof "$sh/globex")" >/dev/null 2>&1
+python3 - "$sh/acme/index.json" "$sh/globex/index.json" <<'PY'
+import json, sys
+m = json.load(open(sys.argv[1])); m["serial"] = 999999
+open(sys.argv[2], "w").write(json.dumps(m, indent=2, sort_keys=True) + "\n")
+PY
+rm -f "$sh/globex/index.json.sig"; ssh-keygen -Y sign -f "$sh/globex/.fpa/signing_key" -n foreign-prompts "$sh/globex/index.json" >/dev/null 2>&1
+"$here/bin/fp-verify" --from "$sh/globex" >/dev/null 2>&1 </dev/null
+"$here/bin/fp-verify" hello --from "$sh/acme" >/dev/null 2>&1 </dev/null
+check "another trusted publisher cannot raise one catalog's freshness floor (M6)" 0 $?
+
+# Two keys under one principal made "signed by X" mean either, and made the
+# fingerprint lookup take whichever line came first.
+mkcat "$sh/namesake" https://namesake.example catalog.acme.example
+"$here/bin/fp-register" "$sh/namesake" --key "$(keyof "$sh/namesake")" >/dev/null 2>&1
+check "a second key under a principal the trust root already uses is refused" 1 $?
+
+# The published key matches the fingerprint, but the manifest was signed by a
+# different key the client also trusts: registering records who actually signed.
+mkcat "$sh/mixed" https://mixed.example
+rm -f "$sh/mixed/index.json.sig"; ssh-keygen -Y sign -f "$sh/globex/.fpa/signing_key" -n foreign-prompts "$sh/mixed/index.json" >/dev/null 2>&1
+"$here/bin/fp-register" "$sh/mixed" --key "$(keyof "$sh/mixed")" >/dev/null 2>&1
+check "fp-register refuses a catalog signed by a key other than the one it was given" 1 $?
+unset FPA_WORKSPACE
+rm -rf "$sh"
+
+"$here/examples/08-host-your-own-catalog/run.sh" >/dev/null 2>&1
+check "examples/08-host-your-own-catalog runs: fingerprint, pin, drift, a second publisher, a swapped key" 0 $?
 
 # --- the full-blown example still runs ------------------------------------------
 "$here/examples/06-catalog-end-to-end/run.sh" >/dev/null 2>&1

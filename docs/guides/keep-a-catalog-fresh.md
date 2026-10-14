@@ -8,10 +8,24 @@ The default window is 30 days.
 
 ```
 cd ~/path/to/catalog
-bin/fp-index --renew      # moves not_after; the serial changes only if the frompts did
-bin/fp-sign
+fp-index --renew      # moves not_after; the serial changes only if the frompts did
+fp-sign
 git add index.json index.json.sig INDEX.md && git commit -m "renew manifest" && git push
 ```
+
+The window is the catalog's `validity_days` in `frompt-catalog.json` (`FPA_VALIDITY_DAYS`
+overrides it for one run).
+
+## Or let CI do it
+
+A catalog made with `fp-init-catalog` carries `.github/workflows/renew.yml`. Once a week it checks
+the manifest and, when fewer than ten days remain, renews and signs it, then commits. It needs the
+private key as the repository secret `FPA_SIGNING_KEY` (the contents of `.fpa/signing_key`); without
+the secret it only warns. Store it yourself, in the repository settings.
+
+That is a trade: the key then lives with your CI provider, and anything that can run a workflow in
+that repository can sign for your domain. If that is not acceptable, leave the secret unset and
+renew by hand.
 
 Check when it ends:
 
