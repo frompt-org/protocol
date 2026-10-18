@@ -89,6 +89,10 @@ A release is a tag plus a GitHub release on `frompt-org/protocol`. All of these 
    full each with its own README, and this file.
 3. A fresh conformance run if agent-facing rules changed (`bin/fp-conform --agent codex`), with the
    results committed as written — misses included — and the README's results table matching them.
+   The arena's full set must be green on the release commit: `gentar/release-gate.sh <sha>` refuses
+   otherwise ([guide](docs/guides/run-the-arena.md)). Run the arena from a **fresh clone** — `run.sh`
+   copies the working tree into the bench, and a working checkout holds `.fpa/`, the private
+   signing key.
 4. Any frompt that changed is published to the catalog (`fp-publish --only`), signed and attested.
 5. `git tag -a vX.Y.Z` and `gh release create` with notes that say what changed and what the
    evidence shows.

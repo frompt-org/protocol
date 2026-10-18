@@ -25,7 +25,8 @@ rules = {m.group(1) for m in re.finditer(r"\*\*([A-Z]{1,2}\d+)\.\*\*", text)}
 
 bad = []
 for f in sorted(root.rglob("*.md")):
-    if ".git" in str(f) or "history/" in str(f):
+    if ".git" in str(f) or "history/" in str(f) or "gentar/" in str(f):
+        # gentar/ is the arena kit and its staged engine: the engine's text, not this repo's.
         # history/ is skipped: a retired document's references are stale on purpose,
 # and repointing them would destroy the thing that makes it a record.
         continue

@@ -78,7 +78,8 @@ VERSION_MENTION = re.compile(r"\b(?:FPA|FOREIGN-PROMPT|protocol) v(\d+)\b")
 
 bad = []
 for f in sorted(root.rglob("*.md")):
-    if ".git" in str(f) or "history/" in str(f):
+    if ".git" in str(f) or "history/" in str(f) or "gentar/" in str(f):
+        # gentar/ is the arena kit and its staged engine: the engine's text, not this repo's.
         # history/ is skipped: retired documents describe what was true when written,
 # including names and claims this repo has since dropped. That is their job.
         continue
