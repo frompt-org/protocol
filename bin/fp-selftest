@@ -649,6 +649,71 @@ check "fp-register refuses a catalog signed by a key other than the one it was g
 unset FPA_WORKSPACE
 rm -rf "$sh"
 
+# --- certificate authorities: trust the authority, not the key (M7b) ----------
+# The trust root names an authority, and publishers sign with keys it certified.
+# Every key is made for these checks; nothing is written to this checkout.
+ca=$(mktemp -d 2>/dev/null || echo "/tmp/fp-ca-$$"); mkdir -p "$ca/ws" "$ca/cat" "$ca/fresh"
+export FPA_WORKSPACE="$ca/ws"
+ssh-keygen -q -t ed25519 -N "" -C authority -f "$ca/authority" >/dev/null 2>&1
+printf '*@docs.example.org cert-authority,namespaces="foreign-prompts" %s\n' \
+  "$(cut -d' ' -f1,2 "$ca/authority.pub")" > "$ca/ws/allowed_signers"
+cafp=$(ssh-keygen -lf "$ca/authority.pub" | awk '{print $2}')
+for k in builder second rogue stale outsider; do
+  ssh-keygen -q -t ed25519 -N "" -C "$k" -f "$ca/$k" >/dev/null 2>&1
+done
+ssh-keygen -q -s "$ca/authority" -I builder -n team-a@docs.example.org -V -5m:+1d "$ca/builder.pub" >/dev/null 2>&1
+ssh-keygen -q -s "$ca/authority" -I second -n team-b@docs.example.org -V -5m:+1d "$ca/second.pub" >/dev/null 2>&1
+ssh-keygen -q -s "$ca/authority" -I stale -n team-a@docs.example.org -V 20200101:20200102 "$ca/stale.pub" >/dev/null 2>&1
+ssh-keygen -q -s "$ca/authority" -I outsider -n team-x@infra.example.org -V -5m:+1d "$ca/outsider.pub" >/dev/null 2>&1
+casign() { # casign <serial> <key-or-cert>: the docs catalog's manifest at that serial, signed
+  python3 -c 'import json, sys
+m = {"base": "https://docs.example.org/prompts", "not_after": "2099-01-01T00:00:00Z",
+     "prompts": [], "serial": int(sys.argv[2])}
+open(sys.argv[1], "w").write(json.dumps(m, indent=2, sort_keys=True) + "\n")' "$ca/cat/index.json" "$1"
+  rm -f "$ca/cat/index.json.sig"
+  ssh-keygen -Y sign -f "$2" -n foreign-prompts "$ca/cat/index.json" >/dev/null 2>&1
+}
+casign 5 "$ca/builder-cert.pub"
+out=$("$here/bin/fp-verify" --from "$ca/cat" 2>/dev/null </dev/null); rc=$?
+[ $rc -eq 0 ] && printf '%s' "$out" | grep -q "signed by team-a@docs.example.org via certificate from authority $cafp"
+check "a key the trusted authority certified verifies, and the authority is named, not the key (M7b)" 0 $?
+casign 6 "$ca/outsider-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "a certificate for a principal outside the authority's pattern is refused" 1 $?
+casign 6 "$ca/rogue"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "an uncertified key is refused when the trust root names only an authority" 1 $?
+casign 6 "$ca/stale-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "an expired certificate is refused, whatever the manifest's not_after says" 1 $?
+casign 999999 "$ca/second-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+casign 6 "$ca/builder-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "one principal under an authority cannot raise another principal's freshness floor" 0 $?
+casign 4 "$ca/builder-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "the floor still holds for the principal that set it" 1 $?
+
+# Registering pins one key; an authority vouches for many principals (M7b).
+casign 7 "$ca/builder-cert.pub"; cp "$ca/ws/allowed_signers" "$ca/cat/allowed_signers"
+FPA_WORKSPACE="$ca/fresh" "$here/bin/fp-register" "$ca/cat" --key "$cafp" >/dev/null 2>&1 </dev/null
+rc=$?; [ $rc -eq 1 ] && [ ! -e "$ca/fresh/allowed_signers" ] && [ ! -e "$ca/fresh/fpa.registered" ]
+check "fp-register refuses an authority's fingerprint before touching the trust root" 0 $?
+"$here/bin/fp-register" "$ca/cat" >/dev/null 2>&1 </dev/null
+rc=$?; [ $rc -eq 1 ] && [ ! -e "$ca/ws/fpa.registered" ]
+check "fp-register refuses a catalog signed under a certificate, even with the authority trusted" 0 $?
+printf '%s %s latest 2026-01-01 selftest\n' "$ca/cat" "$cafp" > "$ca/ws/fpa.registered"
+"$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "a registered catalog signed under a certificate is refused (AC2b, M7b)" 1 $?
+rm -f "$ca/ws/fpa.registered"
+
+# fp-sign signs as the certificate beside the key, and publishes no key line.
+signers_before=$(shasum < "$ca/cat/allowed_signers")
+FPA_CATALOG="$ca/cat" FPA_SIGNING_KEY="$ca/builder" "$here/bin/fp-sign" >/dev/null 2>&1 </dev/null \
+  && ssh-keygen -Y verify -f "$ca/cat/allowed_signers" -I team-a@docs.example.org -n foreign-prompts \
+       -s "$ca/cat/index.json.sig" < "$ca/cat/index.json" >/dev/null 2>&1 \
+  && [ "$(shasum < "$ca/cat/allowed_signers")" = "$signers_before" ]
+check "fp-sign signs with the key's certificate and leaves the authority's trust root alone" 0 $?
+FPA_CATALOG="$ca/cat" FPA_SIGNING_KEY="$ca/outsider" "$here/bin/fp-sign" >/dev/null 2>&1 </dev/null
+check "fp-sign refuses a certificate no authority in allowed_signers accepts" 1 $?
+unset FPA_WORKSPACE
+rm -rf "$ca"
+
 "$here/examples/08-host-your-own-catalog/run.sh" >/dev/null 2>&1
 check "examples/08-host-your-own-catalog runs: fingerprint, pin, drift, a second publisher, a swapped key" 0 $?
 

@@ -10,6 +10,9 @@
 #   fp-sign --keygen               # create that key if it does not exist
 #   FPA_SIGNING_KEY=~/.ssh/id_ed25519 fp-sign
 #
+# A key with a certificate beside it (<key>-cert.pub, or FPA_SIGNING_CERT) signs
+# as that certificate, for clients that trust its authority (FPA.md M7b).
+#
 # It signs the catalog bin/fpa_roots.py finds: FPA_CATALOG, else the nearest
 # directory upward holding frompt-catalog.json, else this checkout. The identity
 # is FPA_SIGNING_IDENTITY, else the catalog's `identity`, else
@@ -44,6 +47,36 @@ fi
 
 [ -f "$key" ] || { echo "fp-sign: no signing key at $key -- run 'fp-sign --keygen'" >&2; exit 2; }
 [ -f index.json ] || { echo "fp-sign: no index.json -- run bin/fp-index" >&2; exit 2; }
+
+# A key certified by an authority (FPA.md M7b) signs as its certificate, which is
+# what lets a client trust the authority rather than this key. There is then no
+# key line to publish: allowed_signers names the authority, and the authority
+# distributes that line, not each publisher it certifies.
+cert="${FPA_SIGNING_CERT:-$key-cert.pub}"
+if [ -f "$cert" ]; then
+  rm -f index.json.sig
+  if ! ssh-keygen -Y sign -f "$cert" -n foreign-prompts index.json >/dev/null 2>&1; then
+    echo "fp-sign: ssh-keygen could not sign index.json with certificate $cert" >&2
+    exit 1
+  fi
+  principal=$(ssh-keygen -Y find-principals -s index.json.sig -f allowed_signers 2>/dev/null | head -1 || true)
+  if [ -z "$principal" ] || ! ssh-keygen -Y verify -f allowed_signers -I "$principal" -n foreign-prompts \
+       -s index.json.sig < index.json >/dev/null 2>&1; then
+    echo "fp-sign: signed with certificate $cert, but no authority in allowed_signers accepts it" >&2
+    echo "  (unknown authority, a principal outside its pattern, or an expired certificate)." >&2
+    echo "  Add the authority's cert-authority line, or renew the certificate." >&2
+    exit 1
+  fi
+  certinfo=$(ssh-keygen -L -f "$cert")
+  authority=$(printf '%s\n' "$certinfo" | sed -n 's/.*Signing CA: .* \(SHA256:[^ ]*\).*/\1/p' | head -1)
+  valid=$(printf '%s\n' "$certinfo" | sed -n 's/^ *Valid: //p' | head -1)
+  echo "signed index.json -> index.json.sig with a certificate (verified)"
+  echo "principal $principal, authority $authority, valid $valid"
+  echo
+  echo "The signature verifies only while the certificate is valid. Commit index.json and"
+  echo "index.json.sig; clients trust the authority's cert-authority line, not this key."
+  exit 0
+fi
 
 # ssh-keygen -Y sign PROMPTS before overwriting an existing .sig, and answers "no"
 # and exits 0 when stdin is closed. It reported success while leaving a stale

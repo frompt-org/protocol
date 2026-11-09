@@ -116,12 +116,70 @@ fi
 # name, which is some other key whenever two publishers chose the same one.
 sigfp=$(printf '%s\n' "$verified" | sed -n 's/.* key \(SHA256:[^ ]*\).*/\1/p' | head -1)
 [ -n "$sigfp" ] || { echo "fp-verify: the signature verified but ssh-keygen did not name its key -- failing closed" >&2; exit 2; }
-echo "manifest verified: index.json signed by $signer $sigfp"
+
+# M7b: a trust root may name an authority (a cert-authority line) instead of a key.
+# Then the signing key is a certificate, and whom this client trusts is the
+# authority that issued it: builder keys come and go under one authority, so the
+# key's own fingerprint is not an identity worth pinning or keying a floor on.
+# ssh-keygen names only the certified key, so the certificate is read back out of
+# the signature itself.
+authority=""; floor_id="$sigfp"
+if printf '%s\n' "$verified" | grep -q -- '-CERT key '; then
+  certinfo=$(python3 - index.json.sig <<'PY'
+import base64, struct, subprocess, sys
+text = open(sys.argv[1]).read()
+blob = base64.b64decode("".join(l.strip() for l in text.splitlines()
+                                if l.strip() and not l.startswith("-----")))
+if blob[:6] != b"SSHSIG":
+    sys.exit(1)
+(n,) = struct.unpack(">I", blob[10:14])          # after magic and uint32 version
+cert = blob[14:14 + n]
+(t,) = struct.unpack(">I", cert[:4])
+open("cert.pub", "w").write(f"{cert[4:4 + t].decode()} {base64.b64encode(cert).decode()}\n")
+out = subprocess.run(["ssh-keygen", "-L", "-f", "cert.pub"], capture_output=True, text=True)
+if out.returncode:
+    sys.exit(1)
+ca = keyid = valid = ""
+for line in out.stdout.splitlines():
+    s = line.strip()
+    if s.startswith("Signing CA:"):
+        ca = next((w for w in s.split() if w.startswith("SHA256:")), "")
+    elif s.startswith("Key ID:"):
+        keyid = s.split(":", 1)[1].strip().strip('"').replace(" ", "_")
+    elif s.startswith("Valid:"):
+        valid = s.split(":", 1)[1].strip()
+if not ca:
+    sys.exit(1)
+print(ca)
+print(keyid or "-")
+print(valid or "-")
+PY
+)
+  authority=$(printf '%s\n' "$certinfo" | sed -n 1p)
+  [ -n "$authority" ] || { echo "fp-verify: signed with a certificate whose authority could not be read -- failing closed" >&2; exit 2; }
+  # Kept per authority AND principal (M7b): one principal certified by an authority
+  # must not be able to raise the freshness floor of another's catalog.
+  floor_id="$authority $signer"
+  echo "certificate: key id $(printf '%s\n' "$certinfo" | sed -n 2p), key $sigfp, valid $(printf '%s\n' "$certinfo" | sed -n 3p)"
+  echo "  the signature stops verifying when the certificate does, whatever not_after says"
+  echo "manifest verified: index.json signed by $signer via certificate from authority $authority"
+  sigfp="$authority"
+else
+  echo "manifest verified: index.json signed by $signer $sigfp"
+fi
 
 # AC2b: the key that signed must be the key this workspace registered. A new key
 # in allowed_signers is not consent; the registration line is.
 if [ -n "$from" ] && [ -z "$registering" ] && [ -f "$ws/fpa.registered" ]; then
   recorded=$(awk -v b="${from%/}" '$1==b {print $2; exit}' "$ws/fpa.registered")
+  # A registration records one key. An authority vouches for many principals, so
+  # pinning it alone would let any of them sign this catalog; until a registration
+  # binds the principal too, a certificate-signed catalog is not registered (M7b).
+  if [ -n "$recorded" ] && [ -n "$authority" ]; then
+    echo "fp-verify: ${from%/} is signed under a certificate from authority $authority." >&2
+    echo "  A registration pins one key, and registering an authority is reserved (FPA.md M7b). Refusing." >&2
+    exit 1
+  fi
   if [ -n "$recorded" ] && [ "$recorded" != "$sigfp" ]; then
     echo "fp-verify: ${from%/} is signed by $sigfp but this workspace registered $recorded" >&2
     echo "  The publisher's key changed since somebody agreed to it. If that is expected, re-register deliberately." >&2
@@ -145,7 +203,7 @@ if [ "${1:-}" = "--base" ]; then
 fi
 
 case "$base" in ""|/*|*://*|gh:*) ;; *) base="$orig_pwd/$base";; esac
-python3 - "$id" "$base" "$ws" "$from" "$context" "$manifest_out" "$sigfp" "$orig_pwd" <<'PY'
+python3 - "$id" "$base" "$ws" "$from" "$context" "$manifest_out" "$floor_id" "$orig_pwd" <<'PY'
 import hashlib, json, os, pathlib, sys, urllib.request
 wanted, base, root, origin = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3]), sys.argv[4]
 context, manifest_out, signed_by = sys.argv[5], sys.argv[6], sys.argv[7]
@@ -180,6 +238,8 @@ if now > not_after:
 # manifest naming another catalog's base at serial 999999 -- and every real
 # manifest from that catalog was then refused as a rollback. A floor only the
 # key that set it can raise is a floor nobody else can poison.
+# Under a certificate (M7b) the "key" here is the authority and the principal it
+# certified, so builders certified by one authority cannot poison each other either.
 seen = root / ".fpa" / "manifest-serials.json"
 catalog = manifest.get("base", "")
 floor_key = f"{catalog} {signed_by}"
