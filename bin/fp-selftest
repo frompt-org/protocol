@@ -657,8 +657,11 @@ check "a second key under a principal the trust root already uses is refused" 1 
 # different key the client also trusts: registering records who actually signed.
 mkcat "$sh/mixed" https://mixed.example
 rm -f "$sh/mixed/index.json.sig"; ssh-keygen -Y sign -f "$sh/globex/.fpa/signing_key" -n foreign-prompts "$sh/mixed/index.json" >/dev/null 2>&1
+floors_before=$(shasum < "$sh/client/.fpa/manifest-serials.json")
 "$here/bin/fp-register" "$sh/mixed" --key "$(keyof "$sh/mixed")" >/dev/null 2>&1
 check "fp-register refuses a catalog signed by a key other than the one it was given" 1 $?
+[ "$(shasum < "$sh/client/.fpa/manifest-serials.json")" = "$floors_before" ]
+check "a refused registration leaves the freshness floors as they were" 0 $?
 grep -qF "$(awk '{print $2}' "$sh/mixed/.fpa/signing_key.pub")" "$sh/client/allowed_signers"
 check "a refused registration leaves no key behind in the trust root" 1 $?
 "$here/bin/fp-register" "$sh/stray" --key "$(keyof "$sh/stray")" >/dev/null 2>&1
@@ -695,9 +698,19 @@ FPA_WORKSPACE="$lw" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </de
   && python3 -c '
 import json, sys
 f = json.load(open(sys.argv[1]))
-sys.exit(0 if sys.argv[2] not in f and any(k.startswith(sys.argv[2] + " ") for k in f) else 1)
+sys.exit(0 if sys.argv[2] in f and any(k.startswith(sys.argv[2] + " ") for k in f) else 1)
 ' "$lw/.fpa/manifest-serials.json" "$acme_base"
-check "an old-format floor counts once: the manifest that passes it retires it" 0 $?
+check "an old-format floor stays when a manifest passes it, beside the new keyed floor" 0 $?
+printf '{"%s": %s}\n' "$acme_base" $((acme_serial + 1)) > "$lw/.fpa/manifest-serials.json"
+FPA_WORKSPACE="$lw" "$here/bin/fp-verify" --from "$sh/globex" >/dev/null 2>&1 </dev/null
+FPA_WORKSPACE="$lw" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </dev/null
+check "another key passing an old-format floor does not lift it for the catalog's own key" 1 $?
+
+# A floor moves only when everything the run checks has passed.
+mkdir -p "$sh/g3"; cp "$sh/client/allowed_signers" "$sh/g3/"
+FPA_WORKSPACE="$sh/g3" "$here/bin/fp-verify" no-such-prompt --from "$sh/acme" >/dev/null 2>&1 </dev/null
+rc=$?; [ -e "$sh/g3/.fpa/manifest-serials.json" ]
+check "a refused prompt does not raise the manifest's floor" "1 1" "$rc $?"
 
 # A manifest's `file` is a plain path under prompts/, signed or not.
 mkcat "$sh/odd" https://odd.example
@@ -713,6 +726,34 @@ FPA_WORKSPACE="$lw" "$here/bin/fp-verify" hello --from "$sh/odd" >/dev/null 2>&1
 check "fp-verify refuses a signed manifest whose file is not a plain path under prompts/" 1 $?
 FPA_CATALOG="$sh/odd" "$here/bin/fp-resolve" hello --record >/dev/null 2>&1
 check "fp-resolve refuses the same manifest from FPA_CATALOG" 1 $?
+
+# A publisher rotates its key: re-registering needs a deliberate unregister, and
+# the old key leaves the trust root with the registration it came in with.
+mkcat "$sh/rot" https://rot.example
+"$here/bin/fp-register" "$sh/rot" --key "$(keyof "$sh/rot")" >/dev/null 2>&1
+old_key=$(awk '{print $2}' "$sh/rot/.fpa/signing_key.pub")
+rm -f "$sh/rot/.fpa/signing_key" "$sh/rot/.fpa/signing_key.pub"
+FPA_CATALOG="$sh/rot" "$here/bin/fp-sign" --keygen >/dev/null 2>&1 </dev/null
+"$here/bin/fp-register" "$sh/rot" --key "$(keyof "$sh/rot")" >/dev/null 2>&1
+r1=$?; "$here/bin/fp-unregister" "$sh/rot" >/dev/null 2>&1
+r2=$?; grep -qF "$old_key" "$sh/client/allowed_signers"
+r3=$?; "$here/bin/fp-register" "$sh/rot" --key "$(keyof "$sh/rot")" >/dev/null 2>&1
+check "a rotated key: refused, then unregister drops the old key and the new one registers" "1 0 1 0" "$r1 $r2 $r3 $?"
+
+# Usage errors are usage errors: exit 2 with a message, never a traceback.
+r=""
+for cmd in "fp-register $sh/acme --key" "fp-lock --update hello --from" "fp-resolve hello --from" \
+           "fp-init-catalog $sh/never --url https://never.example --identity" "fp-verify --from"; do
+  out=$("$here"/bin/$cmd 2>&1 </dev/null); rc=$?
+  case "$out" in *Traceback*) rc=traceback;; esac; r="$r$rc "
+done
+check "a flag given without its value is a usage error in every tool" "2 2 2 2 2 " "$r"
+"$here/bin/fp-verify" --from gh:frompt-org/catalog >/dev/null 2>&1 </dev/null
+check "a gh: catalog without @branch is a usage error" 2 $?
+"$here/bin/fp-verify" hello --from "$sh/acme//" --context registered >/dev/null 2>&1 </dev/null
+check "trailing slashes do not make a registered catalog a different one" 0 $?
+FPA_WORKSPACE="$lw" "$here/bin/fp-verify" --from "file://$sh/acme" >/dev/null 2>&1 </dev/null
+check "fp-verify fetches over http and https only" 2 $?
 unset FPA_WORKSPACE
 rm -rf "$sh"
 

@@ -34,6 +34,9 @@ import subprocess
 import sys
 from urllib.parse import urlsplit
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import fpa_roots  # noqa: E402
+
 TOOLS = pathlib.Path(__file__).resolve().parent.parent
 
 README = """# {name}
@@ -153,8 +156,7 @@ def main(argv):
     target = pathlib.Path(args[0]).expanduser().resolve()
     url = argv[argv.index("--url") + 1].rstrip("/")
     parts = urlsplit(url)
-    identity = (argv[argv.index("--identity") + 1] if "--identity" in argv
-                else parts.hostname or target.name)
+    identity = fpa_roots.flag_value(argv, "--identity", "fp-init-catalog") or parts.hostname or target.name
     if not identity or any(c.isspace() or c == "," for c in identity):
         print(f"fp-init-catalog: identity {identity!r} cannot contain spaces or commas -- it is an "
               "allowed_signers principal", file=sys.stderr)

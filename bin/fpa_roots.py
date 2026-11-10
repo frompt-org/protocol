@@ -68,6 +68,18 @@ def safe_file(name):
     return isinstance(name, str) and bool(_FILE.fullmatch(name))
 
 
+def flag_value(argv, flag, tool):
+    """The value after `flag`, or None when the flag is absent. A flag given with
+    no value is a usage error (exit 2), not a crash."""
+    if flag not in argv:
+        return None
+    i = argv.index(flag) + 1
+    if i >= len(argv) or argv[i].startswith("--"):
+        print(f"{tool}: {flag} needs a value", file=sys.stderr)
+        sys.exit(2)
+    return argv[i]
+
+
 def config(root=None):
     """The catalog's frompt-catalog.json, or {} when it has none."""
     path = (root or catalog()) / CONFIG
