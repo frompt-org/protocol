@@ -159,23 +159,42 @@ ONE_WORD = re.compile(r"[^\s\x00-\x1f\x7f-\x9f]+")
 
 
 class TrustRoot:
-    """The workspace trust root as it was before this run, so a refused
-    registration can put it back. Keys are added before the catalog is verified,
-    because verification needs them; a refusal must not leave them behind."""
+    """The workspace's trust root and freshness floors as they were before this
+    run, so a refused registration can put them back. Keys are added before the
+    catalog is verified, because verification needs them, and verifying records a
+    floor; a refusal must leave neither behind."""
 
     def __init__(self):
-        self.path = WS / "allowed_signers"
-        self.before = self.path.read_bytes() if self.path.exists() else None
+        self.paths = [WS / "allowed_signers", WS / ".fpa" / "manifest-serials.json"]
+        self.before = [p.read_bytes() if p.exists() else None for p in self.paths]
 
     def restore(self):
-        now = self.path.read_bytes() if self.path.exists() else None
-        if now == self.before:
-            return
-        if self.before is None:
-            self.path.unlink()
-        else:
-            self.path.write_bytes(self.before)
-        print(f"  {self.path} is back as it was before this registration", file=sys.stderr)
+        for path, before in zip(self.paths, self.before):
+            now = path.read_bytes() if path.exists() else None
+            if now == before:
+                continue
+            if before is None:
+                path.unlink()
+            else:
+                path.write_bytes(before)
+            print(f"  {path} is back as it was before this registration", file=sys.stderr)
+
+
+def drop_key(fp):
+    """Remove the trust-root lines for the key with this fingerprint."""
+    local = WS / "allowed_signers"
+    if not local.exists():
+        return 0
+    keep, dropped = [], 0
+    for line in local.read_text().splitlines():
+        k = key_of(line)
+        if k and fingerprint(k[1]) == fp:
+            dropped += 1
+            continue
+        keep.append(line)
+    if dropped:
+        local.write_text("\n".join(keep) + ("\n" if keep else ""))
+    return dropped
 
 
 def main(argv):
@@ -211,9 +230,15 @@ def main(argv):
         if base not in entries:
             print(f"fp-unregister: {base} is not registered", file=sys.stderr)
             return 1
-        del entries[base]
+        gone = entries.pop(base)
         FILE.write_text(render(entries))
         print(f"unregistered {base}\n  Nothing else revoked it, because nothing else agreed to it.")
+        # The key came in with the registration, so it leaves with it -- unless
+        # another registration still names it. A publisher that rotates its key is
+        # then unregistered and registered again, under the same principal.
+        if not any(e["fingerprint"] == gone["fingerprint"] for e in entries.values()):
+            if drop_key(gone["fingerprint"]):
+                print(f"  its key {gone['fingerprint']} is removed from the trust root")
         if not entries:
             print("  fpa.registered is now empty. It still opts this workspace into the model, so\n"
                   "  every catalog is refused until one is registered. Delete the file to opt out.")
@@ -223,27 +248,25 @@ def main(argv):
     # brings it: as a file obtained out of band (--trust), or as a fingerprint
     # obtained out of band (--key), against which the catalog's published key is
     # then checked. Either way the decision was made somewhere else.
-    pin = "latest"
-    if "--pin" in argv:
-        pin = argv[argv.index("--pin") + 1]
+    pin = fpa_roots.flag_value(argv, "--pin", "fp-register") or "latest"
     if pin not in ("latest", "version", "digest"):
         print(f"fp-register: --pin must be latest, version or digest", file=sys.stderr)
         return 2
-    who = argv[argv.index("--as") + 1] if "--as" in argv else (os.environ.get("USER") or "unknown")
+    who = fpa_roots.flag_value(argv, "--as", "fp-register") or os.environ.get("USER") or "unknown"
     if not ONE_WORD.fullmatch(who):
         print(f"fp-register: {who!r} cannot be recorded as who registered -- it must be one word "
               "with no spaces or control characters (set --as)", file=sys.stderr)
         return 2
 
     trust = TrustRoot()
-    want = argv[argv.index("--key") + 1] if "--key" in argv else None
+    want = fpa_roots.flag_value(argv, "--key", "fp-register")
     if want is not None and not want.startswith("SHA256:"):
         print("fp-register: --key takes a fingerprint, SHA256:..., as ssh-keygen -l prints it",
               file=sys.stderr)
         return 2
     if "--trust" in argv or want:
         if "--trust" in argv:
-            src = argv[argv.index("--trust") + 1]
+            src = fpa_roots.flag_value(argv, "--trust", "fp-register")
             text = pathlib.Path(src).read_text()
         else:
             src = f"{base}/allowed_signers"

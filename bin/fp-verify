@@ -40,7 +40,14 @@ for i in "$@"; do
   [ "${prev:-}" = "--manifest-out" ] && manifest_out="$i"
   prev="$i"
 done
+case "${prev:-}" in --from|--context|--manifest-out) echo "fp-verify: $prev needs a value" >&2; exit 2;; esac
 case "$context" in registered|managed) ;; *) echo "fp-verify: --context must be registered or managed" >&2; exit 2;; esac
+# One spelling per catalog: every trailing slash goes, as fp-register strips them.
+while [ "${#from}" -gt 1 ] && [ "$from" != "${from%/}" ]; do from="${from%/}"; done
+case "$from" in
+  gh:*@?*|gh:*@?*/*) ;;
+  gh:*) echo "fp-verify: a gh: catalog is gh:owner/repo@branch -- got $from" >&2; exit 2;;
+esac
 case "$manifest_out" in ""|/*) ;; *) manifest_out="$PWD/$manifest_out";; esac
 
 # Once fpa.registered exists, this workspace has opted into the registered model,
@@ -50,8 +57,9 @@ registering=""
 for i in "$@"; do [ "$i" = "--registering" ] && registering=1; done
 
 if [ -n "$from" ] && [ -z "$registering" ] && [ -f "$ws/fpa.registered" ]; then
-  base_key="${from%/}"
-  if ! awk -v b="$base_key" '$1==b {found=1} END {exit !found}' "$ws/fpa.registered"; then
+  base_key="$from"
+  # ENVIRON, not awk -v: -v reads backslash escapes in the value.
+  if ! B="$base_key" awk '$1==ENVIRON["B"] {found=1} END {exit !found}' "$ws/fpa.registered"; then
     echo "fp-verify: $base_key is not in fpa.registered." >&2
     echo "  This workspace registers the catalogs it accepts. Register it deliberately:" >&2
     echo "    fp-register $base_key --key <the publisher's fingerprint>" >&2
@@ -88,7 +96,7 @@ for f in index.json index.json.sig; do
       # `--` ends the options: what follows is always a path or a URL.
       if [ -f "$from/$f" ]; then
         cp -- "$from/$f" "$work/$f" || { echo "fp-verify: cannot read $from/$f" >&2; exit 2; }
-      elif ! curl -fsS --max-time 20 -o "$work/$f" -- "$from/$f" 2>/dev/null; then
+      elif ! curl -fsS --globoff --proto '=https,http' --max-time 20 -o "$work/$f" -- "$from/$f" 2>/dev/null; then
         echo "fp-verify: cannot fetch $from/$f -- cannot verify, failing closed" >&2; exit 2
       fi
       ;;
@@ -123,7 +131,7 @@ echo "manifest verified: index.json signed by $signer $sigfp"
 # AC2b: the key that signed must be the key this workspace registered. A new key
 # in allowed_signers is not consent; the registration line is.
 if [ -n "$from" ] && [ -z "$registering" ] && [ -f "$ws/fpa.registered" ]; then
-  recorded=$(awk -v b="${from%/}" '$1==b {print $2; exit}' "$ws/fpa.registered")
+  recorded=$(B="$from" awk '$1==ENVIRON["B"] {print $2; exit}' "$ws/fpa.registered")
   if [ -n "$recorded" ] && [ "$recorded" != "$sigfp" ]; then
     echo "fp-verify: ${from%/} is signed by $sigfp but this workspace registered $recorded" >&2
     echo "  The publisher's key changed since somebody agreed to it. If that is expected, re-register deliberately." >&2
@@ -194,9 +202,9 @@ if seen.exists():
         floors = json.loads(seen.read_text())
     except json.JSONDecodeError:
         floors = {}
-# A floor recorded before floors were keyed by signer still counts once, for the
-# key that next signs that catalog: it is retired as soon as a manifest passes it,
-# and from then on the keyed floor takes over.
+# A floor recorded before floors were keyed by signer applies to every key that
+# signs that catalog until the pilot clears it. It cannot say which key set it, so
+# no key's manifest may retire it.
 known = floors.get(floor_key)
 legacy = known is None and catalog in floors
 if legacy:
@@ -213,11 +221,17 @@ if known is not None:
                   f"  serial {floor}, they can delete the \"{catalog}\" entry from {seen};\n"
                   "  nothing clears it on its own.", file=sys.stderr)
         sys.exit(1)
-floors[floor_key] = serial
-floors.pop(catalog, None)
-seen.parent.mkdir(parents=True, exist_ok=True)
-seen.write_text(json.dumps(floors, indent=2, sort_keys=True) + "\n")
+
+def record_floor():
+    """Raise the floor only once everything this run checks has passed: a manifest
+    that is refused for any reason is not one this client has accepted."""
+    floors[floor_key] = serial
+    seen.parent.mkdir(parents=True, exist_ok=True)
+    seen.write_text(json.dumps(floors, indent=2, sort_keys=True) + "\n")
+
+
 if not wanted:
+    record_floor()
     if manifest_out:
         pathlib.Path(manifest_out).write_bytes(pathlib.Path("index.json").read_bytes())
     print(f"manifest current: serial {serial} expires {not_after}")
@@ -281,6 +295,7 @@ soon = (datetime.datetime.strptime(not_after, "%Y-%m-%dT%H:%M:%SZ")
 if soon <= 3:
     print(f"fp-verify: note -- this manifest expires in {soon} day(s), on {not_after}",
           file=sys.stderr)
+record_floor()
 if manifest_out:
     pathlib.Path(manifest_out).write_bytes(pathlib.Path("index.json").read_bytes())
 print(f"authorized: {wanted} v{entry['version']} digest {got[:12]} "

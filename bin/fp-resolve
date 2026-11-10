@@ -154,7 +154,7 @@ def main(argv):
 
     origin = None
     if "--from" in argv:
-        origin = argv[argv.index("--from") + 1].rstrip("/")
+        origin = fpa_roots.flag_value(argv, "--from", "fp-resolve").rstrip("/")
         reg = registered(origin)
         if reg is None:
             print(f"fp-resolve: {origin} is not in fpa.registered.\n"
@@ -195,7 +195,7 @@ def main(argv):
     wanted, _, selector = args[0].partition("@")
     base = None
     if "--base" in argv:
-        base = argv[argv.index("--base") + 1]
+        base = fpa_roots.flag_value(argv, "--base", "fp-resolve")
 
     if wanted in known:
         version, asked = select(known[wanted], selector)
