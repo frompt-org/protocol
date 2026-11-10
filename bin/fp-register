@@ -304,6 +304,7 @@ def main(argv):
     fp = None
     for line in proc.stdout.splitlines():
         if line.startswith("manifest verified:") and " via certificate from authority " in line:
+            trust.restore()
             print(f"fp-register: {base} is signed under a certificate, not by a key.\n"
                   + AUTHORITY_RESERVED, file=sys.stderr)
             return 1

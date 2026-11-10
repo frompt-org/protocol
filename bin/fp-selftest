@@ -764,6 +764,12 @@ check "fp-register refuses an authority's fingerprint before touching the trust 
 "$here/bin/fp-register" "$ca/cat" >/dev/null 2>&1 </dev/null
 rc=$?; [ $rc -eq 1 ] && [ ! -e "$ca/ws/fpa.registered" ]
 check "fp-register refuses a catalog signed under a certificate, even with the authority trusted" 0 $?
+mkdir -p "$ca/fresh2"; cp "$ca/ws/allowed_signers" "$ca/fresh2/"
+printf 'other@docs.example.org %s\n' "$(cut -d' ' -f1,2 "$ca/rogue.pub")" > "$ca/rogue.signers"
+signers_before=$(shasum < "$ca/fresh2/allowed_signers")
+FPA_WORKSPACE="$ca/fresh2" "$here/bin/fp-register" "$ca/cat" --trust "$ca/rogue.signers" >/dev/null 2>&1 </dev/null
+rc=$?; [ $rc -eq 1 ] && [ "$(shasum < "$ca/fresh2/allowed_signers")" = "$signers_before" ]
+check "refusing a catalog signed under a certificate also takes back the keys it added" 0 $?
 printf '%s %s latest 2026-01-01 selftest\n' "$ca/cat" "$cafp" > "$ca/ws/fpa.registered"
 "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
 check "a registered catalog signed under a certificate is refused (AC2b, M7b)" 1 $?
