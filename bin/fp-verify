@@ -52,11 +52,9 @@ case "$manifest_out" in ""|/*) ;; *) manifest_out="$PWD/$manifest_out";; esac
 
 # Once fpa.registered exists, this workspace has opted into the registered model,
 # and a catalog absent from it was never agreed to. A workspace with no such file
-# is simply not using the model, so nothing changes for it.
-registering=""
-for i in "$@"; do [ "$i" = "--registering" ] && registering=1; done
-
-if [ -n "$from" ] && [ -z "$registering" ] && [ -f "$ws/fpa.registered" ]; then
+# is simply not using the model, so nothing changes for it. There is no flag that
+# skips this: fp-register verifies a catalog in a trial workspace of its own.
+if [ -n "$from" ] && [ -f "$ws/fpa.registered" ]; then
   base_key="$from"
   # ENVIRON, not awk -v: -v reads backslash escapes in the value.
   if ! B="$base_key" awk '$1==ENVIRON["B"] {found=1} END {exit !found}' "$ws/fpa.registered"; then
@@ -133,7 +131,7 @@ sigfp=$(printf '%s\n' "$verified" | sed -n 's/.* key \(SHA256:[^ ]*\).*/\1/p' | 
 # key's own fingerprint is not an identity worth pinning or keying a floor on.
 # ssh-keygen names only the certified key, so the certificate is read back out of
 # the signature itself.
-authority=""; floor_id="$sigfp"
+authority=""; floor_id="$signer"
 if printf '%s\n' "$verified" | grep -q -- '-CERT key '; then
   certinfo=$(python3 - index.json.sig "$sigfp" <<'PY'
 import base64, binascii, struct, subprocess, sys
@@ -194,7 +192,7 @@ fi
 
 # AC2b: the key that signed must be the key this workspace registered. A new key
 # in allowed_signers is not consent; the registration line is.
-if [ -n "$from" ] && [ -z "$registering" ] && [ -f "$ws/fpa.registered" ]; then
+if [ -n "$from" ] && [ -f "$ws/fpa.registered" ]; then
   recorded=$(B="$from" awk '$1==ENVIRON["B"] {print $2; exit}' "$ws/fpa.registered")
   # A registration records one key. An authority vouches for many principals, so
   # pinning it alone would let any of them sign this catalog; until a registration
@@ -232,7 +230,7 @@ import hashlib, json, os, pathlib, sys, urllib.request
 sys.path.insert(0, sys.argv[9])
 import fpa_roots
 wanted, base, root, origin = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3]), sys.argv[4]
-context, manifest_out, signed_by = sys.argv[5], sys.argv[6], sys.argv[7]
+context, manifest_out, signer = sys.argv[5], sys.argv[6], sys.argv[7]
 # A relative --from names a directory where the caller stood; this runs elsewhere.
 origin_path = origin if origin.startswith(("/", "gh:")) or "://" in origin else os.path.join(sys.argv[8], origin)
 manifest = json.load(open("index.json"))
@@ -262,13 +260,34 @@ if now > not_after:
 # `base` alone fixed that and opened the reverse: `base` is inside the signed
 # bytes, so nobody can edit it, but any publisher this client trusts can SIGN a
 # manifest naming another catalog's base at serial 999999 -- and every real
-# manifest from that catalog was then refused as a rollback. A floor only the
-# key that set it can raise is a floor nobody else can poison.
-# Under a certificate (M7b) the "key" here is the authority and the principal it
+# manifest from that catalog was then refused as a rollback. A floor only its own
+# signer can raise is a floor nobody else can poison. The signer is the principal
+# the signature verified as, not the key, so a publisher that rotates its key
+# keeps its floor (M6).
+# Under a certificate (M7b) the signer is the authority and the principal it
 # certified, so builders certified by one authority cannot poison each other either.
 seen = root / ".fpa" / "manifest-serials.json"
 catalog = manifest.get("base", "")
-floor_key = f"{catalog} {signed_by}"
+if not catalog:
+    print("fp-verify: the manifest names no base -- refusing", file=sys.stderr)
+    sys.exit(1)
+floor_key = f"{catalog} {signer}"
+
+# One signer per catalog (M6b). The first signer whose manifest naming a base this
+# client accepted is the one it accepts for that base from then on: another
+# publisher this client also trusts can sign a manifest naming the same base, and
+# that is a refusal here, not a second source for the same catalog.
+bound_file = root / ".fpa" / "catalog-signers.json"
+try:
+    bound = json.loads(bound_file.read_text()) if bound_file.exists() else {}
+except json.JSONDecodeError:
+    bound = {}
+if bound.get(catalog, signer) != signer:
+    print(f"fp-verify: {catalog} is signed by {signer}, but this workspace accepts that catalog "
+          f"from {bound[catalog]} only.\n"
+          "  A catalog's manifests come from one signer. If its publisher deliberately moved to a\n"
+          f"  new one, the pilot deletes the \"{catalog}\" entry from {bound_file}.", file=sys.stderr)
+    sys.exit(1)
 serial = int(manifest.get("serial", 0))
 floors = {}
 if seen.exists():
@@ -287,7 +306,7 @@ if known is not None:
     floor = int(known)
     if serial < floor:
         print(f"fp-verify: manifest serial {serial} from {catalog} is older than {floor}, "
-              "already seen from that catalog" + ("" if legacy else " under this key") + ".\n"
+              "already seen from that catalog" + ("" if legacy else f" signed by {signer}") + ".\n"
               "  A validly signed but stale manifest is a rollback. Refusing.", file=sys.stderr)
         if legacy:
             print(f"  That floor was recorded before floors were kept per signing key, so this tool\n"
@@ -302,6 +321,9 @@ def record_floor():
     floors[floor_key] = serial
     seen.parent.mkdir(parents=True, exist_ok=True)
     seen.write_text(json.dumps(floors, indent=2, sort_keys=True) + "\n")
+    if catalog not in bound:
+        bound[catalog] = signer
+        bound_file.write_text(json.dumps(bound, indent=2, sort_keys=True) + "\n")
 
 
 if not wanted:

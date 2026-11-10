@@ -8,13 +8,17 @@
 #
 #   fp-sign                        # sign index.json with .fpa/signing_key
 #   fp-sign --keygen               # create that key if it does not exist
-#   FPA_SIGNING_KEY=~/.ssh/id_ed25519 fp-sign
+#   fp-sign --catalog DIR          # name the catalog instead of standing in it
+#   FPA_SIGNING_KEY=~/.ssh/id_ed25519 fp-sign --catalog DIR
 #
 # A key with a certificate beside it (<key>-cert.pub, or FPA_SIGNING_CERT) signs
 # as that certificate, for clients that trust its authority (FPA.md M7b).
 #
-# It signs the catalog bin/fpa_roots.py finds: FPA_CATALOG, else the nearest
-# directory upward holding frompt-catalog.json, else this checkout. The identity
+# It signs the catalog named by --catalog or FPA_CATALOG, else the one
+# bin/fpa_roots.py finds: the nearest directory upward holding
+# frompt-catalog.json, else this checkout. A key from outside the catalog
+# (FPA_SIGNING_KEY) signs only a catalog named explicitly: finding one by where
+# you stand is a convenience for the catalog's own key. The identity
 # is FPA_SIGNING_IDENTITY, else the catalog's `identity`, else
 # foreign-prompts-publisher.
 #
@@ -26,7 +30,26 @@
 # enough to forge.
 set -euo pipefail
 tools=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-here=$(python3 "$tools/bin/fpa_roots.py" catalog)
+keygen=""; named="${FPA_CATALOG:-}"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --keygen) keygen=1 ;;
+    --catalog) [ $# -ge 2 ] || { echo "fp-sign: --catalog needs a value" >&2; exit 2; }
+               named="$2"; shift ;;
+    *) echo "fp-sign: unknown argument $1" >&2; exit 2 ;;
+  esac
+  shift
+done
+if [ -n "${FPA_SIGNING_KEY:-}" ] && [ -z "$named" ]; then
+  echo "fp-sign: FPA_SIGNING_KEY is set, so name the catalog to sign with --catalog DIR (or FPA_CATALOG)." >&2
+  echo "  A key from outside a catalog signs only a catalog somebody named, never the one you stand in." >&2
+  exit 2
+fi
+if [ -n "$named" ]; then
+  here=$(cd "$named" 2>/dev/null && pwd) || { echo "fp-sign: no catalog directory at $named" >&2; exit 2; }
+else
+  here=$(python3 "$tools/bin/fpa_roots.py" catalog)
+fi
 cd "$here"
 
 key="${FPA_SIGNING_KEY:-$here/.fpa/signing_key}"
@@ -35,7 +58,7 @@ configured=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get
 identity="${FPA_SIGNING_IDENTITY:-${configured:-foreign-prompts-publisher}}"
 case "$identity" in *[[:space:],]*|"") echo "fp-sign: identity '$identity' cannot contain spaces or commas -- it is an allowed_signers principal" >&2; exit 2;; esac
 
-if [ "${1:-}" = "--keygen" ]; then
+if [ -n "$keygen" ]; then
   mkdir -p "$(dirname "$key")"
   if [ -f "$key" ]; then
     echo "fp-sign: $key already exists; refusing to overwrite a signing key" >&2

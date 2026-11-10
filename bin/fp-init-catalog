@@ -84,7 +84,13 @@ WORKFLOW = """# renew -- re-sign this catalog's manifest before it expires (FPA.
 # A manifest carries not_after, and past it every client refuses the catalog: that is
 # what stops an old signed manifest being replayed. Something has to re-sign it. This
 # job does, weekly, once fewer than ten days remain -- if you give it the key, as the
-# repository secret FPA_SIGNING_KEY (the contents of .fpa/signing_key).
+# secret FPA_SIGNING_KEY (the contents of .fpa/signing_key) of the GitHub environment
+# frompt-signing. Give that environment required reviewers, so each renewal waits for
+# a person, and limit it to the default branch.
+#
+# It renews and does nothing else: it re-signs only a manifest this same key already
+# signed, and only if the documents are still the ones that manifest lists. New
+# content is published by hand (fp-index, review, fp-sign, commit).
 #
 # A key in CI is a key your CI provider can use. If that is not acceptable, leave the
 # secret unset: the job then only warns, and you renew by hand
@@ -98,11 +104,13 @@ permissions:
   contents: write
 jobs:
   renew:
+    if: github.ref == format('refs/heads/{{0}}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
+    environment: frompt-signing
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - name: the tools, pinned to the commit this catalog was made with
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           repository: frompt-org/protocol
           ref: {ref}
@@ -119,12 +127,19 @@ jobs:
             exit 0
           fi
           umask 077
+          trap 'rm -rf .fpa' EXIT
           mkdir -p .fpa
           printf '%s\\n' "$FPA_SIGNING_KEY_MATERIAL" > .fpa/signing_key
           ssh-keygen -y -f .fpa/signing_key > .fpa/signing_key.pub
+          # Only a manifest this key signed is renewed, and fp-index --renew refuses
+          # documents that manifest does not list: together, nothing new is signed.
+          printf 'renewer namespaces="foreign-prompts" %s\\n' "$(cut -d' ' -f1,2 .fpa/signing_key.pub)" > .fpa/self
+          if ! ssh-keygen -Y verify -f .fpa/self -I renewer -n foreign-prompts -s index.json.sig < index.json >/dev/null 2>&1; then
+            echo "::error::index.json is not the manifest this key last signed -- not renewing"
+            exit 1
+          fi
           .frompt-tools/bin/fp-index --renew
           .frompt-tools/bin/fp-sign
-          rm -rf .fpa
           git config user.name renew
           git config user.email renew@frompt
           git add index.json index.json.sig INDEX.md allowed_signers

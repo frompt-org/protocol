@@ -23,7 +23,7 @@ catalogs), [SkillSpector](https://github.com/NVIDIA/SkillSpector) (`fp-assay`), 
 
 **Two places, kept apart.** A **workspace** is what a client trusts: `allowed_signers` (the keys
 it trusts), `fpa.registered` (which catalogs it consented to), `fpa.lock` and `.fpa/` (freshness
-floors, adoption record). It is `FPA_WORKSPACE`, else this checkout; set `FPA_WORKSPACE=~/.config/frompt`
+floors, catalog bindings, adoption record). It is `FPA_WORKSPACE`, else this checkout; set `FPA_WORKSPACE=~/.config/frompt`
 for one per user. A **catalog** is what a publisher signs: `frompt-catalog.json`, `prompts/`, the
 manifest and its signature, the published key, and `.fpa/signing_key`. The tools that build one
 (`fp-index`, `fp-sign`, `fp-publish`) use `FPA_CATALOG`, else the catalog you stand in (the nearest

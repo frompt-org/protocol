@@ -6,7 +6,7 @@
 #   acme     publishes https://catalog.acme.example and hands out a fingerprint
 #   client   registers it by that fingerprint, pins a version, resolves by id
 #   globex   another publisher the client trusts, signing a manifest that names
-#            acme's catalog -- which must change nothing about acme
+#            acme's catalog -- which is refused and changes nothing about acme
 #
 # A directory stands in for each domain: the client's --from is that directory
 # where in production it would be the https URL. Everything is checked the same
@@ -74,8 +74,9 @@ open(sys.argv[2], "w").write(json.dumps(m, indent=2, sort_keys=True) + "\n")
 PY
 rm -f "$globex/index.json.sig"
 ssh-keygen -Y sign -f "$globex/.fpa/signing_key" -n foreign-prompts "$globex/index.json" 2>/dev/null
-"$tools/fp-verify" --from "$globex" | tail -1
-echo "acme's catalog is untouched -- a freshness floor is raised only by the key that set it:"
+expect_refusal "a manifest for acme's catalog signed by somebody other than acme" \
+  "$tools/fp-verify" --from "$globex"
+echo "acme's catalog is untouched -- this client takes it from acme's signer only:"
 "$tools/fp-verify" standup --from "$acme" | tail -1 | cut -c1-90
 
 step "7. Someone swaps acme's key at the host -- manifest, signature and published key"
