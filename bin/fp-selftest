@@ -867,6 +867,7 @@ check "an uncertified key is refused when the trust root names only an authority
 casign 6 "$ca/stale-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
 check "an expired certificate is refused, whatever the manifest's not_after says" 1 $?
 casign 999999 "$ca/second-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "a second principal of the same authority cannot sign a catalog the first one signs (M6b)" 1 $?
 casign 6 "$ca/builder-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
 check "one principal under an authority cannot raise another principal's freshness floor" 0 $?
 casign 4 "$ca/builder-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
@@ -877,6 +878,14 @@ casign 7 "$ca/builder-cert.pub"; cp "$ca/ws/allowed_signers" "$ca/cat/allowed_si
 FPA_WORKSPACE="$ca/fresh" "$here/bin/fp-register" "$ca/cat" --key "$cafp" >/dev/null 2>&1 </dev/null
 rc=$?; [ $rc -eq 1 ] && [ ! -e "$ca/fresh/allowed_signers" ] && [ ! -e "$ca/fresh/fpa.registered" ]
 check "fp-register refuses an authority's fingerprint before touching the trust root" 0 $?
+r=""
+for form in 'CERT-AUTHORITY,namespaces="foreign-prompts"' 'namespaces="x y,foreign-prompts",cert-authority'; do
+  rm -rf "$ca/served" "$ca/served-ws"; cp -R "$ca/cat" "$ca/served"; mkdir -p "$ca/served-ws"
+  printf '*@docs.example.org %s %s\n' "$form" "$(cut -d' ' -f1,2 "$ca/authority.pub")" > "$ca/served/allowed_signers"
+  out=$(FPA_WORKSPACE="$ca/served-ws" "$here/bin/fp-register" "$ca/served" --key "$cafp" 2>&1 </dev/null)
+  rc=$?; printf '%s' "$out" | grep -q 'names a certificate authority' && r="$r$rc " || r="${r}missed "
+done
+check "an authority line is recognised in any letter case and with quoted option values" "1 1 " "$r"
 "$here/bin/fp-register" "$ca/cat" >/dev/null 2>&1 </dev/null
 rc=$?; [ $rc -eq 1 ] && [ ! -e "$ca/ws/fpa.registered" ]
 check "fp-register refuses a catalog signed under a certificate, even with the authority trusted" 0 $?

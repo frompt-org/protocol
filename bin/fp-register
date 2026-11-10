@@ -113,9 +113,10 @@ def publisher_line(line, src):
 
 
 def is_authority(line):
-    """True for an allowed_signers line that names a certificate authority."""
-    parts = line.split()
-    return len(parts) > 2 and "cert-authority" in parts[1].split(",")
+    """True for an allowed_signers line that names a certificate authority, read
+    the way OpenSSH reads it: quoted option values intact, option names in any case."""
+    entry = fpa_roots.signers_entry(line)
+    return bool(entry) and any(name == "cert-authority" for name, _ in entry[1])
 
 
 AUTHORITY_RESERVED = (
