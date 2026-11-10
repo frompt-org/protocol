@@ -33,14 +33,28 @@ tools=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 catalog=$(python3 "$tools/bin/fpa_roots.py" catalog --no-discover) || exit 2
 ws=$(python3 "$tools/bin/fpa_roots.py" workspace) || exit 2
 
-from=""; context="managed"; manifest_out=""
+# The prompt id is the one argument that is not a flag or a flag's value, wherever
+# it stands: an id after the flags was once ignored, and the run then checked the
+# manifest alone and exited 0.
+from=""; context="managed"; manifest_out=""; base=""; id=""; prev=""
 for i in "$@"; do
-  [ "${prev:-}" = "--from" ] && from="$i"
-  [ "${prev:-}" = "--context" ] && context="$i"
-  [ "${prev:-}" = "--manifest-out" ] && manifest_out="$i"
+  case "$prev" in
+    --from|--context|--manifest-out|--base)
+      case "$i" in --*) echo "fp-verify: $prev needs a value" >&2; exit 2;; esac
+      case "$prev" in
+        --from) from="$i" ;; --context) context="$i" ;;
+        --manifest-out) manifest_out="$i" ;; --base) base="$i" ;;
+      esac
+      prev=""; continue ;;
+  esac
+  case "$i" in
+    -*) ;;
+    *) [ -z "$id" ] || { echo "fp-verify: one prompt id at a time -- got $id and $i" >&2; exit 2; }
+       id="$i" ;;
+  esac
   prev="$i"
 done
-case "${prev:-}" in --from|--context|--manifest-out) echo "fp-verify: $prev needs a value" >&2; exit 2;; esac
+case "$prev" in --from|--context|--manifest-out|--base) echo "fp-verify: $prev needs a value" >&2; exit 2;; esac
 case "$context" in registered|managed) ;; *) echo "fp-verify: --context must be registered or managed" >&2; exit 2;; esac
 # One spelling per catalog: every trailing slash goes, as fp-register strips them.
 while [ "${#from}" -gt 1 ] && [ "$from" != "${from%/}" ]; do from="${from%/}"; done
@@ -71,8 +85,7 @@ command -v ssh-keygen >/dev/null || { echo "fp-verify: ssh-keygen not found" >&2
 
 # Everything is checked in a scratch directory: the manifest and its signature
 # (fetched, or copied from the local catalog) beside a copy of the trust root.
-work=$(mktemp -d 2>/dev/null || echo "/tmp/fp-verify-$$") || exit 2
-mkdir -p "$work" || exit 2
+work=$(mktemp -d) || { echo "fp-verify: cannot make a scratch directory -- failing closed" >&2; exit 2; }
 trap 'rm -rf "$work"' EXIT
 for f in index.json index.json.sig; do
   case "$from" in
@@ -90,13 +103,14 @@ for f in index.json index.json.sig; do
         exit 2
       fi
       ;;
-    *)
-      # `--` ends the options: what follows is always a path or a URL.
-      if [ -f "$from/$f" ]; then
-        cp -- "$from/$f" "$work/$f" || { echo "fp-verify: cannot read $from/$f" >&2; exit 2; }
-      elif ! curl -fsS --globoff --proto '=https,http' --max-time 20 -o "$work/$f" -- "$from/$f" 2>/dev/null; then
+    *://*)
+      # A URL is fetched, never looked up as a path: `--` ends the options.
+      if ! curl -fsS --globoff --proto '=https,http' --max-time 20 -o "$work/$f" -- "$from/$f" 2>/dev/null; then
         echo "fp-verify: cannot fetch $from/$f -- cannot verify, failing closed" >&2; exit 2
       fi
+      ;;
+    *)
+      cp -- "$from/$f" "$work/$f" 2>/dev/null || { echo "fp-verify: cannot read $from/$f -- cannot verify, failing closed" >&2; exit 2; }
       ;;
   esac
 done
@@ -124,6 +138,13 @@ fi
 # name, which is some other key whenever two publishers chose the same one.
 sigfp=$(printf '%s\n' "$verified" | sed -n 's/.* key \(SHA256:[^ ]*\).*/\1/p' | head -1)
 [ -n "$sigfp" ] || { echo "fp-verify: the signature verified but ssh-keygen did not name its key -- failing closed" >&2; exit 2; }
+# This client trusts keys. A signature made under a certificate needs the
+# authority and its principal to be told apart, which this version does not do,
+# so it is refused rather than half understood.
+if printf '%s\n' "$verified" | grep -q -- '-CERT key '; then
+  echo "fp-verify: index.json is signed under a certificate; this client trusts keys, not certificate authorities. Refusing." >&2
+  exit 1
+fi
 echo "manifest verified: index.json signed by $signer $sigfp"
 
 # AC2b: the key that signed must be the key this workspace registered. A new key
@@ -139,18 +160,6 @@ fi
 
 # With no prompt id the manifest itself is still checked for expiry and freshness:
 # a valid signature on a stale manifest is not a current manifest.
-id=""
-if [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then id="$1"; shift; fi
-base=""
-if [ "${1:-}" = "--base" ]; then
-  # ${2:-} not $2: with set -u a missing value crashed the script and exited 1,
-  # which on the managed path reads as "not verified" rather than "cannot check".
-  base="${2:-}"
-  if [ -z "$base" ]; then
-    echo "fp-verify: --base given without a directory -- cannot check, failing closed" >&2
-    exit 2
-  fi
-fi
 
 case "$base" in ""|/*|*://*|gh:*) ;; *) base="$orig_pwd/$base";; esac
 python3 - "$id" "$base" "$ws" "$from" "$context" "$manifest_out" "$signer" "$orig_pwd" "$tools/bin" <<'PY'
@@ -169,9 +178,9 @@ manifest = json.load(open("index.json"))
 import datetime
 now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 not_after = manifest.get("not_after")
-if not not_after:
-    print("fp-verify: manifest carries no not_after -- cannot tell a current manifest from a "
-          "replayed one. Refusing.", file=sys.stderr)
+if not fpa_roots.valid_stamp(not_after):
+    print("fp-verify: manifest carries no not_after in the form 2026-12-01T08:57:00Z -- cannot "
+          "tell a current manifest from a replayed one. Refusing.", file=sys.stderr)
     sys.exit(1)
 if now > not_after:
     print(f"fp-verify: manifest expired at {not_after} (now {now}).\n"
@@ -192,64 +201,102 @@ if now > not_after:
 # signer can raise is a floor nobody else can poison. The signer is the principal
 # the signature verified as, not the key, so a publisher that rotates its key
 # keeps its floor (M6).
-seen = root / ".fpa" / "manifest-serials.json"
-catalog = manifest.get("base", "")
-if not catalog:
-    print("fp-verify: the manifest names no base -- refusing", file=sys.stderr)
+raw_base = manifest.get("base")
+if not fpa_roots.valid_base(raw_base):
+    print(f"fp-verify: the manifest's base {raw_base!r} is neither an http(s) address nor an "
+          "absolute path in plain printable characters -- refusing", file=sys.stderr)
+    sys.exit(1)
+catalog = fpa_roots.normalize_base(raw_base)
+serial = manifest.get("serial")
+if not isinstance(serial, int) or isinstance(serial, bool) or serial < 1:
+    print(f"fp-verify: the manifest's serial {serial!r} is not a positive whole number -- refusing",
+          file=sys.stderr)
     sys.exit(1)
 floor_key = f"{catalog} {signer}"
+# The address the manifest was fetched from, spelled one way: a directory as its
+# absolute path, a URL normalised like a base.
+address = None
+if origin:
+    address = fpa_roots.normalize_base(
+        origin if origin.startswith("gh:") or "://" in origin else os.path.abspath(origin_path))
 
-# One signer per catalog (M6b). The first signer whose manifest naming a base this
-# client accepted is the one it accepts for that base from then on: another
-# publisher this client also trusts can sign a manifest naming the same base, and
-# that is a refusal here, not a second source for the same catalog.
-bound_file = root / ".fpa" / "catalog-signers.json"
-try:
-    bound = json.loads(bound_file.read_text()) if bound_file.exists() else {}
-except json.JSONDecodeError:
-    bound = {}
-if bound.get(catalog, signer) != signer:
-    print(f"fp-verify: {catalog} is signed by {signer}, but this workspace accepts that catalog "
-          f"from {bound[catalog]} only.\n"
-          "  A catalog's manifests come from one signer. If its publisher deliberately moved to a\n"
-          f"  new one, the pilot deletes the \"{catalog}\" entry from {bound_file}.", file=sys.stderr)
-    sys.exit(1)
-serial = int(manifest.get("serial", 0))
-floors = {}
-if seen.exists():
-    try:
-        floors = json.loads(seen.read_text())
-    except json.JSONDecodeError:
-        floors = {}
-# A floor recorded before floors were keyed by signer applies to every key that
-# signs that catalog until the pilot clears it. It cannot say which key set it, so
-# no key's manifest may retire it.
-known = floors.get(floor_key)
-legacy = known is None and catalog in floors
-if legacy:
-    known = floors[catalog]
-if known is not None:
-    floor = int(known)
-    if serial < floor:
-        print(f"fp-verify: manifest serial {serial} from {catalog} is older than {floor}, "
-              "already seen from that catalog" + ("" if legacy else f" signed by {signer}") + ".\n"
-              "  A validly signed but stale manifest is a rollback. Refusing.", file=sys.stderr)
+
+def state_refusal(exc):
+    print(f"fp-verify: {exc}.\n"
+          "  This workspace cannot read what it has already accepted, so it cannot check anything\n"
+          "  against it. Failing closed. Restore the file, or have the pilot remove it deliberately.",
+          file=sys.stderr)
+    sys.exit(2)
+
+
+# One signer per catalog, one catalog per address (M6b). The first signer whose
+# manifest naming a base this client accepted is the one it accepts for that base
+# from then on, and an address that served one catalog serves that one: a second
+# publisher this client also trusts can sign a manifest naming the same base, or
+# serve its own catalog at another's address, and both are refusals here.
+def problem(floors, signers, addresses):
+    bound = signers.get(catalog)
+    if bound is not None and bound != signer:
+        return (f"fp-verify: {catalog} is signed by {signer}, but this workspace accepts that "
+                f"catalog from {bound} only.\n"
+                "  A catalog's manifests come from one signer. If its publisher deliberately moved to a\n"
+                f"  new one, the pilot deletes the \"{catalog}\" entry from "
+                f"{fpa_roots.state_path(root, 'signers')}.")
+    if address is not None and addresses.get(address, catalog) != catalog:
+        return (f"fp-verify: {address} served the catalog {addresses[address]} before, and now "
+                f"serves {catalog}.\n"
+                "  An address serves one catalog. If that change is deliberate, the pilot deletes the\n"
+                f"  \"{address}\" entry from {fpa_roots.state_path(root, 'addresses')}.")
+    # A floor recorded before floors were keyed by signer applies to every key that
+    # signs that catalog until the pilot clears it. It cannot say which key set it,
+    # so no key's manifest may retire it.
+    known, legacy = floors.get(floor_key), None
+    if known is None:
+        legacy = next((k for k in (catalog, raw_base) if k in floors), None)
+        known = floors[legacy] if legacy else None
+    if known is not None and serial < known:
+        text = (f"fp-verify: manifest serial {serial} from {catalog} is older than {known}, already "
+                "seen from that catalog" + ("" if legacy else f" signed by {signer}") + ".\n"
+                "  A validly signed but stale manifest is a rollback. Refusing.")
         if legacy:
-            print(f"  That floor was recorded before floors were kept per signing key, so this tool\n"
-                  f"  cannot tell which key set it. If the pilot is sure this catalog never published\n"
-                  f"  serial {floor}, they can delete the \"{catalog}\" entry from {seen};\n"
-                  "  nothing clears it on its own.", file=sys.stderr)
-        sys.exit(1)
+            text += (f"\n  That floor was recorded before floors were kept per signer, so this tool\n"
+                     f"  cannot tell which key set it. If the pilot is sure this catalog never published\n"
+                     f"  serial {known}, they can delete the \"{legacy}\" entry from "
+                     f"{fpa_roots.state_path(root, 'floors')};\n  nothing clears it on its own.")
+        return text
+    return None
+
+
+try:
+    found = problem(*fpa_roots.read_trust_state(root))
+except fpa_roots.StateError as exc:
+    state_refusal(exc)
+if found:
+    print(found, file=sys.stderr)
+    sys.exit(1)
+
 
 def record_floor():
-    """Raise the floor only once everything this run checks has passed: a manifest
-    that is refused for any reason is not one this client has accepted."""
-    floors[floor_key] = serial
-    seen.parent.mkdir(parents=True, exist_ok=True)
-    seen.write_text(json.dumps(floors, indent=2, sort_keys=True) + "\n")
-    if catalog not in bound:
-        bound[catalog] = signer
-        bound_file.write_text(json.dumps(bound, indent=2, sort_keys=True) + "\n")
+    """Raise the floor and record the bindings only once everything this run checks
+    has passed: a manifest that is refused for any reason is not one this client has
+    accepted. Under the lock the state is read again and checked again, because
+    another run may have accepted something in the meantime."""
+    with fpa_roots.state_lock(root):
+        try:
+            floors, signers, addresses = fpa_roots.read_trust_state(root)
+        except fpa_roots.StateError as exc:
+            state_refusal(exc)
+        found = problem(floors, signers, addresses)
+        if found:
+            print(found, file=sys.stderr)
+            sys.exit(1)
+        floors[floor_key] = max(serial, floors.get(floor_key, 0))
+        signers.setdefault(catalog, signer)
+        fpa_roots.write_state(root, "floors", floors)
+        fpa_roots.write_state(root, "signers", signers)
+        if address is not None:
+            addresses.setdefault(address, catalog)
+            fpa_roots.write_state(root, "addresses", addresses)
 
 
 if not wanted:
@@ -272,6 +319,11 @@ if entry is None:
           f"Published: {have}", file=sys.stderr)
     sys.exit(1)
 entry = dict(entry, id=wanted)
+if not (fpa_roots.valid_id(wanted) and fpa_roots.valid_version(entry.get("version"))
+        and fpa_roots.valid_digest(entry.get("digest"))):
+    print(f"fp-verify: the signed manifest gives {wanted!r} an id, version or digest this client "
+          "does not accept -- refusing", file=sys.stderr)
+    sys.exit(1)
 if not fpa_roots.safe_file(entry.get("file")):
     print(f"fp-verify: the signed manifest gives {wanted} the file {entry.get('file')!r}, which is "
           "not a plain path under prompts/ -- refusing", file=sys.stderr)

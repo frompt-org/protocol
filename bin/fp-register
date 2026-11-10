@@ -39,6 +39,7 @@ import os
 import pathlib
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -144,16 +145,16 @@ def extend_trust(lines, source, local):
         for l in local.read_text().splitlines():
             k = key_of(l)
             if k:
-                have.setdefault(k[0], set()).add(k[1])
+                have.setdefault(k[0].lower(), set()).add(k[1])
     added = []
     for line in lines:
         k = key_of(line)
         if not k:
             continue
         principal, key = k
-        if key in have.get(principal, set()):
+        if key in have.get(principal.lower(), set()):
             continue
-        if principal in have:
+        if principal.lower() in have:
             print(f"fp-register: the principal {principal!r} already names a different key in "
                   "the trust root.\n  Two publishers under one name would make 'signed by {principal}' "
                   "mean either of them. Ask the publisher, or edit the trust root deliberately.",
@@ -162,7 +163,7 @@ def extend_trust(lines, source, local):
         local.parent.mkdir(parents=True, exist_ok=True)
         with local.open("a") as f:
             f.write(line.rstrip("\n") + "\n")
-        have.setdefault(principal, set()).add(key)
+        have.setdefault(principal.lower(), set()).add(key)
         added.append(f"{principal} {fingerprint(key)}")
     return added
 
@@ -179,9 +180,11 @@ class Trial:
     itself, not whether it is registered yet. Nothing in the real workspace changes
     until commit(), so a refusal needs no undoing."""
 
-    FILES = ("allowed_signers", ".fpa/manifest-serials.json", ".fpa/catalog-signers.json")
+    FILES = ("allowed_signers",) + tuple(f".fpa/{name}" for name in fpa_roots.STATE.values())
 
     def __init__(self):
+        # A workspace whose state cannot be read is not one to register into.
+        fpa_roots.read_trust_state(WS)
         self.dir = pathlib.Path(tempfile.mkdtemp(prefix="fp-register-"))
         for name in self.FILES:
             if (WS / name).exists():
@@ -192,30 +195,46 @@ class Trial:
     def discard(self):
         shutil.rmtree(self.dir, ignore_errors=True)
 
-    def commit(self):
-        """Fold the trial into the workspace: keys added, floors raised, bindings
-        recorded. Merged rather than copied, so nothing the workspace learned in
-        the meantime is lost and no floor moves down."""
-        WS.mkdir(parents=True, exist_ok=True)
-        local = WS / "allowed_signers"
-        have = local.read_text().splitlines() if local.exists() else []
-        new = [l for l in (self.trust.read_text().splitlines() if self.trust.exists() else [])
-               if l not in have]
-        if new:
-            local.write_text("\n".join(have + new) + "\n")
-        for name, merge in ((".fpa/manifest-serials.json", lambda a, b: max(int(a), int(b))),
-                            (".fpa/catalog-signers.json", lambda a, b: a)):
-            src = self.dir / name
-            if not src.exists():
-                continue
-            dst = WS / name
-            mine = json.loads(dst.read_text()) if dst.exists() else {}
-            for k, v in json.loads(src.read_text()).items():
-                mine[k] = merge(mine[k], v) if k in mine else v
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            dst.write_text(json.dumps(mine, indent=2, sort_keys=True) + "\n")
+    def commit(self, base, record):
+        """Fold the trial into the workspace and record the registration. Under the
+        state lock everything is read again and checked first -- the workspace's
+        state, any binding it already holds, the registration it may already have --
+        and only then written, each file whole: floors and bindings first, then the
+        registration, and the trust root last, so that a run stopped part way leaves
+        a key that is not trusted rather than one trusted without a registration."""
+        with fpa_roots.state_lock(WS):
+            floors, signers, addresses = fpa_roots.read_trust_state(WS)
+            t_floors, t_signers, t_addresses = fpa_roots.read_trust_state(self.dir)
+            for mine, theirs, what in ((signers, t_signers, "signer"), (addresses, t_addresses, "catalog")):
+                for k, v in theirs.items():
+                    if mine.get(k, v) != v:
+                        raise Refused(f"this workspace binds {k} to the {what} {mine[k]}, not {v}")
+            entries = parse()
+            was = entries.get(base)
+            if was and was["fingerprint"] != record["fingerprint"]:
+                raise Refused(f"{base} was registered against key {was['fingerprint']} meanwhile")
+            for k, v in t_floors.items():
+                floors[k] = max(v, floors.get(k, v))
+            for mine, theirs in ((signers, t_signers), (addresses, t_addresses)):
+                for k, v in theirs.items():
+                    mine.setdefault(k, v)
+            local = WS / "allowed_signers"
+            have = local.read_text().splitlines() if local.exists() else []
+            new = [l for l in (self.trust.read_text().splitlines() if self.trust.exists() else [])
+                   if l not in have]
+            entries[base] = record
+            fpa_roots.write_state(WS, "floors", floors)
+            fpa_roots.write_state(WS, "signers", signers)
+            fpa_roots.write_state(WS, "addresses", addresses)
+            fpa_roots.write_text_atomic(FILE, render(entries))
+            if new:
+                fpa_roots.write_text_atomic(local, "\n".join(have + new) + "\n")
         self.discard()
         return new
+
+
+class Refused(Exception):
+    """A registration this run will not record."""
 
 
 def drop_key(fp):
@@ -231,7 +250,7 @@ def drop_key(fp):
             continue
         keep.append(line)
     if dropped:
-        local.write_text("\n".join(keep) + ("\n" if keep else ""))
+        fpa_roots.write_text_atomic(local, "\n".join(keep) + ("\n" if keep else ""))
     return dropped
 
 
@@ -269,7 +288,7 @@ def main(argv):
             print(f"fp-unregister: {base} is not registered", file=sys.stderr)
             return 1
         gone = entries.pop(base)
-        FILE.write_text(render(entries))
+        fpa_roots.write_text_atomic(FILE, render(entries))
         print(f"unregistered {base}\n  Nothing else revoked it, because nothing else agreed to it.")
         # The key came in with the registration, so it leaves with it -- unless
         # another registration still names it. A publisher that rotates its key is
@@ -296,9 +315,20 @@ def main(argv):
               "with no spaces or control characters (set --as)", file=sys.stderr)
         return 2
 
-    trial = Trial()
+    try:
+        trial = Trial()
+    except fpa_roots.StateError as exc:
+        print(f"fp-register: {exc}. Refusing to register into a workspace whose state cannot be read.",
+              file=sys.stderr)
+        return 1
     try:
         return register(argv, entries, base, pin, who, trial)
+    except fpa_roots.StateError as exc:
+        print(f"fp-register: {exc}. Nothing was registered.", file=sys.stderr)
+        return 1
+    except Refused as exc:
+        print(f"fp-register: {exc}. Nothing was registered.", file=sys.stderr)
+        return 1
     finally:
         trial.discard()
 
@@ -359,8 +389,9 @@ def register(argv, entries, base, pin, who, trial):
     # found it -- not the first key in the local file, which is some other publisher's.
     fp = None
     for line in proc.stdout.splitlines():
-        if line.startswith("manifest verified:") and line.split()[-1].startswith("SHA256:"):
-            fp = line.split()[-1]
+        if line.startswith("manifest verified:"):
+            fp = line.split()[-1] if line.split()[-1].startswith("SHA256:") else None
+            break
     if not fp:
         print("fp-register: fp-verify did not report the signing key's fingerprint", file=sys.stderr)
         return 1
@@ -377,15 +408,20 @@ def register(argv, entries, base, pin, who, trial):
               "Unregister first, deliberately, if this is expected.", file=sys.stderr)
         return 1
 
-    added = trial.commit()
+    added = trial.commit(base, {"fingerprint": fp, "pin": pin,
+                                "when": datetime.datetime.now().strftime("%Y-%m-%d"), "who": who})
     if added:
         print(f"trust root {WS / 'allowed_signers'} extended:\n  " + "\n  ".join(added))
-    entries[base] = {"fingerprint": fp, "pin": pin,
-                     "when": datetime.datetime.now().strftime("%Y-%m-%d"), "who": who}
-    FILE.write_text(render(entries))
     print(f"registered {base}\n  key {fp}\n  pin {pin}, by {who}")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    # A stop request ends the run through the same cleanup as a refusal, so the
+    # trial copy does not outlive it.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    signal.signal(signal.SIGHUP, lambda *_: sys.exit(129))
+    try:
+        sys.exit(main(sys.argv))
+    except KeyboardInterrupt:
+        sys.exit(130)

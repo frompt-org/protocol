@@ -90,7 +90,11 @@ Adds the `managed` context: no human at use time, so a signature authorizes.
   already accepted **from that catalog and signer**, keyed by the manifest's `base` and the
   principal it verified as (§M6) — so no other trusted publisher can raise it.
 - **MUST** accept each catalog from one signer, the first it accepted for that `base`, and
-  refuse a manifest naming that `base` under another (§M6b).
+  each address for one catalog, the first it accepted from there; refuse a conflict (§M6b);
+  and refuse to check anything when the state holding floors and bindings exists but cannot be
+  read. The reference tools keep them in `.fpa/manifest-serials.json`,
+  `.fpa/catalog-signers.json` and `.fpa/catalog-addresses.json`; the pilot rebinds by deleting
+  an entry.
 - **MUST** compute digests over exact bytes (§M8); a client that reads text first has a
   line-ending bug that hashes a CRLF copy identical to its LF original.
 - **MUST** fail closed — exit non-zero, adopt nothing — when it cannot fetch or verify the

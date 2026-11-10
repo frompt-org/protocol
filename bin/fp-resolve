@@ -87,12 +87,7 @@ def pins():
     lock = WS / "fpa.lock"
     if not lock.exists():
         return None
-    out = {}
-    for line in lock.read_text().splitlines():
-        if line.strip() and not line.startswith("#"):
-            pid, version, dg, url = line.split()
-            out[pid] = (version, dg.removeprefix("sha256:"), url)
-    return out
+    return fpa_roots.parse_lock(lock)
 
 
 def select(entry, selector):
@@ -260,7 +255,8 @@ def main(argv):
         pv, pd, purl = locked[wanted]
         repin = f"fp-lock --update {wanted}" + (f" --from {origin}" if origin else "")
         pub_base = manifest.get("base", "")
-        if pub_base and not purl.startswith(pub_base.rstrip("/") + "/"):
+        if pub_base and not fpa_roots.normalize_base(purl).startswith(
+                fpa_roots.normalize_base(pub_base) + "/"):
             print(f"fp-resolve: {wanted} is pinned from a different publisher\n"
                   f"  pinned  {purl}\n  manifest base {pub_base}\n"
                   "A pin names one catalog; the same bytes from another are not what was agreed to (M5).",
@@ -303,6 +299,9 @@ def main(argv):
 if __name__ == "__main__":
     try:
         sys.exit(main(sys.argv))
+    except fpa_roots.LockError as exc:
+        print(f"fp-resolve: {exc} -- refusing to resolve against it", file=sys.stderr)
+        sys.exit(1)
     except Exception as exc:  # noqa: BLE001
         print(f"fp-resolve: internal error: {type(exc).__name__}: {exc}", file=sys.stderr)
         sys.exit(3)
