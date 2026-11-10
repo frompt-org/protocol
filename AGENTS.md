@@ -25,9 +25,11 @@ catalogs), [SkillSpector](https://github.com/NVIDIA/SkillSpector) (`fp-assay`), 
 it trusts), `fpa.registered` (which catalogs it consented to), `fpa.lock` and `.fpa/` (freshness
 floors, adoption record). It is `FPA_WORKSPACE`, else this checkout; set `FPA_WORKSPACE=~/.config/frompt`
 for one per user. A **catalog** is what a publisher signs: `frompt-catalog.json`, `prompts/`, the
-manifest and its signature, the published key, and `.fpa/signing_key`. The tools use
-`FPA_CATALOG`, else the catalog you stand in (the nearest `frompt-catalog.json` upward), else this
-checkout, which is both.
+manifest and its signature, the published key, and `.fpa/signing_key`. The tools that build one
+(`fp-index`, `fp-sign`, `fp-publish`) use `FPA_CATALOG`, else the catalog you stand in (the nearest
+`frompt-catalog.json` upward), else this checkout, which is both. The tools that read one
+(`fp-resolve`, `fp-lock`, `fp-verify`) use `FPA_CATALOG`, a registered catalog given with `--from`,
+or this checkout, and never a catalog that merely sits in the current directory.
 
 ## Adopt frompts correctly
 

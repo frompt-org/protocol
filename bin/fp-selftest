@@ -602,8 +602,21 @@ check "fp-index takes the catalog's base from frompt-catalog.json, not from its 
 check "fp-init-catalog refuses to overwrite a catalog -- a new key would orphan its clients" 1 $?
 [ -f "$sh/acme/.nojekyll" ] && grep -qx 'catalog.acme.example' "$sh/acme/CNAME" && grep -q '^.fpa/$' "$sh/acme/.gitignore"
 check "fp-init-catalog leaves .nojekyll, CNAME and a .gitignore that keeps the key out" 0 $?
-(cd "$sh/acme" && "$here/bin/fp-resolve" --list 2>/dev/null) | grep -q '^hello '
-check "standing in a catalog, the tools read that catalog, not this checkout" 0 $?
+(cd "$sh/acme" && "$here/bin/fp-index" --check >/dev/null 2>&1)
+check "standing in a catalog, the tools that build it find it" 0 $?
+FPA_CATALOG="$sh/acme" "$here/bin/fp-resolve" --list 2>/dev/null | grep -q '^hello '
+check "a reader reads the catalog FPA_CATALOG names" 0 $?
+
+# A reader reads only a catalog somebody chose: FPA_CATALOG, a registration, or
+# this checkout. The current directory is none of those.
+mkcat "$sh/stray" https://stray.example && rm -f "$sh/stray/index.json.sig"
+(cd "$sh/stray" && "$here/bin/fp-resolve" --list 2>/dev/null) | grep -q '^hello '
+check "standing in a catalog, fp-resolve --list does not read it" 1 $?
+(cd "$sh/stray" && "$here/bin/fp-resolve" hello --record >/dev/null 2>&1)
+check "standing in a catalog, fp-resolve does not resolve from it" 1 $?
+mkdir -p "$sh/stray-ws"; (cd "$sh/stray" && FPA_WORKSPACE="$sh/stray-ws" "$here/bin/fp-lock" >/dev/null 2>&1)
+grep -q '^hello ' "$sh/stray-ws/fpa.lock" 2>/dev/null
+check "standing in a catalog, fp-lock does not pin from it" 1 $?
 
 export FPA_WORKSPACE="$sh/client"
 "$here/bin/fp-register" "$sh/acme" --key SHA256:0000000000000000000000000000000000000000000 >/dev/null 2>&1
@@ -646,6 +659,60 @@ mkcat "$sh/mixed" https://mixed.example
 rm -f "$sh/mixed/index.json.sig"; ssh-keygen -Y sign -f "$sh/globex/.fpa/signing_key" -n foreign-prompts "$sh/mixed/index.json" >/dev/null 2>&1
 "$here/bin/fp-register" "$sh/mixed" --key "$(keyof "$sh/mixed")" >/dev/null 2>&1
 check "fp-register refuses a catalog signed by a key other than the one it was given" 1 $?
+grep -qF "$(awk '{print $2}' "$sh/mixed/.fpa/signing_key.pub")" "$sh/client/allowed_signers"
+check "a refused registration leaves no key behind in the trust root" 1 $?
+"$here/bin/fp-register" "$sh/stray" --key "$(keyof "$sh/stray")" >/dev/null 2>&1
+rc=$?; grep -qF "$(awk '{print $2}' "$sh/stray/.fpa/signing_key.pub")" "$sh/client/allowed_signers"
+check "a catalog that fails verification is refused and its key removed again" "1 1" "$rc $?"
+
+# Every field of a registration is one word.
+regs=$(shasum < "$sh/client/fpa.registered")
+"$here/bin/fp-register" "$sh/acme" --key "$(keyof "$sh/acme")" --as "$(printf 'x\ny')" >/dev/null 2>&1
+rc=$?; [ "$(shasum < "$sh/client/fpa.registered")" = "$regs" ]
+check "fp-register refuses a name with a line break in --as, and records nothing" "2 0" "$rc $?"
+USER="$(printf 'x\ny')" "$here/bin/fp-register" "$sh/acme" --key "$(keyof "$sh/acme")" >/dev/null 2>&1
+check "fp-register refuses a line break arriving through USER" 2 $?
+
+# The registered context: a manifest naming acme's catalog but signed by another
+# key this client trusts is refused, because the registration names acme's key.
+cp "$sh/acme/index.json" "$sh/acme/index.json.keep"; cp "$sh/acme/index.json.sig" "$sh/acme/index.json.sig.keep"
+cp "$sh/globex/index.json" "$sh/globex/index.json.sig" "$sh/acme/"
+"$here/bin/fp-verify" hello --from "$sh/acme" --context registered >/dev/null 2>&1 </dev/null
+check "registered: another trusted key signing a manifest for this catalog is refused (AC2b)" 1 $?
+mv "$sh/acme/index.json.keep" "$sh/acme/index.json"; mv "$sh/acme/index.json.sig.keep" "$sh/acme/index.json.sig"
+
+# Floors written before they were keyed by signer: they still refuse, they say so,
+# and they count once.
+lw="$sh/legacy"; mkdir -p "$lw/.fpa"; cp "$sh/client/allowed_signers" "$lw/"
+acme_base=https://catalog.acme.example/prompts
+acme_serial=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['serial'])" "$sh/acme/index.json")
+printf '{"%s": %s}\n' "$acme_base" $((acme_serial + 1)) > "$lw/.fpa/manifest-serials.json"
+FPA_WORKSPACE="$lw" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>"$sh/legacy.err" </dev/null
+rc=$?; grep -q 'before floors were kept per signing key' "$sh/legacy.err"
+check "an old-format floor above the manifest refuses it and says how the pilot can clear it" "1 0" "$rc $?"
+printf '{"%s": %s}\n' "$acme_base" "$acme_serial" > "$lw/.fpa/manifest-serials.json"
+FPA_WORKSPACE="$lw" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </dev/null \
+  && python3 -c '
+import json, sys
+f = json.load(open(sys.argv[1]))
+sys.exit(0 if sys.argv[2] not in f and any(k.startswith(sys.argv[2] + " ") for k in f) else 1)
+' "$lw/.fpa/manifest-serials.json" "$acme_base"
+check "an old-format floor counts once: the manifest that passes it retires it" 0 $?
+
+# A manifest's `file` is a plain path under prompts/, signed or not.
+mkcat "$sh/odd" https://odd.example
+python3 -c '
+import json, sys
+m = json.load(open(sys.argv[1]))
+m["prompts"][0]["versions"][0]["file"] = "../../outside.frompt.md"
+open(sys.argv[1], "w").write(json.dumps(m, indent=2, sort_keys=True) + "\n")
+' "$sh/odd/index.json"
+rm -f "$sh/odd/index.json.sig"; ssh-keygen -Y sign -f "$sh/odd/.fpa/signing_key" -n foreign-prompts "$sh/odd/index.json" >/dev/null 2>&1
+cat "$sh/odd/allowed_signers" >> "$lw/allowed_signers"
+FPA_WORKSPACE="$lw" "$here/bin/fp-verify" hello --from "$sh/odd" >/dev/null 2>&1 </dev/null
+check "fp-verify refuses a signed manifest whose file is not a plain path under prompts/" 1 $?
+FPA_CATALOG="$sh/odd" "$here/bin/fp-resolve" hello --record >/dev/null 2>&1
+check "fp-resolve refuses the same manifest from FPA_CATALOG" 1 $?
 unset FPA_WORKSPACE
 rm -rf "$sh"
 

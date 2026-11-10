@@ -26,10 +26,11 @@
 set -uo pipefail
 tools=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # Two places (bin/fpa_roots.py). The catalog is whose manifest is checked when
-# there is no --from. The workspace holds the trust root, the registrations and
-# the freshness floors -- what this client trusts, which is never read out of a
-# catalog. In this repository they are the same directory.
-catalog=$(python3 "$tools/bin/fpa_roots.py" catalog) || exit 2
+# there is no --from: FPA_CATALOG, else this checkout, never a directory found on
+# disk. The workspace holds the trust root, the registrations and the freshness
+# floors -- what this client trusts, which is never read out of a catalog. In
+# this repository they are the same directory.
+catalog=$(python3 "$tools/bin/fpa_roots.py" catalog --no-discover) || exit 2
 ws=$(python3 "$tools/bin/fpa_roots.py" workspace) || exit 2
 
 from=""; context="managed"; manifest_out=""
@@ -84,9 +85,10 @@ for f in index.json index.json.sig; do
       fi
       ;;
     *)
+      # `--` ends the options: what follows is always a path or a URL.
       if [ -f "$from/$f" ]; then
-        cp "$from/$f" "$work/$f" || { echo "fp-verify: cannot read $from/$f" >&2; exit 2; }
-      elif ! curl -fsS --max-time 20 "$from/$f" -o "$work/$f" 2>/dev/null; then
+        cp -- "$from/$f" "$work/$f" || { echo "fp-verify: cannot read $from/$f" >&2; exit 2; }
+      elif ! curl -fsS --max-time 20 -o "$work/$f" -- "$from/$f" 2>/dev/null; then
         echo "fp-verify: cannot fetch $from/$f -- cannot verify, failing closed" >&2; exit 2
       fi
       ;;
@@ -145,8 +147,10 @@ if [ "${1:-}" = "--base" ]; then
 fi
 
 case "$base" in ""|/*|*://*|gh:*) ;; *) base="$orig_pwd/$base";; esac
-python3 - "$id" "$base" "$ws" "$from" "$context" "$manifest_out" "$sigfp" "$orig_pwd" <<'PY'
+python3 - "$id" "$base" "$ws" "$from" "$context" "$manifest_out" "$sigfp" "$orig_pwd" "$tools/bin" <<'PY'
 import hashlib, json, os, pathlib, sys, urllib.request
+sys.path.insert(0, sys.argv[9])
+import fpa_roots
 wanted, base, root, origin = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3]), sys.argv[4]
 context, manifest_out, signed_by = sys.argv[5], sys.argv[6], sys.argv[7]
 # A relative --from names a directory where the caller stood; this runs elsewhere.
@@ -191,16 +195,26 @@ if seen.exists():
     except json.JSONDecodeError:
         floors = {}
 # A floor recorded before floors were keyed by signer still counts once, for the
-# key that next signs that catalog; after that the keyed floor takes over.
-known = floors.get(floor_key, floors.get(catalog))
+# key that next signs that catalog: it is retired as soon as a manifest passes it,
+# and from then on the keyed floor takes over.
+known = floors.get(floor_key)
+legacy = known is None and catalog in floors
+if legacy:
+    known = floors[catalog]
 if known is not None:
     floor = int(known)
     if serial < floor:
         print(f"fp-verify: manifest serial {serial} from {catalog} is older than {floor}, "
-              "already seen from that catalog under this key.\n"
+              "already seen from that catalog" + ("" if legacy else " under this key") + ".\n"
               "  A validly signed but stale manifest is a rollback. Refusing.", file=sys.stderr)
+        if legacy:
+            print(f"  That floor was recorded before floors were kept per signing key, so this tool\n"
+                  f"  cannot tell which key set it. If the pilot is sure this catalog never published\n"
+                  f"  serial {floor}, they can delete the \"{catalog}\" entry from {seen};\n"
+                  "  nothing clears it on its own.", file=sys.stderr)
         sys.exit(1)
 floors[floor_key] = serial
+floors.pop(catalog, None)
 seen.parent.mkdir(parents=True, exist_ok=True)
 seen.write_text(json.dumps(floors, indent=2, sort_keys=True) + "\n")
 if not wanted:
@@ -222,6 +236,10 @@ if entry is None:
           f"Published: {have}", file=sys.stderr)
     sys.exit(1)
 entry = dict(entry, id=wanted)
+if not fpa_roots.safe_file(entry.get("file")):
+    print(f"fp-verify: the signed manifest gives {wanted} the file {entry.get('file')!r}, which is "
+          "not a plain path under prompts/ -- refusing", file=sys.stderr)
+    sys.exit(1)
 # A fetched manifest names where its own documents live; prefer that over the
 # base baked into whatever copy happened to be on disk.
 if base:
