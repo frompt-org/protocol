@@ -785,6 +785,13 @@ casign 5 "$ca/builder-cert.pub"
 out=$("$here/bin/fp-verify" --from "$ca/cat" 2>/dev/null </dev/null); rc=$?
 [ $rc -eq 0 ] && printf '%s' "$out" | grep -q "signed by team-a@docs.example.org via certificate from authority $cafp"
 check "a key the trusted authority certified verifies, and the authority is named, not the key (M7b)" 0 $?
+casign 5 "$ca/builder-cert.pub"; { echo "-- note --"; cat "$ca/cat/index.json.sig"; } > "$ca/sig.tmp"
+mv "$ca/sig.tmp" "$ca/cat/index.json.sig"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "a signature file with text before its armor is refused" 1 $?
+casign 5 "$ca/second-cert.pub"; cp "$ca/cat/index.json.sig" "$ca/second.sig"
+casign 5 "$ca/builder-cert.pub"; cat "$ca/second.sig" >> "$ca/cat/index.json.sig"
+"$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "a signature file carrying a second signature after its armor is refused" 2 $?
 casign 6 "$ca/outsider-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
 check "a certificate for a principal outside the authority's pattern is refused" 1 $?
 casign 6 "$ca/rogue"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
@@ -809,8 +816,9 @@ mkdir -p "$ca/fresh2"; cp "$ca/ws/allowed_signers" "$ca/fresh2/"
 printf 'other@docs.example.org %s\n' "$(cut -d' ' -f1,2 "$ca/rogue.pub")" > "$ca/rogue.signers"
 signers_before=$(shasum < "$ca/fresh2/allowed_signers")
 FPA_WORKSPACE="$ca/fresh2" "$here/bin/fp-register" "$ca/cat" --trust "$ca/rogue.signers" >/dev/null 2>&1 </dev/null
-rc=$?; [ $rc -eq 1 ] && [ "$(shasum < "$ca/fresh2/allowed_signers")" = "$signers_before" ]
-check "refusing a catalog signed under a certificate also takes back the keys it added" 0 $?
+rc=$?; [ $rc -eq 1 ] && [ "$(shasum < "$ca/fresh2/allowed_signers")" = "$signers_before" ] \
+  && [ ! -e "$ca/fresh2/.fpa/manifest-serials.json" ]
+check "refusing a catalog signed under a certificate also takes back the keys and floors it added" 0 $?
 printf '%s %s latest 2026-01-01 selftest\n' "$ca/cat" "$cafp" > "$ca/ws/fpa.registered"
 "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
 check "a registered catalog signed under a certificate is refused (AC2b, M7b)" 1 $?

@@ -135,11 +135,22 @@ sigfp=$(printf '%s\n' "$verified" | sed -n 's/.* key \(SHA256:[^ ]*\).*/\1/p' | 
 # the signature itself.
 authority=""; floor_id="$sigfp"
 if printf '%s\n' "$verified" | grep -q -- '-CERT key '; then
-  certinfo=$(python3 - index.json.sig <<'PY'
-import base64, struct, subprocess, sys
-text = open(sys.argv[1]).read()
-blob = base64.b64decode("".join(l.strip() for l in text.splitlines()
-                                if l.strip() and not l.startswith("-----")))
+  certinfo=$(python3 - index.json.sig "$sigfp" <<'PY'
+import base64, binascii, struct, subprocess, sys
+# Exactly one armored signature and nothing around it: the bytes read here must
+# be the bytes ssh-keygen verified.
+lines = [l.strip() for l in open(sys.argv[1]).read().splitlines()]
+try:
+    b = lines.index("-----BEGIN SSH SIGNATURE-----")
+    e = lines.index("-----END SSH SIGNATURE-----", b)
+except ValueError:
+    sys.exit(1)
+if any(lines[:b]) or any(lines[e + 1:]):
+    sys.exit(1)
+try:
+    blob = base64.b64decode("".join(lines[b + 1:e]), validate=True)
+except (binascii.Error, ValueError):
+    sys.exit(1)
 if blob[:6] != b"SSHSIG":
     sys.exit(1)
 (n,) = struct.unpack(">I", blob[10:14])          # after magic and uint32 version
@@ -149,16 +160,19 @@ open("cert.pub", "w").write(f"{cert[4:4 + t].decode()} {base64.b64encode(cert).d
 out = subprocess.run(["ssh-keygen", "-L", "-f", "cert.pub"], capture_output=True, text=True)
 if out.returncode:
     sys.exit(1)
-ca = keyid = valid = ""
+ca = keyid = valid = certified = ""
 for line in out.stdout.splitlines():
     s = line.strip()
-    if s.startswith("Signing CA:"):
+    if s.startswith("Public key:"):
+        certified = next((w for w in s.split() if w.startswith("SHA256:")), "")
+    elif s.startswith("Signing CA:"):
         ca = next((w for w in s.split() if w.startswith("SHA256:")), "")
     elif s.startswith("Key ID:"):
         keyid = s.split(":", 1)[1].strip().strip('"').replace(" ", "_")
     elif s.startswith("Valid:"):
         valid = s.split(":", 1)[1].strip()
-if not ca:
+# The certificate read back must certify the very key ssh-keygen reported.
+if not ca or certified != sys.argv[2]:
     sys.exit(1)
 print(ca)
 print(keyid or "-")
