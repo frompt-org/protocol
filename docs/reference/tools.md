@@ -51,7 +51,7 @@ Every tool is a plain script in [`bin/`](../../bin/). Each prints its full usage
 | Variable | Names | Default |
 |---|---|---|
 | `FPA_CATALOG` | the **catalog** a publisher signs: `frompt-catalog.json`, `prompts/`, `index.json`, its signature, the published `allowed_signers`, `.fpa/signing_key` | for `fp-index`, `fp-sign` and `fp-publish`: the nearest directory upward holding `frompt-catalog.json`, else the tool checkout. For `fp-resolve`, `fp-lock` and `fp-verify`: the tool checkout, never a directory found on disk |
-| `FPA_WORKSPACE` | the **workspace** a client trusts from: `allowed_signers`, `fpa.registered`, `fpa.lock`, `.fpa/` floors and adoption record | the tool checkout |
+| `FPA_WORKSPACE` | the **workspace** a client trusts from: `allowed_signers`, `fpa.registered`, `fpa.lock`, `.fpa/` floors, catalog bindings and adoption record | the tool checkout |
 | `FPA_SIGNING_KEY` · `FPA_SIGNING_IDENTITY` | the key `fp-sign` uses, and the name it publishes it under | `<catalog>/.fpa/signing_key` · the catalog's `identity` |
 | `FPA_VALIDITY_DAYS` | how long a manifest `fp-index` writes stays valid | the catalog's `validity_days`, else 30 |
 

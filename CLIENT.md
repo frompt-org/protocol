@@ -87,8 +87,10 @@ Adds the `managed` context: no human at use time, so a signature authorizes.
 - **MUST** verify the manifest's signature against a trust root held locally and never fetched
   from the host being checked (§M7).
 - **MUST** refuse a manifest past `not_after` (§M6a) and one whose `serial` is below the highest
-  already accepted **from that catalog under that key**, keyed by the manifest's `base` and the
-  signing key's fingerprint (§M6) — so no other trusted publisher can raise it.
+  already accepted **from that catalog and signer**, keyed by the manifest's `base` and the
+  principal it verified as (§M6) — so no other trusted publisher can raise it.
+- **MUST** accept each catalog from one signer, the first it accepted for that `base`, and
+  refuse a manifest naming that `base` under another (§M6b).
 - **MUST** compute digests over exact bytes (§M8); a client that reads text first has a
   line-ending bug that hashes a CRLF copy identical to its LF original.
 - **MUST** fail closed — exit non-zero, adopt nothing — when it cannot fetch or verify the

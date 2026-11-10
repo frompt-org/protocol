@@ -9,7 +9,7 @@ ceremony this protocol exists to create.
 
     fp-index            # rewrite INDEX.md and index.json
     fp-index --check    # exit 1 if either is stale (used by fp-selftest)
-    fp-index --renew    # move not_after forward even if nothing changed
+    fp-index --renew    # move not_after forward; refused if any document changed
 
 It indexes the catalog it finds (bin/fpa_roots.py): FPA_CATALOG, else the nearest
 directory upward holding frompt-catalog.json. That file says where the catalog is
@@ -190,6 +190,20 @@ def build():
 if __name__ == "__main__":
     text, mtext = build(), manifest()
     md, js = ROOT / "INDEX.md", ROOT / "index.json"
+    # --renew extends the life of what was already published; publishing something
+    # new is a separate, deliberate run without it. So a renewal refuses as soon as
+    # the documents differ from the manifest on disk.
+    if "--renew" in sys.argv:
+        drop = ("serial", "not_after")
+        try:
+            was = {k: v for k, v in json.loads(js.read_text()).items() if k not in drop}
+        except (OSError, json.JSONDecodeError):
+            was = None
+        if was != {k: v for k, v in json.loads(mtext).items() if k not in drop}:
+            print("fp-index --renew: the documents differ from the manifest in index.json, so this\n"
+                  "  would publish new content, not renew the old. Run fp-index without --renew,\n"
+                  "  review the change, then sign it.", file=sys.stderr)
+            sys.exit(1)
     if "--check" in sys.argv:
         stale = [p.name for p, want in ((md, text), (js, mtext))
                  if (p.read_text() if p.exists() else "") != want]

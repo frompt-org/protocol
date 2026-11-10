@@ -68,6 +68,56 @@ def safe_file(name):
     return isinstance(name, str) and bool(_FILE.fullmatch(name))
 
 
+KEY_TYPES = ("ssh-", "ecdsa-", "sk-")
+
+
+def _split(text, sep):
+    """Split at `sep` outside double quotes; None if a quote is left open."""
+    parts, cur, quoted = [], "", False
+    for c in text:
+        if c == '"':
+            quoted = not quoted
+        if (c.isspace() if sep is None else c == sep) and not quoted:
+            if cur or sep is not None:
+                parts.append(cur)
+            cur = ""
+            continue
+        cur += c
+    if quoted:
+        return None
+    if cur or sep is not None:
+        parts.append(cur)
+    return parts
+
+
+def signers_entry(line):
+    """(principals, options, keytype, key) of an allowed_signers line, or None.
+
+    Fields are split the way OpenSSH splits them: at whitespace outside double
+    quotes, so an option value may hold spaces. `options` is a list of
+    (name, value) pairs, the name lowercased because OpenSSH matches option names
+    without regard to case, the value None for a bare option."""
+    text = line.strip()
+    if not text or text.startswith("#"):
+        return None
+    fields = _split(text, None)
+    if not fields or len(fields) < 3:
+        return None
+    if fields[1].startswith(KEY_TYPES):
+        principals, opts, keytype, key = fields[0], "", fields[1], fields[2]
+    elif len(fields) >= 4 and fields[2].startswith(KEY_TYPES):
+        principals, opts, keytype, key = fields[0], fields[1], fields[2], fields[3]
+    else:
+        return None
+    options = []
+    for item in (_split(opts, ",") if opts else []) or []:
+        name, eq, value = item.partition("=")
+        options.append((name.strip().lower(), value.strip().strip('"') if eq else None))
+    if opts and _split(opts, ",") is None:
+        return None
+    return principals, options, keytype, key
+
+
 def flag_value(argv, flag, tool):
     """The value after `flag`, or None when the flag is absent. A flag given with
     no value is a usage error (exit 2), not a crash."""

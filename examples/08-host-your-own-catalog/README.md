@@ -9,7 +9,7 @@ its key's fingerprint, played out with the attacks the protocol has to refuse:
 | 3 | the client registers by fingerprint; a wrong one is refused | the key served by the catalog is trusted only because it matched (FPA.md M7a) |
 | 4 | the client pins a version from a catalog it does not hold, then resolves by id | `fp-lock --from` pins what `fp-verify` just verified |
 | 5 | acme ships 1.1.0; the pinned client refuses it until it re-pins | consent given once is bounded by the pin (AC2) |
-| 6 | globex, also trusted, signs a manifest naming acme's catalog at serial 999999 | acme's freshness floor is keyed by acme's key, so nothing changes (M6) |
+| 6 | globex, also trusted, signs a manifest naming acme's catalog at serial 999999 | refused: the client takes acme's catalog from acme's signer only, and nothing about acme changes (M6, M6b) |
 | 7 | someone swaps acme's key at the host: manifest, signature and published key | refused: the registered key is the only one that counts (AC2b) |
 
 **Introduces:** `fp-init-catalog`, `fp-register --key`, `fp-lock --update --from`, and
@@ -36,8 +36,10 @@ registered …/catalog.acme.example
   pin version, by client
 
 == 6. globex, also trusted, signs a manifest naming acme's catalog at serial 999999
-manifest current: serial 999999 expires …
-acme's catalog is untouched -- a freshness floor is raised only by the key that set it:
+manifest verified: index.json signed by catalog.globex.example SHA256:…
+fp-verify: https://catalog.acme.example/prompts is signed by catalog.globex.example, but this workspace accepts that catalog from catalog.acme.example only.
+  -> refused, as it should be
+acme's catalog is untouched -- this client takes it from acme's signer only:
 authorized: standup v1.1.0 digest … contexts [interactive, registered, managed]
 
 == 7. Someone swaps acme's key at the host -- manifest, signature and published key
