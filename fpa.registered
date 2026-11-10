@@ -6,4 +6,4 @@
 # of the registered context. Remove a line with fp-unregister; nothing else
 # revokes it, because nothing else agreed to it.
 
-gh:frompt-org/catalog@main SHA256:x4Z+wsX1wVrBt5SV/NWWgPfapXlpcmSk3rqZ36Y/rKY latest 2026-09-09 polat
+gh:frompt-org/catalog@main SHA256:x4Z+wsX1wVrBt5SV/NWWgPfapXlpcmSk3rqZ36Y/rKY latest 2026-09-09 maintainer
