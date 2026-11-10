@@ -32,7 +32,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import fpa_roots  # noqa: E402
 
 TOOLS = fpa_roots.TOOLS
-ROOT = fpa_roots.catalog()
+ROOT = fpa_roots.catalog(discover=False)  # a reader: never a catalog found on disk
 LOCK = fpa_roots.workspace() / "fpa.lock"
 HEADER = [
     "# fpa.lock -- pinned foreign prompts.",
@@ -65,7 +65,8 @@ def current():
     urls = {}
     for entry in m["prompts"]:
         for v in entry["versions"]:
-            urls[(entry["id"], v["version"])] = f"{m['base']}/{v['file']}"
+            if fpa_roots.safe_file(v.get("file")):
+                urls[(entry["id"], v["version"])] = f"{m['base']}/{v['file']}"
     out = {}
     for path in sorted(ROOT.glob("prompts/*/*.frompt.md")):
         raw = path.read_bytes()
@@ -107,6 +108,10 @@ def remote(pid, base):
         m = json.loads(out.read_text())
     entry = next(p for p in m["prompts"] if p["id"] == pid)
     v = next(v for v in entry["versions"] if v["version"] == entry["latest"])
+    if not fpa_roots.safe_file(v.get("file")):
+        print(f"fp-lock: the manifest gives {pid} the file {v.get('file')!r}, which is not a plain "
+              "path under prompts/ -- nothing pinned", file=sys.stderr)
+        sys.exit(1)
     return v["version"], v["digest"], f"{m['base']}/{v['file']}"
 
 

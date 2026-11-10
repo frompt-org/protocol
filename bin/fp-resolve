@@ -22,8 +22,10 @@ the one just registered. With --from, a workspace that keeps fpa.registered
 refuses an unregistered catalog, and the pin mode it registered with is
 enforced: `latest` floats, `version` and `digest` require a matching fpa.lock.
 
-Without --from it resolves from the catalog bin/fpa_roots.py finds; registrations
-and pins are read from the workspace (FPA_WORKSPACE, else this checkout).
+Without --from it resolves from FPA_CATALOG, else this checkout -- never from a
+catalog that happens to be in the current directory (bin/fpa_roots.py).
+Registrations and pins are read from the workspace (FPA_WORKSPACE, else this
+checkout).
 
 Exit: 0 verified · 1 digest mismatch, unknown id, or refused · 2 unreachable.
 
@@ -41,7 +43,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import fpa_roots  # noqa: E402
 
 ROOT = fpa_roots.TOOLS
-CATALOG = fpa_roots.catalog()
+CATALOG = fpa_roots.catalog(discover=False)
 WS = fpa_roots.workspace()
 
 
@@ -203,6 +205,10 @@ def main(argv):
                   file=sys.stderr)
             return 1
         entry = dict(version, id=wanted)
+        if not fpa_roots.safe_file(entry.get("file")):
+            print(f"fp-resolve: the manifest gives {wanted} the file {entry.get('file')!r}, "
+                  "which is not a plain path under prompts/ -- refusing", file=sys.stderr)
+            return 1
         if base:
             source = f"{base.rstrip('/')}/{entry['file']}"
         elif origin:
