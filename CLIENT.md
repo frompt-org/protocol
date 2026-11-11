@@ -73,6 +73,9 @@ to a publisher once.
   document and returning success is how unindexed text becomes an adoption.
 - **MUST NOT** apply a pin or a registration to a prompt whose `contexts` excludes
   `registered` (§AC4b).
+- **MUST** refuse a manifest signed under a certificate in the `registered` context, whether
+  or not the workspace keeps a register, and refuse to register such a catalog: a
+  registration pins one key, and an authority vouches for many (§M7b).
 
 Reference: `bin/fp-resolve`, `bin/fp-lock`, `bin/fp-register --key`. The registration record is
 `fpa.registered`, one line per catalog, the shape `sources.list` has had for thirty years. It
@@ -97,6 +100,10 @@ Adds the `managed` context: no human at use time, so a signature authorizes.
   cannot be read. The reference tools keep them in `.fpa/manifest-serials.json`,
   `.fpa/catalog-signers.json` and `.fpa/catalog-addresses.json`; a floor binds its catalog
   too, so the pilot rebinds by deleting the binding and the old signer's floor.
+- **MAY** trust an authority instead of a key (§M7b). It then **MUST** accept a certificate
+  signature only through a `cert-authority` line for the authority that signed it, read that
+  authority from the certificate itself, refuse a certificate naming other than exactly one
+  principal, and key floors and bindings by authority and principal together.
 - **MUST** compute digests over exact bytes (§M8); a client that reads text first has a
   line-ending bug that hashes a CRLF copy identical to its LF original.
 - **MUST** fail closed — exit non-zero, adopt nothing — when it cannot fetch or verify the

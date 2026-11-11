@@ -23,6 +23,9 @@ Everything is recorded in the workspace (bin/fpa_roots.py): FPA_WORKSPACE, else
 this tool checkout. Point FPA_WORKSPACE at ~/.config/frompt for one record per
 user, or at a directory your fleet tooling provisions for one per machine.
 
+A catalog signed under a certificate (an authority's cert-authority line, FPA.md
+M7b) is refused: a registration pins one key, and an authority vouches for many.
+
 Registering verifies the catalog first: a catalog you cannot verify is not one you
 can meaningfully accept. It records the signer's fingerprint, so a later key
 substitution is visible even if the new key is also in allowed_signers.
@@ -108,6 +111,20 @@ def publisher_line(line, src):
         raise ValueError(f"{src} gives the key for {principals} the option(s) {', '.join(extra)}; "
                          "a registration takes a key and nothing else")
     return f'{principals} namespaces="foreign-prompts" {keytype} {key}'
+
+
+def is_authority(line):
+    """True for an allowed_signers line that names a certificate authority, read
+    the way OpenSSH reads it: quoted option values intact, option names in any case."""
+    entry = fpa_roots.signers_entry(line)
+    return bool(entry) and any(name == "cert-authority" for name, _ in entry[1])
+
+
+AUTHORITY_RESERVED = (
+    "  A registration pins one key. An authority vouches for many principals, so pinning\n"
+    "  it alone would let any of them sign this catalog. Registering an authority is\n"
+    "  reserved until a registration binds the principal too (FPA.md M7b); trust it in\n"
+    "  the managed context instead, with its cert-authority line in your trust root.")
 
 
 def fingerprint(key):
@@ -410,6 +427,11 @@ def register(argv, entries, base, pin, who, trial):
                       "  A registration trusts one key under one principal. Do not register it.",
                       file=sys.stderr)
                 return 1
+        # An authority line gets its own answer: registering one is reserved (M7b).
+        if any(is_authority(l) for l in lines):
+            print(f"fp-register: {src} names a certificate authority, not a key.\n"
+                  + AUTHORITY_RESERVED, file=sys.stderr)
+            return 1
         try:
             lines = [publisher_line(l, src) for l in lines]
         except ValueError as exc:
@@ -445,6 +467,10 @@ def register(argv, entries, base, pin, who, trial):
     # found it -- not the first key in the local file, which is some other publisher's.
     fp = None
     for line in proc.stdout.splitlines():
+        if line.startswith("manifest verified:") and " via certificate from authority " in line:
+            print(f"fp-register: {base} is signed under a certificate, not by a key.\n"
+                  + AUTHORITY_RESERVED, file=sys.stderr)
+            return 1
         if line.startswith("manifest verified:"):
             fp = line.split()[-1] if line.split()[-1].startswith("SHA256:") else None
             break

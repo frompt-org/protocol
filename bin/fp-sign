@@ -11,6 +11,11 @@
 #   fp-sign --catalog DIR          # name the catalog instead of standing in it
 #   FPA_SIGNING_KEY=~/.ssh/id_ed25519 fp-sign --catalog DIR
 #
+# FPA_SIGNING_CERT names a certificate for the signing key: the manifest is then
+# signed as that certificate, for clients that trust its authority (FPA.md M7b).
+# A certificate is used only when named -- never a <key>-cert.pub found beside the
+# key -- and it must certify that key. Unset or empty, the key signs as itself.
+#
 # It signs the catalog named by --catalog or FPA_CATALOG, else the one
 # bin/fpa_roots.py finds: the nearest directory upward holding
 # frompt-catalog.json, else this checkout. A key from outside the catalog
@@ -67,6 +72,54 @@ fi
 
 [ -f "$key" ] || { echo "fp-sign: no signing key at $key -- run 'fp-sign --keygen'" >&2; exit 2; }
 [ -f index.json ] || { echo "fp-sign: no index.json -- run bin/fp-index" >&2; exit 2; }
+
+# A key certified by an authority (FPA.md M7b) signs as its certificate, which is
+# what lets a client trust the authority rather than this key. There is then no
+# key line to publish: allowed_signers names the authority, and the authority
+# distributes that line, not each publisher it certifies.
+cert="${FPA_SIGNING_CERT:-}"
+if [ -n "$cert" ]; then
+  # A refusal leaves no signature behind: an unverifiable index.json.sig is worse
+  # than none.
+  refuse() { rm -f index.json.sig; echo "fp-sign: $1" >&2; [ -z "${2:-}" ] || echo "  $2" >&2; exit 1; }
+  [ -f "$cert" ] || refuse "FPA_SIGNING_CERT names $cert, which does not exist"
+  [ -f "$key.pub" ] || refuse "no public key at $key.pub to match the certificate against"
+  certinfo=$(python3 - "$tools/bin" "$cert" "$key.pub" <<'PY'
+import base64, sys
+sys.path.insert(0, sys.argv[1])
+import fpa_roots
+try:
+    c = fpa_roots.certificate_file(open(sys.argv[2]).read())
+    key = fpa_roots.ssh_fingerprint(base64.b64decode(open(sys.argv[3]).read().split()[1], validate=True))
+except (ValueError, IndexError, OSError) as exc:
+    print(f"cannot read: {exc}")
+    sys.exit(1)
+if c["certified"] != key:
+    print(f"certifies {c['certified']}, not the signing key {key}")
+    sys.exit(1)
+print(c["authority"])
+print(",".join(c["principals"]))
+PY
+) || refuse "certificate $cert: $certinfo" "A certificate signs only for the key it certifies (FPA_SIGNING_KEY, else .fpa/signing_key)."
+  authority=$(printf '%s\n' "$certinfo" | sed -n 1p)
+  rm -f index.json.sig
+  # ssh-keygen signs with the private key beside the certificate, which the check
+  # above has shown is the key this run was given.
+  ssh-keygen -Y sign -f "$cert" -n foreign-prompts index.json >/dev/null 2>&1 \
+    || refuse "ssh-keygen could not sign index.json with certificate $cert"
+  principal=$(ssh-keygen -Y find-principals -s index.json.sig -f allowed_signers 2>/dev/null | head -1 || true)
+  if [ -z "$principal" ] || ! ssh-keygen -Y verify -f allowed_signers -I "$principal" -n foreign-prompts \
+       -s index.json.sig < index.json >/dev/null 2>&1; then
+    refuse "signed with certificate $cert, but no authority in allowed_signers accepts it" \
+      "(unknown authority, a principal outside its pattern, or an expired certificate). Add the authority's cert-authority line, or renew the certificate."
+  fi
+  echo "signed index.json -> index.json.sig with a certificate (verified)"
+  echo "principal $principal, authority $authority"
+  echo
+  echo "The signature verifies only while the certificate is valid. Commit index.json and"
+  echo "index.json.sig; clients trust the authority's cert-authority line, not this key."
+  exit 0
+fi
 
 # ssh-keygen -Y sign PROMPTS before overwriting an existing .sig, and answers "no"
 # and exits 0 when stdin is closed. It reported success while leaving a stale

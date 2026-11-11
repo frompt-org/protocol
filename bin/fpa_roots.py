@@ -28,14 +28,18 @@ be a key taken from the host it is used to check (FPA.md M7).
     python3 bin/fpa_roots.py catalog --no-discover   # ...and the one a reader uses
     python3 bin/fpa_roots.py workspace    # print the workspace
 """
+import base64
+import binascii
 import contextlib
 import datetime
+import hashlib
 import fcntl
 import json
 import os
 import pathlib
 import re
 import stat
+import struct
 import sys
 import tempfile
 from urllib.parse import urlsplit, urlunsplit
@@ -408,6 +412,124 @@ def config(root=None):
     if not path.is_file():
         return {}
     return json.loads(path.read_text())
+
+
+# --- OpenSSH certificates (FPA.md M7b) ---------------------------------------------
+# A certificate is read from its wire format (OpenSSH PROTOCOL.certkeys), never from
+# `ssh-keygen -L` text: a key id or a principal is free text an authority signs, and
+# text can spell any label. Fingerprints are computed the way ssh-keygen computes them.
+CERT_TYPES = {  # certificate type -> (plain key type, number of key fields)
+    "ssh-rsa-cert-v01@openssh.com": ("ssh-rsa", 2),
+    "ssh-dss-cert-v01@openssh.com": ("ssh-dss", 4),
+    "ecdsa-sha2-nistp256-cert-v01@openssh.com": ("ecdsa-sha2-nistp256", 2),
+    "ecdsa-sha2-nistp384-cert-v01@openssh.com": ("ecdsa-sha2-nistp384", 2),
+    "ecdsa-sha2-nistp521-cert-v01@openssh.com": ("ecdsa-sha2-nistp521", 2),
+    "ssh-ed25519-cert-v01@openssh.com": ("ssh-ed25519", 1),
+    "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com": ("sk-ecdsa-sha2-nistp256@openssh.com", 3),
+    "sk-ssh-ed25519-cert-v01@openssh.com": ("sk-ssh-ed25519@openssh.com", 2),
+}
+
+
+def _string(buf, i):
+    if i + 4 > len(buf):
+        raise ValueError("truncated")
+    (n,) = struct.unpack(">I", buf[i:i + 4])
+    if i + 4 + n > len(buf):
+        raise ValueError("truncated")
+    return buf[i + 4:i + 4 + n], i + 4 + n
+
+
+def _pack(b):
+    return struct.pack(">I", len(b)) + b
+
+
+def ssh_fingerprint(blob):
+    """SHA256:... of a public key blob, as ssh-keygen -l prints it."""
+    return "SHA256:" + base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip("=")
+
+
+def certificate(blob):
+    """The parts of an OpenSSH certificate this client relies on, read from its bytes:
+    the authority that signed it, the key it certifies, its key id, principals and
+    validity. Raises ValueError for anything that is not a well-formed certificate."""
+    ctype, i = _string(blob, 0)
+    ctype = ctype.decode("ascii", "strict")
+    if ctype not in CERT_TYPES:
+        raise ValueError(f"not a certificate type this client reads: {ctype!r}")
+    plain, nfields = CERT_TYPES[ctype]
+    _nonce, i = _string(blob, i)
+    fields = []
+    for _ in range(nfields):
+        f, i = _string(blob, i)
+        fields.append(f)
+    if i + 12 > len(blob):
+        raise ValueError("truncated")
+    i += 12  # uint64 serial, uint32 type
+    key_id, i = _string(blob, i)
+    packed, i = _string(blob, i)
+    principals, j = [], 0
+    while j < len(packed):
+        p, j = _string(packed, j)
+        principals.append(p.decode("utf-8", "strict"))
+    if i + 16 > len(blob):
+        raise ValueError("truncated")
+    after, before = struct.unpack(">QQ", blob[i:i + 16])
+    i += 16
+    for _ in range(3):  # critical options, extensions, reserved
+        _, i = _string(blob, i)
+    ca_key, i = _string(blob, i)
+    _sig, i = _string(blob, i)
+    if i != len(blob):
+        raise ValueError("trailing bytes after the certificate")
+    certified = _pack(plain.encode()) + b"".join(_pack(f) for f in fields)
+    return {"authority": ssh_fingerprint(ca_key), "certified": ssh_fingerprint(certified),
+            "key_id": key_id.decode("utf-8", "replace"), "principals": principals,
+            "valid_after": after, "valid_before": before}
+
+
+def signature_key(data):
+    """The public key blob inside an armored SSH signature (bytes), read strictly:
+    exactly one armor and nothing around it, base64 without junk, the SSHSIG magic."""
+    try:
+        text = data.decode("ascii")
+    except UnicodeDecodeError:
+        raise ValueError("the signature file is not plain ASCII") from None
+    lines = [l.strip() for l in text.splitlines()]
+    try:
+        b = lines.index("-----BEGIN SSH SIGNATURE-----")
+        e = lines.index("-----END SSH SIGNATURE-----", b)
+    except ValueError:
+        raise ValueError("no armored signature") from None
+    if any(lines[:b]) or any(lines[e + 1:]):
+        raise ValueError("text around the armored signature")
+    try:
+        blob = base64.b64decode("".join(lines[b + 1:e]), validate=True)
+    except (binascii.Error, ValueError):
+        raise ValueError("the signature is not valid base64") from None
+    if blob[:6] != b"SSHSIG":
+        raise ValueError("not an SSH signature")
+    key, _ = _string(blob, 10)  # after the magic and the uint32 version
+    return key
+
+
+def certificate_file(text):
+    """certificate() of an OpenSSH certificate file (`<type> <base64> [comment]`)."""
+    parts = text.split()
+    if len(parts) < 2:
+        raise ValueError("not a certificate file")
+    try:
+        blob = base64.b64decode(parts[1], validate=True)
+    except (binascii.Error, ValueError):
+        raise ValueError("not a certificate file") from None
+    return certificate(blob)
+
+
+def cert_identity(authority, principal):
+    """The signer a certificate signature counts as: its authority and its principal.
+    The comma marks it: OpenSSH splits principals at commas, so no plain principal
+    can spell it, and it does not begin with SHA256:, which old floors keyed by key
+    used."""
+    return f"ca:{authority},{principal}"
 
 
 if __name__ == "__main__":

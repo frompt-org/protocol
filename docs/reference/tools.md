@@ -53,10 +53,15 @@ Every tool is a plain script in [`bin/`](../../bin/). Each prints its full usage
 | `FPA_CATALOG` | the **catalog** a publisher signs: `frompt-catalog.json`, `prompts/`, `index.json`, its signature, the published `allowed_signers`, `.fpa/signing_key` | for `fp-index`, `fp-sign` and `fp-publish`: the nearest directory upward holding `frompt-catalog.json`, else the tool checkout. For `fp-resolve`, `fp-lock` and `fp-verify`: the tool checkout, never a directory found on disk |
 | `FPA_WORKSPACE` | the **workspace** a client trusts from: `allowed_signers`, `fpa.registered`, `fpa.lock`, `.fpa/` floors, catalog bindings and adoption record | the tool checkout |
 | `FPA_SIGNING_KEY` · `FPA_SIGNING_IDENTITY` | the key `fp-sign` uses, and the name it publishes it under | `<catalog>/.fpa/signing_key` · the catalog's `identity` |
+| `FPA_SIGNING_CERT` | a certificate for that key: `fp-sign` then signs as the certificate (FPA M7b) and publishes no key line. It must certify the signing key, and is used only when named — never a `<key>-cert.pub` found beside the key | unset: the key signs as itself |
 | `FPA_VALIDITY_DAYS` | how long a manifest `fp-index` writes stays valid, at most 90 days | the catalog's `validity_days`, else 30 |
 
-These tools trust keys. A manifest signed under a certificate is refused for now, rather than
-trusted on half its meaning.
+These tools trust keys, and in the `managed` context authorities as well (FPA M7b): a manifest
+signed under a certificate counts as its authority and principal together, never as a key, so it
+does not pass for a catalog bound to a key. It counts only through a `cert-authority` line, and
+only when the certificate names exactly one principal. `fp-register` refuses a catalog signed
+under a certificate, since a registration pins one key, and `fp-verify --context registered`
+refuses one whether or not the workspace keeps a register. Checked with OpenSSH 10.2p1.
 
 A catalog is the address it is served from: `fp-verify --from <dir>` checks a catalog only when its
 `base` is that directory, and `--from https://…` only when its `base` is that URL. A publisher
