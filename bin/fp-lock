@@ -132,23 +132,24 @@ def registered_ids():
 
 
 def parse():
-    if not LOCK.exists():
-        return {}
-    out = {}
-    for line in LOCK.read_text().splitlines():
-        if line.startswith("#") or not line.strip():
-            continue
-        pid, version, digest, url = line.split()
-        out[pid] = (version, digest.removeprefix("sha256:"), url)
-    return out
+    return fpa_roots.parse_lock(LOCK)
 
 
 def render(pins):
+    """The lock file. Every value is checked first: a lock line is space-delimited,
+    and a value with a space or a line break in it would be another pin."""
     lines = list(HEADER) + [""]
     for pid in sorted(pins):
         version, digest, url = pins[pid]
+        if not fpa_roots.lock_line_ok(pid, version, digest, url):
+            raise fpa_roots.LockError(f"refusing to pin {pid!r}: its id, version, digest or address "
+                                      "is not one a lock line can hold")
         lines.append(f"{pid} {version} sha256:{digest} {url}")
     return "\n".join(lines) + "\n"
+
+
+def write(pins):
+    fpa_roots.write_text_atomic(LOCK, render(pins))
 
 
 def main(argv):
@@ -167,8 +168,7 @@ def main(argv):
             pins = parse()
             was = pins.get(wanted)
             pins[wanted] = remote(wanted, base)
-            LOCK.parent.mkdir(parents=True, exist_ok=True)
-            LOCK.write_text(render(pins))
+            write(pins)
             now_v, now_d, _ = pins[wanted]
             if was and was[1] != now_d:
                 print(f"re-pinned {wanted}: {was[0]} {was[1][:12]} -> {now_v} {now_d[:12]}")
@@ -181,7 +181,7 @@ def main(argv):
             return 2
         was = pins.get(wanted)
         pins[wanted] = now[wanted]
-        LOCK.write_text(render(pins))
+        write(pins)
         if was and was[1] != now[wanted][1]:
             print(f"re-pinned {wanted}: {was[0]} {was[1][:12]} -> {now[wanted][0]} {now[wanted][1][:12]}")
         else:
@@ -225,7 +225,7 @@ def main(argv):
     # Pins taken from other catalogs (--from) are not this catalog's to rewrite.
     base = manifest()["base"].rstrip("/") + "/"
     kept = {pid: v for pid, v in parse().items() if not v[2].startswith(base) and pid not in fit}
-    LOCK.write_text(render({**kept, **fit}))
+    write({**kept, **fit})
     print(f"wrote fpa.lock ({len(fit)} pinned)")
     if skipped:
         print("not pinned -- these do not declare the registered context (FPA.md AC1): "
@@ -236,6 +236,9 @@ def main(argv):
 if __name__ == "__main__":
     try:
         sys.exit(main(sys.argv))
+    except fpa_roots.LockError as exc:
+        print(f"fp-lock: {exc}. Nothing was written.", file=sys.stderr)
+        sys.exit(1)
     except Exception as exc:  # noqa: BLE001
         print(f"fp-lock: internal error: {type(exc).__name__}: {exc}", file=sys.stderr)
         sys.exit(3)

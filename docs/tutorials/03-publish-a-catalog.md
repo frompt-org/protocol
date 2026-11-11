@@ -89,11 +89,12 @@ catalog. [Tutorial 4](04-run-unattended.md) continues from the client's side.
 
 ## 6. Keep it fresh
 
-A manifest expires 30 days after it is signed (`validity_days`), and clients refuse an expired
-one: that is what stops an old signed manifest being replayed. Either:
+A manifest expires 30 days after it is signed (`validity_days`, at most 90), and clients refuse
+an expired one: that is what stops an old signed manifest being replayed. Either:
 
-- give `.github/workflows/renew.yml` the private key as the repository secret
-  `FPA_SIGNING_KEY`, and it re-signs weekly once fewer than ten days remain; or
+- give `.github/workflows/renew.yml` the private key as the secret `FPA_SIGNING_KEY` of a
+  `frompt-signing` environment with required reviewers, and it re-signs weekly once fewer than
+  ten days remain ([guide](../guides/keep-a-catalog-fresh.md) for the environment); or
 - renew by hand: `fp-index --renew && fp-sign`, then commit
   ([guide](../guides/keep-a-catalog-fresh.md)).
 
@@ -117,9 +118,9 @@ A **catalog** is a published set of prompts — a signed manifest and the docume
 <base>/prompts/<id>/<version>.frompt.md
 ```
 
-That is the whole standard, and it is a **shape rather than a privilege**: anyone who can serve files can publish one, and no catalog is more official than another. The org's catalog lives at [`frompt-org/catalog`](https://github.com/frompt-org/catalog); a company serves `https://frompts.acme.com` from wherever it already serves static files.
+That is the whole standard, and it is a **shape rather than a privilege**: anyone who can serve files can publish one, and no catalog is more official than another. The org's catalog lives at [`frompt-org/catalog`](https://github.com/frompt-org/catalog); a company serves `https://frompts.acme.example` from wherever it already serves static files.
 
-A client may adopt from several. Each carries its own freshness floor — kept per catalog *and* per signing key, so no publisher can raise another's — and each is trusted through its own publisher key, held locally and brought in by fingerprint, never on the catalog's word alone.
+A client may adopt from several. Each carries its own freshness floor — kept per catalog *and* per signer, so no publisher can raise another's — and each is trusted through its own publisher key, held locally and brought in by fingerprint, never on the catalog's word alone.
 
 Finding a catalog you do not already know is a different layer — a **directory** of catalogs, specified in [`DIRECTORY.md`](https://github.com/frompt-org/frompt/blob/main/DIRECTORY.md) and not built. It lists; it never authorizes.
 

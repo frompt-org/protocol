@@ -86,7 +86,8 @@ WORKFLOW = """# renew -- re-sign this catalog's manifest before it expires (FPA.
 # job does, weekly, once fewer than ten days remain -- if you give it the key, as the
 # secret FPA_SIGNING_KEY (the contents of .fpa/signing_key) of the GitHub environment
 # frompt-signing. Give that environment required reviewers, so each renewal waits for
-# a person, and limit it to the default branch.
+# a person, and limit it to the default branch. GitHub creates a missing environment
+# with no protection, so the job checks for the reviewers and does not sign without them.
 #
 # It renews and does nothing else: it re-signs only a manifest this same key already
 # signed, and only if the documents are still the ones that manifest lists. New
@@ -102,6 +103,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: read
 jobs:
   renew:
     if: github.ref == format('refs/heads/{{0}}', github.event.repository.default_branch)
@@ -118,6 +120,7 @@ jobs:
       - name: renew if it expires within ten days
         env:
           FPA_SIGNING_KEY_MATERIAL: ${{{{ secrets.FPA_SIGNING_KEY }}}}
+          GH_TOKEN: ${{{{ github.token }}}}
         run: |
           left=$(python3 -c "import json, datetime as d; t = d.datetime.strptime(json.load(open('index.json'))['not_after'], '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=d.timezone.utc); print((t - d.datetime.now(d.timezone.utc)).days)")
           echo "manifest expires in $left day(s)"
@@ -126,6 +129,12 @@ jobs:
             echo "::warning::manifest expires in $left day(s) and FPA_SIGNING_KEY is not set -- renew by hand"
             exit 0
           fi
+          rules=$(gh api "repos/$GITHUB_REPOSITORY/environments/frompt-signing" \\
+                    --jq '[.protection_rules[]?.type] | join(",")' 2>/dev/null) || rules=""
+          case ",$rules," in
+            *,required_reviewers,*) ;;
+            *) echo "::error::the frompt-signing environment has no required reviewers -- not signing"; exit 1 ;;
+          esac
           umask 077
           trap 'rm -rf .fpa' EXIT
           mkdir -p .fpa
@@ -156,7 +165,7 @@ def tools_ref():
     head = git("rev-parse", "HEAD")
     if head and git("branch", "-r", "--contains", head):
         return head
-    return git("rev-parse", "origin/main") or "main"
+    return git("rev-parse", "origin/main") or None
 
 
 def main(argv):
@@ -219,9 +228,13 @@ def main(argv):
         (target / "README.md").write_text(README.format(
             name=identity, url=url, fingerprint=fingerprint, days=days))
     workflow = target / ".github" / "workflows" / "renew.yml"
-    if not workflow.exists():
+    ref = tools_ref()
+    if not workflow.exists() and ref:
         workflow.parent.mkdir(parents=True, exist_ok=True)
-        workflow.write_text(WORKFLOW.format(ref=tools_ref()))
+        workflow.write_text(WORKFLOW.format(ref=ref))
+    elif not ref:
+        print("note: no renew workflow written -- these tools are not a git checkout of "
+              "frompt-org/protocol, so there is no commit to pin them to", file=sys.stderr)
 
     print(f"created a signed, empty catalog in {target}")
     print(f"  served from  {url}")

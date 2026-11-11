@@ -113,7 +113,8 @@ fi
 # Merge, do not overwrite: allowed_signers is also this workspace's trust root
 # for OTHER publishers' catalogs, and an earlier version replaced the whole file
 # with one line every time it signed -- silently dropping every registered key.
-tmp_signers=$(mktemp 2>/dev/null || echo "/tmp/fp-signers-$$")
+tmp_signers=$(mktemp "$here/.allowed_signers.XXXXXX") || { echo "fp-sign: cannot write beside allowed_signers" >&2; exit 1; }
+trap 'rm -f "$tmp_signers"' EXIT
 { [ -f allowed_signers ] && awk -v id="$identity" '$1 != id' allowed_signers; printf '%s %s\n' "$identity" "$(cat "$key.pub")"; } > "$tmp_signers"
 mv "$tmp_signers" allowed_signers
 

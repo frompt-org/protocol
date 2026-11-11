@@ -708,7 +708,7 @@ acme_base=https://catalog.acme.example/prompts
 acme_serial=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['serial'])" "$sh/acme/index.json")
 printf '{"%s": %s}\n' "$acme_base" $((acme_serial + 1)) > "$lw/.fpa/manifest-serials.json"
 FPA_WORKSPACE="$lw" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>"$sh/legacy.err" </dev/null
-rc=$?; grep -q 'before floors were kept per signing key' "$sh/legacy.err"
+rc=$?; grep -q 'before floors were kept per signer' "$sh/legacy.err"
 check "an old-format floor above the manifest refuses it and says how the pilot can clear it" "1 0" "$rc $?"
 printf '{"%s": %s}\n' "$acme_base" "$acme_serial" > "$lw/.fpa/manifest-serials.json"
 FPA_WORKSPACE="$lw" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </dev/null \
@@ -792,8 +792,141 @@ check "the renew workflow pins actions by commit, signs only in its environment 
 # A key from outside a catalog signs only a catalog somebody named.
 (cd "$sh/acme" && FPA_SIGNING_KEY="$sh/acme/.fpa/signing_key" "$here/bin/fp-sign" </dev/null >/dev/null 2>&1)
 check "fp-sign with FPA_SIGNING_KEY will not sign the catalog it merely stands in" 2 $?
-FPA_SIGNING_KEY="$sh/acme/.fpa/signing_key" "$here/bin/fp-sign" --catalog "$sh/acme" </dev/null >/dev/null 2>&1
-check "fp-sign --catalog names the catalog for an outside key" 0 $?
+gx_sig=$(shasum < "$sh/globex/index.json.sig")
+(cd "$sh/globex" && FPA_SIGNING_KEY="$sh/acme/.fpa/signing_key" "$here/bin/fp-sign" --catalog "$sh/acme" </dev/null >/dev/null 2>&1)
+rc=$?; ssh-keygen -Y verify -f "$sh/acme/allowed_signers" -I catalog.acme.example -n foreign-prompts \
+  -s "$sh/acme/index.json.sig" < "$sh/acme/index.json" >/dev/null 2>&1
+v=$?; [ "$(shasum < "$sh/globex/index.json.sig")" = "$gx_sig" ]
+check "fp-sign --catalog signs the catalog it names, not the one it stands in" "0 0 0" "$rc $v $?"
+
+# resign <dir> <python statement on m> [key]: rewrite a catalog's manifest and sign it
+resign() {
+  python3 -c 'import json, sys
+m = json.load(open(sys.argv[1])); exec(sys.argv[2])
+open(sys.argv[1], "w").write(json.dumps(m, indent=2, sort_keys=True) + "\n")' "$1/index.json" "$2"
+  rm -f "$1/index.json.sig"; ssh-keygen -Y sign -f "${3:-$1/.fpa/signing_key}" -n foreign-prompts "$1/index.json" >/dev/null 2>&1
+}
+freshws() { mkdir -p "$1"; cp "$sh/client/allowed_signers" "$1/"; }
+
+# The workspace's own state: read whole, or not at all.
+st="$sh/st"; freshws "$st"
+FPA_WORKSPACE="$st" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </dev/null
+r=""
+for bad in '' '{"https://catalog.acme.example/prompts": ' '[]' '{"x": 5}'; do
+  printf '%s' "$bad" > "$st/.fpa/catalog-signers.json"
+  FPA_WORKSPACE="$st" "$here/bin/fp-verify" --from "$sh/globex" >/dev/null 2>"$sh/st.err" </dev/null
+  rc=$?; grep -q 'catalog-signers.json' "$sh/st.err" && r="$r$rc " || r="${r}unnamed-$rc "
+done
+check "a bindings file that exists but cannot be read is a refusal that names it" "2 2 2 2 " "$r"
+rm -rf "$st/.fpa"; FPA_WORKSPACE="$st" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </dev/null
+printf '{"%s catalog.acme.example": 1' "$acme_base" > "$st/.fpa/manifest-serials.json"
+FPA_WORKSPACE="$st" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </dev/null
+check "a floors file that exists but cannot be read is a refusal, not a fresh start" 2 $?
+rm -rf "$st/.fpa"; FPA_WORKSPACE="$st" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </dev/null
+rm -f "$st/.fpa/catalog-signers.json"
+FPA_WORKSPACE="$st" "$here/bin/fp-verify" --from "$sh/globex" >/dev/null 2>&1 </dev/null
+check "with the bindings file gone, the bindings the floors imply still hold" 1 $?
+
+# Accepted at once, remembered at once: every binding and floor survives.
+cw="$sh/cw"; mkdir -p "$cw"; : > "$cw/allowed_signers"
+for i in 1 2 3 4 5 6 7 8; do
+  mkcat "$sh/p$i" "https://p$i.example"; cat "$sh/p$i/allowed_signers" >> "$cw/allowed_signers"
+done
+lost=0
+for round in 1 2 3 4 5; do
+  rm -rf "$cw/.fpa"
+  for i in 1 2 3 4 5 6 7 8; do FPA_WORKSPACE="$cw" "$here/bin/fp-verify" --from "$sh/p$i" >/dev/null 2>&1 </dev/null & done
+  wait
+  n=$(python3 -c 'import json, sys
+print(min(len(json.load(open(f))) for f in sys.argv[1:]))' "$cw/.fpa/catalog-signers.json" \
+      "$cw/.fpa/manifest-serials.json" "$cw/.fpa/catalog-addresses.json" 2>/dev/null || echo 0)
+  [ "$n" = 8 ] || lost=$((lost + 1))
+done
+check "eight catalogs accepted at once keep all eight bindings and floors" 0 $lost
+
+# A lock line is space-delimited: what a manifest says cannot become a second pin.
+mkcat "$sh/nl" https://nl.example; nw="$sh/nlws"; mkdir -p "$nw"; cp "$sh/nl/allowed_signers" "$nw/"
+resign "$sh/nl" 'm["base"] = "https://nl.example/prompts\nhello 9.9.9 sha256:" + "0" * 64 + " https://x.example/p"'
+FPA_WORKSPACE="$nw" "$here/bin/fp-verify" --from "$sh/nl" >/dev/null 2>&1 </dev/null
+r1=$?; FPA_WORKSPACE="$nw" "$here/bin/fp-lock" --update hello --from "$sh/nl" >/dev/null 2>&1 </dev/null
+r2=$?; [ -e "$nw/fpa.lock" ]
+check "a manifest whose base would split a lock line is refused, and nothing is pinned" "1 1 1" "$r1 $r2 $?"
+cp "$sh/client/fpa.lock" "$sh/lock.keep"
+grep '^hello ' "$sh/lock.keep" | sed 's/sha256:[0-9a-f]*/sha256:'"$(printf '%064d' 0)"'/' >> "$sh/client/fpa.lock"
+out=$("$here/bin/fp-resolve" hello --from "$sh/acme" --record 2>&1 </dev/null); rc=$?
+printf '%s' "$out" | grep -q 'twice'
+check "fp-resolve refuses a lock that pins one id twice" "1 0" "$rc $?"
+cp "$sh/lock.keep" "$sh/client/fpa.lock"
+
+# One spelling per address, and one catalog per address.
+vw="$sh/vw"; freshws "$vw"
+FPA_WORKSPACE="$vw" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </dev/null
+r=""
+for spelling in 'm["base"] + "/"' '"https://Catalog.Acme.Example/prompts"'; do
+  rm -rf "$sh/variant"; cp -R "$sh/acme" "$sh/variant"
+  resign "$sh/variant" "m[\"serial\"] = 999999; m[\"base\"] = $spelling" "$sh/globex/.fpa/signing_key"
+  FPA_WORKSPACE="$vw" "$here/bin/fp-verify" --from "$sh/variant" >/dev/null 2>&1 </dev/null; r="$r$? "
+done
+check "another spelling of a bound catalog's base is the same catalog" "1 1 " "$r"
+aw="$sh/aw"; mkdir -p "$aw"; cat "$sh/p1/allowed_signers" "$sh/p2/allowed_signers" > "$aw/allowed_signers"
+cp -R "$sh/p1" "$sh/p1-at"
+FPA_WORKSPACE="$aw" "$here/bin/fp-verify" --from "$sh/p1-at" >/dev/null 2>&1 </dev/null
+r1=$?; cp "$sh/p2/index.json" "$sh/p2/index.json.sig" "$sh/p1-at/"; rm -rf "$sh/p1-at/prompts"; cp -R "$sh/p2/prompts" "$sh/p1-at/"
+FPA_WORKSPACE="$aw" "$here/bin/fp-verify" hello --from "$sh/p1-at" >/dev/null 2>&1 </dev/null
+check "an address that served one catalog does not serve another" "0 1" "$r1 $?"
+
+# A certificate naming a catalog's principal does not stand in for that catalog's key.
+cwk="$sh/certws"; freshws "$cwk"
+FPA_WORKSPACE="$cwk" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </dev/null
+ssh-keygen -q -t ed25519 -N "" -C auth -f "$sh/auth" >/dev/null 2>&1
+ssh-keygen -q -t ed25519 -N "" -C holder -f "$sh/holder" >/dev/null 2>&1
+ssh-keygen -q -s "$sh/auth" -I holder -n catalog.acme.example -V -5m:+1d "$sh/holder.pub" >/dev/null 2>&1
+printf '* cert-authority,namespaces="foreign-prompts" %s\n' "$(cut -d' ' -f1,2 "$sh/auth.pub")" >> "$cwk/allowed_signers"
+rm -rf "$sh/certcat"; cp -R "$sh/acme" "$sh/certcat"; resign "$sh/certcat" 'm["serial"] = 999999' "$sh/holder-cert.pub"
+out=$(FPA_WORKSPACE="$cwk" "$here/bin/fp-verify" --from "$sh/certcat" 2>&1 </dev/null); r=$?
+check "a manifest signed under a certificate does not pass for a catalog bound to a key" 1 $r
+case "$out" in *"accepts that catalog from"*) r=0 ;; *) r=1 ;; esac
+check "  and the refusal is the catalog's binding to its signer, not an unrelated failure" 0 $r
+
+# Renewal: a window has a ceiling, and the workflow will not sign unprotected.
+FPA_CATALOG="$sh/acme-renew" FPA_VALIDITY_DAYS=99999 "$here/bin/fp-index" --renew >/dev/null 2>&1
+check "fp-index refuses a validity window longer than its ceiling" 2 $?
+grep -q 'required_reviewers' "$wf" && grep -q '^  actions: read$' "$wf"
+check "the renew workflow checks its environment for required reviewers before signing" 0 $?
+
+# What a run is asked, and where it reads from.
+iw="$sh/iw"; freshws "$iw"; rm -rf "$sh/acme-t"; cp -R "$sh/acme" "$sh/acme-t"
+printf '\nunsigned change\n' >> "$sh/acme-t/prompts/hello/1.0.0.frompt.md"
+FPA_WORKSPACE="$iw" "$here/bin/fp-verify" --from "$sh/acme-t" hello >/dev/null 2>&1 </dev/null
+check "fp-verify checks the prompt id wherever it stands among the arguments" 1 $?
+mkdir -p "$sh/cwd/https:/nowhere.example"; cp "$sh/acme/index.json" "$sh/acme/index.json.sig" "$sh/cwd/https:/nowhere.example/"
+(cd "$sh/cwd" && FPA_WORKSPACE="$iw" "$here/bin/fp-verify" --from https://nowhere.example >/dev/null 2>&1 </dev/null)
+check "a URL is fetched, never read from a directory that happens to share its name" 2 $?
+rm -rf "$sh/stamp"; cp -R "$sh/acme" "$sh/stamp"
+resign "$sh/stamp" 'm["not_after"] = "2099-01-01T00:00:00Z\nmanifest verified: x SHA256:x"'
+FPA_WORKSPACE="$iw" "$here/bin/fp-verify" --from "$sh/stamp" >/dev/null 2>&1 </dev/null
+check "a not_after that is not a plain timestamp is refused" 1 $?
+
+# Registering: into a readable workspace only; nothing left behind when stopped.
+mkdir -p "$sh/badws/.fpa"; printf '{ "x": 1,' > "$sh/badws/.fpa/manifest-serials.json"
+FPA_WORKSPACE="$sh/badws" "$here/bin/fp-register" "$sh/p3" --key "$(keyof "$sh/p3")" >/dev/null 2>&1 </dev/null
+rc=$?; [ -e "$sh/badws/allowed_signers" ] || [ -e "$sh/badws/fpa.registered" ]
+check "fp-register refuses a workspace whose state cannot be read, and writes nothing" "1 1" "$rc $?"
+fb="$sh/fakebin"; mkdir -p "$fb" "$sh/tmpdir"
+printf '#!/bin/sh\ncase "$*" in *find-principals*) sleep 4;; esac\nexec %s "$@"\n' "$(command -v ssh-keygen)" > "$fb/ssh-keygen"
+chmod +x "$fb/ssh-keygen"
+TMPDIR="$sh/tmpdir" PATH="$fb:$PATH" FPA_WORKSPACE="$sh/sigws" "$here/bin/fp-register" "$sh/p4" --key "$(keyof "$sh/p4")" >/dev/null 2>&1 </dev/null &
+pid=$!; sleep 1.5; kill -TERM "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; sleep 5
+ls "$sh/tmpdir" | grep -q '^fp-register-'
+check "a registration stopped part way leaves no trial copy behind" 1 $?
+mkcat "$sh/case" https://case.example
+printf 'Catalog.Acme.Example %s\n' "$(cut -d' ' -f1,2 "$sh/case/.fpa/signing_key.pub")" > "$sh/case/allowed_signers"
+"$here/bin/fp-register" "$sh/case" --key "$(keyof "$sh/case")" >/dev/null 2>&1 </dev/null
+check "a principal that differs from one in use only in letter case is the same principal" 1 $?
+mkdir -p "$sh/notgit"; cp -R "$here/bin" "$sh/notgit/"
+"$sh/notgit/bin/fp-init-catalog" "$sh/ng" --url https://ng.example >/dev/null 2>&1
+rc=$?; [ -e "$sh/ng/.github/workflows/renew.yml" ]
+check "outside a git checkout, fp-init-catalog writes no workflow it cannot pin" "0 1" "$rc $?"
 
 # A publisher rotates its key: re-registering needs a deliberate unregister, and
 # the old key leaves the trust root with the registration it came in with.
