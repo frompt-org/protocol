@@ -119,7 +119,14 @@ def manifest():
     # container starting clean. All of them accept an arbitrarily old signed bundle.
     # `not_after` needs no memory: a replayed manifest dies on its own. apt calls it
     # Valid-Until and WebPKI shortened certificate lifetimes for the same reason.
-    days = int(os.environ.get("FPA_VALIDITY_DAYS", CONFIG.get("validity_days", 30)))
+    raw = os.environ.get("FPA_VALIDITY_DAYS", CONFIG.get("validity_days", 30))
+    # A whole number of days, written in ASCII digits.
+    days = raw if isinstance(raw, int) and not isinstance(raw, bool) else (
+        int(raw) if isinstance(raw, str) and raw.isascii() and raw.isdigit() else None)
+    if days is None or days < 1:
+        print(f"fp-index: a validity of {raw!r} is not a whole number of days, at least 1",
+              file=sys.stderr)
+        sys.exit(2)
     # A manifest that stays valid for years is one a replay can use for years
     # (M6a), so the window has a ceiling: renewing is cheap, and that is the point.
     if days > MAX_VALIDITY_DAYS:
@@ -141,12 +148,17 @@ def manifest():
 
     # Keep the existing window unless the content changed or it has run out, so
     # `--check` stays deterministic and a re-run is not a re-publication.
+    # A window already on disk is kept only while it is a real time, not yet past,
+    # and no longer than this run would write: a plain run never keeps a window
+    # longer than the ceiling.
     keep = None
+    now = datetime.datetime.now(datetime.timezone.utc)
     if previous:
         keep = previous.get("not_after")
+        until = fpa_roots.parse_stamp(keep)
         stale = {k: v for k, v in previous.items() if k not in ("serial", "not_after")}
-        expired = keep and keep < datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        if stale != {k: v for k, v in body.items() if k != "serial"} or expired or "--renew" in sys.argv:
+        usable = until is not None and now <= until <= now + datetime.timedelta(days=days)
+        if stale != {k: v for k, v in body.items() if k != "serial"} or not usable or "--renew" in sys.argv:
             keep = None
     body["not_after"] = keep or (
         datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=days)

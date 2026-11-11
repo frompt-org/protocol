@@ -58,6 +58,11 @@ Every tool is a plain script in [`bin/`](../../bin/). Each prints its full usage
 These tools trust keys. A manifest signed under a certificate is refused for now, rather than
 trusted on half its meaning.
 
+A catalog is the address it is served from: `fp-verify --from <dir>` checks a catalog only when its
+`base` is that directory, and `--from https://…` only when its `base` is that URL. A publisher
+checks a checkout of an https catalog with `fp-index --check` and `ssh-keygen -Y verify` against
+its own published key ([tutorial 3](../tutorials/03-publish-a-catalog.md)).
+
 A tool that reads a catalog reads one somebody chose: `FPA_CATALOG`, a registration (`--from`), or
 the tool checkout. Standing in a directory is not choosing it.
 

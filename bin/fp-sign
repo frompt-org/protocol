@@ -80,10 +80,19 @@ fi
 # Merge, do not overwrite: allowed_signers is also this workspace's trust root
 # for OTHER publishers' catalogs, and an earlier version replaced the whole file
 # with one line every time it signed -- silently dropping every registered key.
-tmp_signers=$(mktemp "$here/.allowed_signers.XXXXXX") || { echo "fp-sign: cannot write beside allowed_signers" >&2; exit 1; }
-trap 'rm -f "$tmp_signers"' EXIT
-{ [ -f allowed_signers ] && awk -v id="$identity" '$1 != id' allowed_signers; printf '%s %s\n' "$identity" "$(cat "$key.pub")"; } > "$tmp_signers"
-mv "$tmp_signers" allowed_signers
+# Written under the state lock and replaced whole, since where catalog and
+# workspace are one directory a registration may be writing it too.
+python3 - "$tools/bin" "$here" "$identity" "$key.pub" <<'PY' || { echo "fp-sign: cannot write allowed_signers" >&2; exit 1; }
+import pathlib, sys
+sys.path.insert(0, sys.argv[1])
+import fpa_roots
+here, identity, pub = pathlib.Path(sys.argv[2]), sys.argv[3], pathlib.Path(sys.argv[4])
+with fpa_roots.state_lock(here):
+    path = here / "allowed_signers"
+    keep = [l for l in (path.read_text().splitlines() if path.exists() else [])
+            if (l.split() or [""])[0] != identity]
+    fpa_roots.write_text_atomic(path, "\n".join(keep + [f"{identity} {pub.read_text().strip()}"]) + "\n")
+PY
 
 # Never claim a signature without checking it. This is the cheap half of the
 # whole mechanism, and skipping it is how the stale .sig went unnoticed.

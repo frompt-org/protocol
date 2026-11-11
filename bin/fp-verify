@@ -48,7 +48,8 @@ for i in "$@"; do
       prev=""; continue ;;
   esac
   case "$i" in
-    -*) ;;
+    --from|--context|--manifest-out|--base) ;;
+    -*) echo "fp-verify: unknown option $i (flags take their value as the next argument)" >&2; exit 2 ;;
     *) [ -z "$id" ] || { echo "fp-verify: one prompt id at a time -- got $id and $i" >&2; exit 2; }
        id="$i" ;;
   esac
@@ -85,8 +86,13 @@ command -v ssh-keygen >/dev/null || { echo "fp-verify: ssh-keygen not found" >&2
 
 # Everything is checked in a scratch directory: the manifest and its signature
 # (fetched, or copied from the local catalog) beside a copy of the trust root.
-work=$(mktemp -d) || { echo "fp-verify: cannot make a scratch directory -- failing closed" >&2; exit 2; }
+# The template puts it under TMPDIR (a bare `mktemp -d` ignores TMPDIR on macOS), and
+# a run that is stopped still removes it: bash runs the EXIT trap on a signal only
+# when the signal is trapped.
+tmproot=${TMPDIR:-/tmp}
+work=$(mktemp -d "${tmproot%/}/fp-verify.XXXXXXXX") || { echo "fp-verify: cannot make a scratch directory -- failing closed" >&2; exit 2; }
 trap 'rm -rf "$work"' EXIT
+trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
 for f in index.json index.json.sig; do
   case "$from" in
     "")
@@ -176,14 +182,15 @@ manifest = json.load(open("index.json"))
 # .fpa or a clean container has no floor at all, and would accept an arbitrarily
 # old signed bundle. `not_after` kills a replay on its own.
 import datetime
-now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+now = datetime.datetime.now(datetime.timezone.utc)
 not_after = manifest.get("not_after")
-if not fpa_roots.valid_stamp(not_after):
+expires = fpa_roots.parse_stamp(not_after)
+if expires is None:
     print("fp-verify: manifest carries no not_after in the form 2026-12-01T08:57:00Z -- cannot "
           "tell a current manifest from a replayed one. Refusing.", file=sys.stderr)
     sys.exit(1)
-if now > not_after:
-    print(f"fp-verify: manifest expired at {not_after} (now {now}).\n"
+if now > expires:
+    print(f"fp-verify: manifest expired at {not_after} (now {now:%Y-%m-%dT%H:%M:%SZ}).\n"
           "  A signature stays valid forever; the manifest is not meant to. The publisher "
           "re-signs, they do not ask you to trust an old one.", file=sys.stderr)
     sys.exit(1)
@@ -204,7 +211,8 @@ if now > not_after:
 raw_base = manifest.get("base")
 if not fpa_roots.valid_base(raw_base):
     print(f"fp-verify: the manifest's base {raw_base!r} is neither an http(s) address nor an "
-          "absolute path in plain printable characters -- refusing", file=sys.stderr)
+          "absolute path, written once and plainly: no '.' or '..' or empty segment, no '%', ';', "
+          "query or fragment, no trailing dot on the host -- refusing", file=sys.stderr)
     sys.exit(1)
 catalog = fpa_roots.normalize_base(raw_base)
 serial = manifest.get("serial")
@@ -214,11 +222,27 @@ if not isinstance(serial, int) or isinstance(serial, bool) or serial < 1:
     sys.exit(1)
 floor_key = f"{catalog} {signer}"
 # The address the manifest was fetched from, spelled one way: a directory as its
-# absolute path, a URL normalised like a base.
+# real path, a URL normalised like a base.
 address = None
 if origin:
     address = fpa_roots.normalize_base(
-        origin if origin.startswith("gh:") or "://" in origin else os.path.abspath(origin_path))
+        origin if origin.startswith("gh:") or "://" in origin else os.path.realpath(origin_path))
+# A catalog fetched from an http(s) address or a directory is the catalog that
+# address serves: its base is that address plus /prompts. A base is otherwise a
+# claim nobody checked, and it is what fpa.lock records for a reviewer to read.
+# A gh: address stands for a repository, not a base, so it is not compared (FPA.md
+# M6b says what that leaves).
+if address is not None and not address.startswith("gh:"):
+    if "://" in address:
+        names_it = catalog == f"{address}/prompts"
+    else:
+        names_it = (catalog.startswith("/")
+                    and os.path.realpath(catalog) == os.path.join(address, "prompts"))
+    if not names_it:
+        print(f"fp-verify: {origin} serves a manifest whose base is {raw_base}, not "
+              f"{origin.rstrip('/')}/prompts.\n"
+              "  A catalog's base is the address it is served from. Refusing.", file=sys.stderr)
+        sys.exit(1)
 
 
 def state_refusal(exc):
@@ -235,13 +259,15 @@ def state_refusal(exc):
 # publisher this client also trusts can sign a manifest naming the same base, or
 # serve its own catalog at another's address, and both are refusals here.
 def problem(floors, signers, addresses):
-    bound = signers.get(catalog)
-    if bound is not None and bound != signer:
-        return (f"fp-verify: {catalog} is signed by {signer}, but this workspace accepts that "
-                f"catalog from {bound} only.\n"
+    clash = fpa_roots.binding_conflict(signers, catalog, signer)
+    if clash:
+        bound_base, bound = clash
+        return (f"fp-verify: {catalog} is signed by {signer}, but this workspace accepts "
+                f"{bound_base} from {bound} only.\n"
                 "  A catalog's manifests come from one signer. If its publisher deliberately moved to a\n"
-                f"  new one, the pilot deletes the \"{catalog}\" entry from "
-                f"{fpa_roots.state_path(root, 'signers')}.")
+                f"  new one, the pilot deletes the \"{bound_base}\" entry from "
+                f"{fpa_roots.state_path(root, 'signers')}\n"
+                f"  and the \"{bound_base} {bound}\" entry from {fpa_roots.state_path(root, 'floors')}.")
     if address is not None and addresses.get(address, catalog) != catalog:
         return (f"fp-verify: {address} served the catalog {addresses[address]} before, and now "
                 f"serves {catalog}.\n"
@@ -364,8 +390,7 @@ if context not in [c.strip() for c in entry["contexts"].split(",")]:
     print(f"fp-verify: {wanted} declares contexts [{entry['contexts']}] -- it is not fit for the "
           f"{context} context, so {how} does not authorize it (FPA.md AC4b).", file=sys.stderr)
     sys.exit(1)
-soon = (datetime.datetime.strptime(not_after, "%Y-%m-%dT%H:%M:%SZ")
-        .replace(tzinfo=datetime.timezone.utc) - datetime.datetime.now(datetime.timezone.utc)).days
+soon = (expires - datetime.datetime.now(datetime.timezone.utc)).days
 if soon <= 3:
     print(f"fp-verify: note -- this manifest expires in {soon} day(s), on {not_after}",
           file=sys.stderr)

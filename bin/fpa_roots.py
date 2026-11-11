@@ -29,11 +29,13 @@ be a key taken from the host it is used to check (FPA.md M7).
     python3 bin/fpa_roots.py workspace    # print the workspace
 """
 import contextlib
+import datetime
 import fcntl
 import json
 import os
 import pathlib
 import re
+import stat
 import sys
 import tempfile
 from urllib.parse import urlsplit, urlunsplit
@@ -77,15 +79,16 @@ def safe_file(name):
 # reaches one is checked against a strict pattern first: no space, no control
 # character, nothing a reader could split differently from the writer.
 _ID = re.compile(r"[a-z0-9][a-z0-9-]*")
+# [0-9], never \d: in Python \d also matches digits of other scripts.
 _SEMVER = re.compile(
-    r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
-    r"(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)"
-    r"(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
+    r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
+    r"(?:-((?:0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)"
+    r"(?:\.(?:0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
     r"(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?"
 )
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 _PRINTABLE = re.compile(r"[!-~]+")
-_STAMP = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ")
+_STAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
 
 
 def _is(pattern, value):
@@ -104,26 +107,72 @@ def valid_digest(value):
     return _is(_DIGEST, value)
 
 
+def parse_stamp(value):
+    """The moment a manifest timestamp names (2026-12-01T08:57:00Z), as an aware UTC
+    datetime, or None when it is not one: the right shape is not enough, the date
+    has to exist, and it is compared as a time, never as a string."""
+    if not _is(_STAMP, value):
+        return None
+    try:
+        return datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=datetime.timezone.utc)
+    except ValueError:
+        return None
+
+
 def valid_stamp(value):
     """A UTC timestamp as manifests carry it: 2026-12-01T08:57:00Z."""
-    return _is(_STAMP, value)
+    return parse_stamp(value) is not None
 
 
 def valid_base(value):
     """A manifest's base: an http(s) address with a host and no credentials, query
     or fragment, or an absolute path for a catalog on disk -- either way in
-    printable characters without spaces."""
-    if not _is(_PRINTABLE, value):
+    printable characters without spaces, and already in its one plain spelling.
+
+    A spelling that only some readers would take for the same place -- a `.` or
+    `..` segment, an empty segment, a percent escape, a `;`, a host ending in a
+    dot -- is refused, not normalised: normalising every such form is a promise
+    no single function keeps, and a catalog has no reason to be written that way.
+    Trailing slashes, the case of scheme and host and a default port are the
+    only variations allowed; normalize_base() folds them."""
+    if not _is(_PRINTABLE, value) or any(c in value for c in "%;?#\\"):
         return False
-    if value.startswith("/"):
-        return True
+    s = value
+    while len(s) > 1 and s.endswith("/"):
+        s = s[:-1]
+    if s.startswith("/"):
+        return not s.startswith("//") and os.path.normpath(s) == s
     try:
-        p = urlsplit(value)
+        p = urlsplit(s)
         p.port
     except ValueError:
         return False
-    return (p.scheme.lower() in ("http", "https") and bool(p.hostname)
-            and "@" not in p.netloc and not p.query and not p.fragment)
+    if not (p.scheme.lower() in ("http", "https") and p.hostname
+            and "@" not in p.netloc and not p.hostname.endswith(".")):
+        return False
+    if p.path and not p.path.startswith("/"):
+        return False
+    return all(seg not in ("", ".", "..") for seg in p.path.split("/")[1:])
+
+
+def scheme_twin(catalog):
+    """The same catalog under the other of http and https, or None. One spelling
+    per catalog means a base bound under one scheme is not free under the other."""
+    for a, b in (("https://", "http://"), ("http://", "https://")):
+        if catalog.startswith(a):
+            return b + catalog[len(a):]
+    return None
+
+
+def binding_conflict(signers, catalog, signer):
+    """(base, bound signer) when this workspace binds the catalog -- under either
+    scheme -- to a signer other than this one; None otherwise (M6b)."""
+    for k in (catalog, scheme_twin(catalog)):
+        bound = signers.get(k) if k else None
+        if bound is not None and bound != signer:
+            return k, bound
+    return None
 
 
 def normalize_base(value):
@@ -153,8 +202,18 @@ def write_text_atomic(path, text):
     the old one, so a reader sees the old file or the new one and never half of one."""
     path = pathlib.Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    # mkstemp makes the file 0600; the file it replaces keeps the mode it had, and a
+    # new one gets what the umask gives any new file, so a workspace shared by several
+    # accounts stays readable to them.
+    try:
+        mode = stat.S_IMODE(os.stat(path).st_mode)
+    except FileNotFoundError:
+        mask = os.umask(0)
+        os.umask(mask)
+        mode = 0o666 & ~mask
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
     try:
+        os.fchmod(fd, mode)
         with os.fdopen(fd, "w") as f:
             f.write(text)
             f.flush()
@@ -215,11 +274,16 @@ def state_path(ws, kind):
 
 def read_state(ws, kind):
     path = state_path(ws, kind)
+    # .fpa itself must be a directory this tool can read: a file, a dangling link or
+    # a directory it may not enter would make every state file look absent.
+    d = path.parent
+    if os.path.lexists(d) and not (d.is_dir() and os.access(d, os.R_OK | os.X_OK)):
+        raise StateError(f"{d} is not a directory this tool can read")
     if not os.path.lexists(path):
         return {}
     try:
         data = json.loads(path.read_text())
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, RecursionError) as exc:
         raise StateError(f"{path} cannot be read ({type(exc).__name__})") from None
     want = int if kind == "floors" else str
     if not isinstance(data, dict) or not all(
@@ -230,21 +294,23 @@ def read_state(ws, kind):
 
 
 def read_trust_state(ws):
-    """(floors, signers, addresses). The signer bindings are also implied by the
-    floors, which are keyed by catalog and signer: when the bindings file is missing
-    and floors exist, the bindings are read back out of them."""
+    """(floors, signers, addresses). A floor is keyed by catalog and signer, so it
+    is a binding too: a catalog the bindings file does not name is bound to the
+    signer its floors name. The floors are written first, so a run stopped between
+    the two writes still leaves the binding behind. Rebinding a catalog therefore
+    means deleting its binding and the old signer's floor."""
     floors = read_state(ws, "floors")
-    path = state_path(ws, "signers")
-    if os.path.lexists(path):
-        signers = read_state(ws, "signers")
-    else:
-        signers = {}
-        for key in floors:
-            base, sep, signer = key.partition(" ")
-            if not sep or signer.startswith("SHA256:"):
-                continue
-            if signers.setdefault(base, signer) != signer:
-                raise StateError(f"{path} is missing, and the floors name two signers for {base}")
+    signers = read_state(ws, "signers")
+    implied = {}
+    for key in floors:
+        base, sep, signer = key.partition(" ")
+        if not sep or signer.startswith("SHA256:"):
+            continue
+        if implied.setdefault(base, signer) != signer and base not in signers:
+            raise StateError(f"{state_path(ws, 'floors')} names two signers for {base}, and "
+                             f"{state_path(ws, 'signers')} binds it to neither")
+    for base, signer in implied.items():
+        signers.setdefault(base, signer)
     return floors, signers, read_state(ws, "addresses")
 
 

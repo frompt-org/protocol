@@ -8,9 +8,11 @@
 #   globex   another publisher the client trusts, signing a manifest that names
 #            acme's catalog -- which is refused and changes nothing about acme
 #
-# A directory stands in for each domain: the client's --from is that directory
-# where in production it would be the https URL. Everything is checked the same
-# way. Temp directories only, removed at the end. Needs bash, python3, ssh-keygen.
+# A real catalog is served over https; this example serves each one from a
+# directory so it runs offline. A catalog's base is the address it is served from,
+# so each is published at its directory, under its domain's name as the signing
+# identity. Temp directories only, removed at the end. Needs bash, python3,
+# ssh-keygen.
 set -euo pipefail
 tools=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/bin
 tmp=${TMPDIR:-/tmp}
@@ -36,7 +38,7 @@ flow:/' "$dir/$3.frompt.md" && rm -f "$dir/$3.frompt.md.bak"
 }
 
 step "1. acme starts a catalog for its domain"
-"$tools/fp-init-catalog" "$acme" --url https://catalog.acme.example | sed -n '1,3p'
+"$tools/fp-init-catalog" "$acme" --url "$acme" --identity catalog.acme.example | sed -n '1,3p'
 acme_key=$(ssh-keygen -lf "$acme/.fpa/signing_key.pub" | awk '{print $2}')
 echo "acme puts this on its website, its README, its security page -- anywhere but the catalog:"
 echo "  $acme_key"
@@ -44,6 +46,10 @@ echo "  $acme_key"
 step "2. acme publishes a frompt"
 frompt "$acme" standup 1.0.0 i-have-read-this-prompt-and-want-a-standup-note-written-from-my-git-log
 (cd "$acme" && "$tools/fp-index" | tail -1 && "$tools/fp-sign" | sed -n '1p')
+echo "before pushing, acme checks what it will serve -- documents against the manifest, the"
+echo "manifest against its own published key:"
+(cd "$acme" && "$tools/fp-index" --check && ssh-keygen -Y verify -f allowed_signers \
+   -I catalog.acme.example -n foreign-prompts -s index.json.sig < index.json)
 
 step "3. The client registers acme by a fingerprint it got somewhere else"
 expect_refusal "a fingerprint that is not acme's" \
@@ -63,7 +69,7 @@ echo "re-pinning is a deliberate act, and a diff somebody reviews:"
 "$tools/fp-resolve" standup --from "$acme" --record
 
 step "6. globex, also trusted, signs a manifest naming acme's catalog at serial 999999"
-"$tools/fp-init-catalog" "$globex" --url https://catalog.globex.example >/dev/null
+"$tools/fp-init-catalog" "$globex" --url "$globex" --identity catalog.globex.example >/dev/null
 globex_key=$(ssh-keygen -lf "$globex/.fpa/signing_key.pub" | awk '{print $2}')
 "$tools/fp-register" "$globex" --key "$globex_key" --as client >/dev/null
 python3 - "$acme/index.json" "$globex/index.json" <<'PY'
@@ -76,7 +82,8 @@ rm -f "$globex/index.json.sig"
 ssh-keygen -Y sign -f "$globex/.fpa/signing_key" -n foreign-prompts "$globex/index.json" 2>/dev/null
 expect_refusal "a manifest for acme's catalog signed by somebody other than acme" \
   "$tools/fp-verify" --from "$globex"
-echo "acme's catalog is untouched -- this client takes it from acme's signer only:"
+echo "acme's catalog is untouched -- its base is its own address, and this client takes it"
+echo "from acme's signer only:"
 "$tools/fp-verify" standup --from "$acme" | tail -1 | cut -c1-90
 
 step "7. Someone swaps acme's key at the host -- manifest, signature and published key"
@@ -89,7 +96,8 @@ expect_refusal "a catalog signed by a key nobody registered" \
 
 step "To serve a catalog for real"
 cat <<'EOF'
-The catalog directory is the website. Commit it and serve it byte for byte:
+Start it with fp-init-catalog <dir> --url https://<your domain>; the catalog directory is
+then the website. Commit it and serve it byte for byte:
   GitHub Pages     push to a repo, Pages from the branch root; .nojekyll and CNAME are already there
   Cloudflare Pages point it at the repo, no build command, output directory /
   anything static  nginx, S3, R2 -- whatever already serves your files

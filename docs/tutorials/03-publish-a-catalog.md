@@ -53,6 +53,19 @@ Standing anywhere inside the catalog, the tools find it by its `frompt-catalog.j
 elsewhere, set `FPA_CATALOG=~/my-catalog`. `fp-sign` checks its own signature and prints your
 key's fingerprint.
 
+Before you push, check what you are about to serve, standing in the catalog: the documents
+against the manifest, and the manifest against your own published key, under the identity
+`fp-init-catalog` printed.
+
+```
+fp-index --check && ssh-keygen -Y verify -f allowed_signers -I <your identity> \
+  -n foreign-prompts -s index.json.sig < index.json
+```
+
+`fp-verify --from ~/my-catalog` is not that check: a client checks a catalog read from a
+directory only when its `base` is that directory, and yours is your https URL. Example 08 runs
+these two commands on its catalog.
+
 ## 4. Serve it
 
 Commit, push, and serve the directory **byte for byte** at your URL, so that

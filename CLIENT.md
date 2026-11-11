@@ -89,12 +89,14 @@ Adds the `managed` context: no human at use time, so a signature authorizes.
 - **MUST** refuse a manifest past `not_after` (§M6a) and one whose `serial` is below the highest
   already accepted **from that catalog and signer**, keyed by the manifest's `base` and the
   principal it verified as (§M6) — so no other trusted publisher can raise it.
-- **MUST** accept each catalog from one signer, the first it accepted for that `base`, and
-  each address for one catalog, the first it accepted from there; refuse a conflict (§M6b);
-  and refuse to check anything when the state holding floors and bindings exists but cannot be
-  read. The reference tools keep them in `.fpa/manifest-serials.json`,
-  `.fpa/catalog-signers.json` and `.fpa/catalog-addresses.json`; the pilot rebinds by deleting
-  an entry.
+- **MUST** refuse a manifest fetched from an http(s) address or a directory whose `base` is not
+  that address followed by `/prompts`, and a `base` not written in its one plain spelling;
+  accept each catalog from one signer, the first it accepted for that `base` under either
+  scheme, and each address for one catalog, the first it accepted from there; refuse a conflict
+  (§M6b); and refuse to check anything when the state holding floors and bindings exists but
+  cannot be read. The reference tools keep them in `.fpa/manifest-serials.json`,
+  `.fpa/catalog-signers.json` and `.fpa/catalog-addresses.json`; a floor binds its catalog
+  too, so the pilot rebinds by deleting the binding and the old signer's floor.
 - **MUST** compute digests over exact bytes (§M8); a client that reads text first has a
   line-ending bug that hashes a CRLF copy identical to its LF original.
 - **MUST** fail closed — exit non-zero, adopt nothing — when it cannot fetch or verify the
