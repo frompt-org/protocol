@@ -510,7 +510,7 @@ printf '%s %s version 2026-01-01 selftest\n' "$rf2" "$fp" >> "$rw/fpa.registered
 out=$(FPA_WORKSPACE="$rw" "$here/bin/fp-resolve" "pr-review@$pinned" --from "$rf2" --record 2>&1); rc=$?
 [ $rc -eq 1 ] && printf '%s' "$out" | grep -q 'pinned from a different publisher'
 check "a pin from one publisher does not authorize the same bytes from another (M5 origin)" 0 $?
-rm -rf "$rf" "$rf2" "$rw"
+rm -rf "$rf" "$rf2" "$rw" "$mk"
 
 # --- versions: choosing is exact or latest, and nothing else -----------------
 "$here/bin/fp-resolve" pr-review@1.2.0 --base "$here/prompts" --record >/dev/null 2>&1
@@ -1178,6 +1178,45 @@ if command -v chflags >/dev/null 2>&1; then
 else
   echo "skip -- no chflags here; the commit-order check needs a file that refuses to be replaced"
 fi
+
+# A window a deliberate run signed is kept by later plain runs, up to the ceiling.
+rm -rf "$sh/acme-60"; cp -R "$sh/acme" "$sh/acme-60"
+FPA_CATALOG="$sh/acme-60" FPA_VALIDITY_DAYS=60 "$here/bin/fp-index" --renew >/dev/null 2>&1
+FPA_CATALOG="$sh/acme-60" "$here/bin/fp-sign" </dev/null >/dev/null 2>&1
+before=$(cat "$sh/acme-60/index.json")
+FPA_CATALOG="$sh/acme-60" "$here/bin/fp-index" --check >/dev/null 2>&1; r1=$?
+FPA_CATALOG="$sh/acme-60" "$here/bin/fp-index" >/dev/null 2>&1; r2=$?
+[ "$(cat "$sh/acme-60/index.json")" = "$before" ]
+check "a 60-day window signed once survives --check and a plain fp-index run" "0 0 0" "$r1 $r2 $?"
+
+# A catalog on disk may live in a directory whose name holds characters that mean
+# something in a URL; in a path they are ordinary.
+odd="$sh/odd%;?#\\name"
+mkcat "$odd" https://odd-path.example; ow2="$sh/oddws"; mkdir -p "$ow2"; cp "$odd/allowed_signers" "$ow2/"
+FPA_WORKSPACE="$ow2" "$here/bin/fp-verify" hello --from "$odd" >/dev/null 2>&1 </dev/null
+check "a catalog in a directory named with % ; ? # or a backslash verifies from there" 0 $?
+
+# Usage, and a workspace that cannot be used.
+"$here/bin/fp-verify" -h 2>/dev/null | grep -q '^fp-verify'
+check "fp-verify -h prints its usage" 0 $?
+uw="$sh/uw"; mkdir -p "$uw"; printf 'x' > "$uw/.fpa"; printf '%s x latest 2026-01-01 t\n' "$sh/fa" > "$uw/fpa.registered"
+out=$(FPA_WORKSPACE="$uw" "$here/bin/fp-unregister" "$sh/fa" 2>&1 </dev/null); rc=$?
+case "$out" in *Traceback*) rc=traceback;; esac
+check "fp-unregister refuses a workspace whose .fpa is a file, with exit 2" 2 "$rc"
+
+# A registration that relies on a key the trust root already holds: an unregister
+# that removes the key meanwhile makes it a refusal, not a registration.
+mkcat "$sh/sa" https://sa.example; cp -R "$sh/sa" "$sh/sb"
+resign "$sh/sb" "m[\"base\"] = \"$sh/sb/prompts\"" "$sh/sa/.fpa/signing_key"
+cw5="$sh/cw5"; mkdir -p "$cw5"
+FPA_WORKSPACE="$cw5" "$here/bin/fp-register" "$sh/sa" --key "$(keyof "$sh/sa")" >/dev/null 2>&1 </dev/null
+PATH="$slow:$PATH" FPA_WORKSPACE="$cw5" "$here/bin/fp-register" "$sh/sb" --key "$(keyof "$sh/sa")" >"$sh/sb.out" 2>&1 </dev/null &
+pid=$!; sleep 1.5
+FPA_WORKSPACE="$cw5" "$here/bin/fp-unregister" "$sh/sa" >/dev/null 2>&1 </dev/null; r1=$?
+wait "$pid"; r2=$?
+grep -q '^registered' "$sh/sb.out"; r3=$?
+grep -q "^$sh/sb " "$cw5/fpa.registered"
+check "a registration whose already-trusted key is removed meanwhile is refused" "0 1 1 1" "$r1 $r2 $r3 $?"
 
 # Usage errors are usage errors: exit 2 with a message, never a traceback.
 r=""

@@ -149,15 +149,16 @@ def manifest():
     # Keep the existing window unless the content changed or it has run out, so
     # `--check` stays deterministic and a re-run is not a re-publication.
     # A window already on disk is kept only while it is a real time, not yet past,
-    # and no longer than this run would write: a plain run never keeps a window
-    # longer than the ceiling.
+    # and within the ceiling: a plain run never keeps a longer one, and never
+    # shortens one a deliberate run signed.
     keep = None
     now = datetime.datetime.now(datetime.timezone.utc)
     if previous:
         keep = previous.get("not_after")
         until = fpa_roots.parse_stamp(keep)
         stale = {k: v for k, v in previous.items() if k not in ("serial", "not_after")}
-        usable = until is not None and now <= until <= now + datetime.timedelta(days=days)
+        usable = (until is not None
+                  and now <= until <= now + datetime.timedelta(days=MAX_VALIDITY_DAYS))
         if stale != {k: v for k, v in body.items() if k != "serial"} or not usable or "--renew" in sys.argv:
             keep = None
     body["not_after"] = keep or (

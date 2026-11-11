@@ -49,6 +49,7 @@ for i in "$@"; do
   esac
   case "$i" in
     --from|--context|--manifest-out|--base) ;;
+    -h|--help) sed -n '2,/^[^#]/{/^#/s/^# \{0,1\}//p;}' "${BASH_SOURCE[0]}"; exit 0 ;;
     -*) echo "fp-verify: unknown option $i (flags take their value as the next argument)" >&2; exit 2 ;;
     *) [ -z "$id" ] || { echo "fp-verify: one prompt id at a time -- got $id and $i" >&2; exit 2; }
        id="$i" ;;

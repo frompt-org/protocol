@@ -140,13 +140,17 @@ def valid_base(value):
     no single function keeps, and a catalog has no reason to be written that way.
     Trailing slashes, the case of scheme and host and a default port are the
     only variations allowed; normalize_base() folds them."""
-    if not _is(_PRINTABLE, value) or any(c in value for c in "%;?#\\"):
+    if not _is(_PRINTABLE, value):
         return False
     s = value
     while len(s) > 1 and s.endswith("/"):
         s = s[:-1]
+    # A path is one plain spelling when normpath leaves it as it is; the characters
+    # that only mean something in a URL are ordinary in a file name.
     if s.startswith("/"):
         return not s.startswith("//") and os.path.normpath(s) == s
+    if any(c in s for c in "%;?#\\"):
+        return False
     try:
         p = urlsplit(s)
         p.port
@@ -326,8 +330,13 @@ def write_state(ws, kind, data):
 def state_lock(ws):
     """One writer at a time: hold this, read the state again, check, then write."""
     lock = pathlib.Path(ws) / ".fpa" / "state.lock"
-    lock.parent.mkdir(parents=True, exist_ok=True)
-    with open(lock, "a") as f:
+    try:
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        f = open(lock, "a")
+    except OSError as exc:
+        raise StateError(f"{lock.parent} is not a directory this tool can use "
+                         f"({type(exc).__name__})") from None
+    with f:
         fcntl.flock(f, fcntl.LOCK_EX)
         try:
             yield
