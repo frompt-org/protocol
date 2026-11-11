@@ -784,6 +784,19 @@ r1=$?; printf '\nchanged\n' >> "$sh/acme-renew/prompts/hello/1.0.0.frompt.md"
 FPA_CATALOG="$sh/acme-renew" "$here/bin/fp-index" --renew >/dev/null 2>&1
 check "fp-index --renew renews unchanged documents and refuses changed ones" "0 1" "$r1 $?"
 wf="$sh/acme/.github/workflows/renew.yml"
+# Outside a git checkout (a release archive) fp-init-catalog has no commit to pin
+# the tools to and writes no workflow. The workflow's checks still run: they read
+# the same template, rendered here with a stand-in commit.
+if [ ! -e "$wf" ]; then
+  wf="$sh/renew-template.yml"
+  python3 -c 'import importlib.machinery, importlib.util, sys
+loader = importlib.machinery.SourceFileLoader("fp_init_catalog", sys.argv[1])
+m = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+loader.exec_module(m)
+open(sys.argv[2], "w").write(m.WORKFLOW.format(ref="0123456789abcdef0123456789abcdef01234567"))' \
+    "$here/bin/fp-init-catalog" "$wf"
+  echo "note -- the tools are not a git checkout; the renew workflow checks read its template with a stand-in commit"
+fi
 ! grep -Eq 'uses: [^ ]+@v[0-9]' "$wf" && grep -q '^    environment: frompt-signing$' "$wf" \
   && grep -q "trap 'rm -rf .fpa' EXIT" "$wf" && grep -q 'ssh-keygen -Y verify -f .fpa/self' "$wf" \
   && grep -q "if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)" "$wf"
