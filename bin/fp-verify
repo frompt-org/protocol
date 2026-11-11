@@ -127,16 +127,35 @@ cd "$work" || exit 2
 # Which trusted key made this signature? A trust root holds one line per
 # publisher, and an earlier version checked the first line only -- a second
 # catalog with its own key was "NOT signed by" the first catalog's publisher.
-signer=$(ssh-keygen -Y find-principals -s index.json.sig -f allowed_signers 2>/dev/null | head -1)
+# ssh-keygen's own reason is passed on: "expired certificate" is not "modified".
+reason() { tr -d '\r' < "$1" | grep -v '^[[:space:]]*$' | head -1 | cut -c1-200; }
+signer=$(ssh-keygen -Y find-principals -s index.json.sig -f allowed_signers 2>find.err | head -1)
 if [ -z "$signer" ]; then
   echo "fp-verify: index.json.sig was not made by any key in allowed_signers" >&2
   echo "  Either the manifest was modified after signing, or this publisher's key is not in the local trust root." >&2
+  # A certificate that matched no principal says why only when verified against
+  # one, so ask for its own principal: "expired" is not "modified".
+  certp=$(python3 - "$tools/bin" index.json.sig <<'PY' 2>/dev/null
+import sys
+sys.path.insert(0, sys.argv[1])
+import fpa_roots
+c = fpa_roots.certificate(fpa_roots.signature_key(open(sys.argv[2], "rb").read()))
+print(c["principals"][0] if c["principals"] else "")
+PY
+)
+  if [ -n "$certp" ]; then
+    ssh-keygen -Y verify -f allowed_signers -I "$certp" -n foreign-prompts -s index.json.sig \
+      < index.json >/dev/null 2>find.err || true
+  fi
+  [ -z "$(reason find.err)" ] || echo "  ssh-keygen: $(reason find.err)" >&2
   exit 1
 fi
 if ! verified=$(ssh-keygen -Y verify -f allowed_signers -I "$signer" -n foreign-prompts \
      -s index.json.sig < index.json 2>&1); then
   echo "fp-verify: index.json is NOT signed by $signer" >&2
   echo "  Either the manifest was modified after signing, or it was signed by someone else." >&2
+  printf '%s\n' "$verified" > verify.err
+  [ -z "$(reason verify.err)" ] || echo "  ssh-keygen: $(reason verify.err)" >&2
   exit 1
 fi
 # The fingerprint of the key that made THIS signature, as ssh-keygen reports it.
@@ -153,59 +172,74 @@ sigfp=$(printf '%s\n' "$verified" | sed -n 's/.* key \(SHA256:[^ ]*\).*/\1/p' | 
 # the signature itself.
 authority=""; floor_id="$signer"
 if printf '%s\n' "$verified" | grep -q -- '-CERT key '; then
-  certinfo=$(python3 - index.json.sig "$sigfp" <<'PY'
-import base64, binascii, struct, subprocess, sys
-# Exactly one armored signature and nothing around it: the bytes read here must
-# be the bytes ssh-keygen verified.
-lines = [l.strip() for l in open(sys.argv[1]).read().splitlines()]
+  # Read from the certificate's own bytes (bin/fpa_roots.py), never from
+  # `ssh-keygen -L` text, which a key id or a principal can spell.
+  certinfo=$(python3 - "$tools/bin" index.json.sig "$sigfp" "$signer" <<'PY'
+import datetime, sys
+sys.path.insert(0, sys.argv[1])
+import fpa_roots
 try:
-    b = lines.index("-----BEGIN SSH SIGNATURE-----")
-    e = lines.index("-----END SSH SIGNATURE-----", b)
-except ValueError:
-    sys.exit(1)
-if any(lines[:b]) or any(lines[e + 1:]):
-    sys.exit(1)
-try:
-    blob = base64.b64decode("".join(lines[b + 1:e]), validate=True)
-except (binascii.Error, ValueError):
-    sys.exit(1)
-if blob[:6] != b"SSHSIG":
-    sys.exit(1)
-(n,) = struct.unpack(">I", blob[10:14])          # after magic and uint32 version
-cert = blob[14:14 + n]
-(t,) = struct.unpack(">I", cert[:4])
-open("cert.pub", "w").write(f"{cert[4:4 + t].decode()} {base64.b64encode(cert).decode()}\n")
-out = subprocess.run(["ssh-keygen", "-L", "-f", "cert.pub"], capture_output=True, text=True)
-if out.returncode:
-    sys.exit(1)
-ca = keyid = valid = certified = ""
-for line in out.stdout.splitlines():
-    s = line.strip()
-    if s.startswith("Public key:"):
-        certified = next((w for w in s.split() if w.startswith("SHA256:")), "")
-    elif s.startswith("Signing CA:"):
-        ca = next((w for w in s.split() if w.startswith("SHA256:")), "")
-    elif s.startswith("Key ID:"):
-        keyid = s.split(":", 1)[1].strip().strip('"').replace(" ", "_")
-    elif s.startswith("Valid:"):
-        valid = s.split(":", 1)[1].strip()
+    c = fpa_roots.certificate(fpa_roots.signature_key(open(sys.argv[2], "rb").read()))
+except ValueError as exc:
+    print(f"fp-verify: the certificate in index.json.sig cannot be read ({exc}) -- failing closed",
+          file=sys.stderr)
+    sys.exit(2)
 # The certificate read back must certify the very key ssh-keygen reported.
-if not ca or certified != sys.argv[2]:
+if c["certified"] != sys.argv[3]:
+    print("fp-verify: the certificate in index.json.sig does not certify the key that made the "
+          "signature -- failing closed", file=sys.stderr)
+    sys.exit(2)
+# One principal: a certificate counts as one signer, and with several it would be
+# whichever of them a trust root happened to match first (FPA.md M7b).
+if c["principals"] != [sys.argv[4]]:
+    print(f"fp-verify: the certificate names {len(c['principals'])} principal(s) "
+          f"{c['principals']!r}; it counts only when it names exactly one (FPA.md M7b). Refusing.",
+          file=sys.stderr)
     sys.exit(1)
-print(ca)
-print(keyid or "-")
-print(valid or "-")
+def when(t):
+    return "forever" if t >= 2 ** 63 else datetime.datetime.fromtimestamp(
+        t, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+print(c["authority"])
+print("".join(ch if ch.isprintable() and not ch.isspace() else "_" for ch in c["key_id"]) or "-")
+print(f"{when(c['valid_after'])} to {when(c['valid_before'])}")
 PY
-)
+) || exit $?
   authority=$(printf '%s\n' "$certinfo" | sed -n 1p)
   [ -n "$authority" ] || { echo "fp-verify: signed with a certificate whose authority could not be read -- failing closed" >&2; exit 2; }
-  # Kept per authority AND principal (M7b): one principal certified by an authority
-  # must not be able to raise the freshness floor of another's catalog.
-  floor_id="$authority $signer"
+  # A certificate signature counts only through a cert-authority line for the
+  # authority that signed it: a certificate listed as a plain key is not an authority.
+  python3 - "$tools/bin" allowed_signers "$authority" > authority_only <<'PY'
+import base64, binascii, sys
+sys.path.insert(0, sys.argv[1])
+import fpa_roots
+for line in open(sys.argv[2]).read().splitlines():
+    e = fpa_roots.signers_entry(line)
+    if not e or "cert-authority" not in [name for name, _ in e[1]]:
+        continue
+    try:
+        fp = fpa_roots.ssh_fingerprint(base64.b64decode(e[3], validate=True))
+    except (binascii.Error, ValueError):
+        continue
+    if fp == sys.argv[3]:
+        print(line)
+PY
+  if ! ssh-keygen -Y verify -f authority_only -I "$signer" -n foreign-prompts \
+       -s index.json.sig < index.json >/dev/null 2>&1; then
+    echo "fp-verify: index.json is signed under a certificate from $authority, and no cert-authority line" >&2
+    echo "  for that authority in the trust root accepts it. A certificate counts only through its authority. Refusing." >&2
+    exit 1
+  fi
+  # M7b: an authority is trusted in the managed context only, registered or not.
+  if [ "$context" = registered ]; then
+    echo "fp-verify: index.json is signed under a certificate from $authority; a certificate is trusted" >&2
+    echo "  in the managed context only (FPA.md M7b). Refusing for the registered context." >&2
+    exit 1
+  fi
+  # Kept per authority AND principal (M7b), in a form no plain principal can spell.
+  floor_id=$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import fpa_roots; print(fpa_roots.cert_identity(sys.argv[2], sys.argv[3]))' "$tools/bin" "$authority" "$signer")
   echo "certificate: key id $(printf '%s\n' "$certinfo" | sed -n 2p), key $sigfp, valid $(printf '%s\n' "$certinfo" | sed -n 3p)"
   echo "  the signature stops verifying when the certificate does, whatever not_after says"
   echo "manifest verified: index.json signed by $signer via certificate from authority $authority"
-  sigfp="$authority"
 else
   echo "manifest verified: index.json signed by $signer $sigfp"
 fi

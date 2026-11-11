@@ -1237,14 +1237,73 @@ casign 6 "$ca/outsider-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/n
 check "a certificate for a principal outside the authority's pattern is refused" 1 $?
 casign 6 "$ca/rogue"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
 check "an uncertified key is refused when the trust root names only an authority" 1 $?
-casign 6 "$ca/stale-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
-check "an expired certificate is refused, whatever the manifest's not_after says" 1 $?
+casign 6 "$ca/stale-cert.pub"; out=$("$here/bin/fp-verify" --from "$ca/cat" 2>&1 </dev/null); rc=$?
+printf '%s' "$out" | grep -q 'ssh-keygen: .*expired'
+check "an expired certificate is refused, whatever not_after says, and ssh-keygen's reason is passed on" "1 0" "$rc $?"
 casign 999999 "$ca/second-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
 check "a second principal of the same authority cannot sign a catalog the first one signs (M6b)" 1 $?
 casign 6 "$ca/builder-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
 check "one principal under an authority cannot raise another principal's freshness floor" 0 $?
 casign 4 "$ca/builder-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
 check "the floor still holds for the principal that set it" 1 $?
+# The signer is the authority and the principal, not the certified key: a key
+# rotated under the same authority keeps that principal's floor and binding.
+ssh-keygen -q -t ed25519 -N "" -C builder2 -f "$ca/builder2" >/dev/null 2>&1
+ssh-keygen -q -s "$ca/authority" -I builder2 -n team-a@docs.example.org -V -5m:+1d "$ca/builder2.pub" >/dev/null 2>&1
+casign 5 "$ca/builder2-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null; r1=$?
+casign 7 "$ca/builder2-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "a key rotated under one authority keeps that principal's floor and binding" "1 0" "$r1 $?"
+# The authority is read from the certificate's bytes; a key id is free text and
+# can spell any label ssh-keygen -L prints.
+ssh-keygen -q -t ed25519 -N "" -C trick -f "$ca/trick" >/dev/null 2>&1
+ssh-keygen -q -s "$ca/authority" -I "trick
+Signing CA: ED25519 SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA (using ssh-ed25519)" \
+  -n team-a@docs.example.org -V -5m:+1d "$ca/trick.pub" >/dev/null 2>&1
+casign 7 "$ca/trick-cert.pub"; out=$("$here/bin/fp-verify" --from "$ca/cat" 2>/dev/null </dev/null); rc=$?
+printf '%s' "$out" | grep -q "via certificate from authority $cafp\$"
+check "the authority is read from the certificate itself, whatever its key id spells" "0 0" "$rc $?"
+# One principal per certificate.
+ssh-keygen -q -t ed25519 -N "" -C multi -f "$ca/multi" >/dev/null 2>&1
+ssh-keygen -q -s "$ca/authority" -I multi -n team-a@docs.example.org,team-c@docs.example.org -V -5m:+1d "$ca/multi.pub" >/dev/null 2>&1
+casign 7 "$ca/multi-cert.pub"; out=$("$here/bin/fp-verify" --from "$ca/cat" 2>&1 </dev/null); rc=$?
+printf '%s' "$out" | grep -q 'exactly one'
+check "a certificate naming several principals is refused" "1 0" "$rc $?"
+# A certificate counts only through a cert-authority line: listed as a plain key,
+# it is not an authority (and here it has expired besides).
+mkdir -p "$ca/pw"
+printf 'team-a@docs.example.org namespaces="foreign-prompts" %s\n' "$(cut -d' ' -f1,2 "$ca/stale-cert.pub")" > "$ca/pw/allowed_signers"
+casign 7 "$ca/stale-cert.pub"; FPA_WORKSPACE="$ca/pw" "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "a certificate listed as a plain key is not an authority" 1 $?
+# An authority is trusted in the managed context only, whether or not the
+# workspace keeps a register.
+casign 7 "$ca/builder-cert.pub"; "$here/bin/fp-verify" --from "$ca/cat" --context registered >/dev/null 2>&1 </dev/null
+check "a certificate-signed catalog is refused for the registered context, with no register in play" 1 $?
+# The certificate read back must certify the key ssh-keygen reported; a stand-in
+# ssh-keygen reports another.
+mkdir -p "$ca/fakebin"
+printf '#!/bin/bash
+case " $* " in *" -Y verify "*) out=$(%s "$@" 2>&1); rc=$?; printf "%%s\\n" "$out" | sed "s/ key SHA256:[^ ]*/ key SHA256:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB/"; exit $rc ;; esac
+exec %s "$@"
+' \
+  "$(command -v ssh-keygen)" "$(command -v ssh-keygen)" > "$ca/fakebin/ssh-keygen"
+chmod +x "$ca/fakebin/ssh-keygen"
+casign 7 "$ca/builder-cert.pub"; PATH="$ca/fakebin:$PATH" "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "a certificate that does not certify the key ssh-keygen reported is refused" 2 $?
+# A certificate signer's floor binds its catalog like any other: with the binding
+# gone from the bindings file, a plain key the workspace also trusts is refused.
+cp -R "$ca/ws" "$ca/ws5"
+printf 'rogue@docs.example.org namespaces="foreign-prompts" %s\n' "$(cut -d' ' -f1,2 "$ca/rogue.pub")" >> "$ca/ws5/allowed_signers"
+python3 -c 'import json, sys
+p = sys.argv[1]; m = json.load(open(p)); m.pop(sys.argv[2], None); open(p, "w").write(json.dumps(m))' \
+  "$ca/ws5/.fpa/catalog-signers.json" "$ca/cat/prompts"
+casign 999999 "$ca/rogue"; FPA_WORKSPACE="$ca/ws5" "$here/bin/fp-verify" --from "$ca/cat" >/dev/null 2>&1 </dev/null
+check "a certificate signer's floor binds its catalog when the bindings file has lost it" 1 $?
+# Bytes that are not text after the armor are a clean refusal.
+casign 7 "$ca/builder-cert.pub"; printf '\377\376\n' >> "$ca/cat/index.json.sig"
+out=$("$here/bin/fp-verify" --from "$ca/cat" 2>&1 </dev/null); rc=$?
+case "$out" in *Traceback*) rc=traceback;; esac
+[ "$rc" = 1 ] || [ "$rc" = 2 ]
+check "non-UTF-8 bytes after the armor are a refusal, not a traceback" 0 $?
 
 # Registering pins one key; an authority vouches for many principals (M7b).
 casign 7 "$ca/builder-cert.pub"; cp "$ca/ws/allowed_signers" "$ca/cat/allowed_signers"
@@ -1274,15 +1333,35 @@ printf '%s %s latest 2026-01-01 selftest\n' "$ca/cat" "$cafp" > "$ca/ws/fpa.regi
 check "a registered catalog signed under a certificate is refused (AC2b, M7b)" 1 $?
 rm -f "$ca/ws/fpa.registered"
 
-# fp-sign signs as the certificate beside the key, and publishes no key line.
+# fp-sign signs as a certificate only when one is named -- never one it finds
+# beside the key -- and then publishes no key line.
+plainsig() { python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import fpa_roots
+try: fpa_roots.certificate(fpa_roots.signature_key(open(sys.argv[2], "rb").read())); print("cert")
+except ValueError: print("plain")' "$here/bin" "$1"; }
+r=""
+for unasked in unset empty; do
+  rm -rf "$ca/plain"; cp -R "$ca/cat" "$ca/plain"
+  if [ "$unasked" = unset ]; then
+    FPA_CATALOG="$ca/plain" FPA_SIGNING_KEY="$ca/builder" "$here/bin/fp-sign" >/dev/null 2>&1 </dev/null
+  else
+    FPA_CATALOG="$ca/plain" FPA_SIGNING_KEY="$ca/builder" FPA_SIGNING_CERT= "$here/bin/fp-sign" >/dev/null 2>&1 </dev/null
+  fi
+  r="$r$? $(plainsig "$ca/plain/index.json.sig") "
+done
+check "fp-sign uses a certificate only when named; beside the key or empty, it signs as the key" "0 plain 0 plain " "$r"
 signers_before=$(shasum < "$ca/cat/allowed_signers")
-FPA_CATALOG="$ca/cat" FPA_SIGNING_KEY="$ca/builder" "$here/bin/fp-sign" >/dev/null 2>&1 </dev/null \
+FPA_CATALOG="$ca/cat" FPA_SIGNING_KEY="$ca/builder" FPA_SIGNING_CERT="$ca/builder-cert.pub" "$here/bin/fp-sign" >/dev/null 2>&1 </dev/null \
   && ssh-keygen -Y verify -f "$ca/cat/allowed_signers" -I team-a@docs.example.org -n foreign-prompts \
        -s "$ca/cat/index.json.sig" < "$ca/cat/index.json" >/dev/null 2>&1 \
   && [ "$(shasum < "$ca/cat/allowed_signers")" = "$signers_before" ]
-check "fp-sign signs with the key's certificate and leaves the authority's trust root alone" 0 $?
-FPA_CATALOG="$ca/cat" FPA_SIGNING_KEY="$ca/outsider" "$here/bin/fp-sign" >/dev/null 2>&1 </dev/null
-check "fp-sign refuses a certificate no authority in allowed_signers accepts" 1 $?
+check "fp-sign signs with a named certificate and leaves the authority's trust root alone" 0 $?
+FPA_CATALOG="$ca/cat" FPA_SIGNING_KEY="$ca/outsider" FPA_SIGNING_CERT="$ca/outsider-cert.pub" "$here/bin/fp-sign" >/dev/null 2>&1 </dev/null
+rc=$?; [ -e "$ca/cat/index.json.sig" ]
+check "fp-sign refuses a certificate no authority accepts, and leaves no signature" "1 1" "$rc $?"
+casign 7 "$ca/builder-cert.pub"
+FPA_CATALOG="$ca/cat" FPA_SIGNING_KEY="$ca/builder" FPA_SIGNING_CERT="$ca/second-cert.pub" "$here/bin/fp-sign" >/dev/null 2>&1 </dev/null
+rc=$?; [ -e "$ca/cat/index.json.sig" ]
+check "fp-sign refuses a certificate that does not certify its key, and leaves no signature" "1 1" "$rc $?"
 unset FPA_WORKSPACE
 rm -rf "$ca"
 
