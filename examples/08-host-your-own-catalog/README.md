@@ -5,11 +5,11 @@ its key's fingerprint, played out with the attacks the protocol has to refuse:
 
 | Step | What happens | Why it matters |
 |---|---|---|
-| 1–2 | acme starts a catalog for `catalog.acme.example`, publishes a frompt, hands out a fingerprint | the fingerprint is the one thing that must travel by another route |
+| 1–2 | acme starts a catalog for `catalog.acme.example`, publishes a frompt, checks it before pushing, hands out a fingerprint | the fingerprint is the one thing that must travel by another route |
 | 3 | the client registers by fingerprint; a wrong one is refused | the key served by the catalog is trusted only because it matched (FPA.md M7a) |
 | 4 | the client pins a version from a catalog it does not hold, then resolves by id | `fp-lock --from` pins what `fp-verify` just verified |
 | 5 | acme ships 1.1.0; the pinned client refuses it until it re-pins | consent given once is bounded by the pin (AC2) |
-| 6 | globex, also trusted, signs a manifest naming acme's catalog at serial 999999 | refused: the client takes acme's catalog from acme's signer only, and nothing about acme changes (M6, M6b) |
+| 6 | globex, also trusted, signs a manifest naming acme's catalog at serial 999999 | refused: a catalog's base is the address it is served from, the client takes acme's catalog from acme's signer only, and nothing about acme changes (M6, M6b) |
 | 7 | someone swaps acme's key at the host: manifest, signature and published key | refused: the registered key is the only one that counts (AC2b) |
 
 **Introduces:** `fp-init-catalog`, `fp-register --key`, `fp-lock --update --from`, and
@@ -21,9 +21,10 @@ its key's fingerprint, played out with the attacks the protocol has to refuse:
 examples/08-host-your-own-catalog/run.sh
 ```
 
-Directories stand in for the two domains: the client's `--from` is a directory where in production
-it would be `https://catalog.acme.example`, and every check runs the same way. All of it happens
-in temp directories with fresh keys, removed afterwards. No network.
+A real catalog is served over https; this example uses a directory for each so it runs offline.
+A catalog's base is the address it is served from, so each catalog here is published at its own
+directory (`fp-init-catalog --url <dir>`) and signs under its domain's name. All of it happens in
+temp directories with fresh keys, removed afterwards. No network.
 
 ## What passing looks like
 
@@ -37,9 +38,10 @@ registered …/catalog.acme.example
 
 == 6. globex, also trusted, signs a manifest naming acme's catalog at serial 999999
 manifest verified: index.json signed by catalog.globex.example SHA256:…
-fp-verify: https://catalog.acme.example/prompts is signed by catalog.globex.example, but this workspace accepts that catalog from catalog.acme.example only.
+fp-verify: …/catalog.globex.example serves a manifest whose base is …/catalog.acme.example/prompts, not …/catalog.globex.example/prompts.
   -> refused, as it should be
-acme's catalog is untouched -- this client takes it from acme's signer only:
+acme's catalog is untouched -- its base is its own address, and this client takes it
+from acme's signer only:
 authorized: standup v1.1.0 digest … contexts [interactive, registered, managed]
 
 == 7. Someone swaps acme's key at the host -- manifest, signature and published key

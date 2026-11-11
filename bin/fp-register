@@ -173,7 +173,7 @@ def extend_trust(lines, source, local):
             continue
         if principal.lower() in have:
             print(f"fp-register: the principal {principal!r} already names a different key in "
-                  "the trust root.\n  Two publishers under one name would make 'signed by {principal}' "
+                  f"the trust root.\n  Two publishers under one name would make 'signed by {principal}' "
                   "mean either of them. Ask the publisher, or edit the trust root deliberately.",
                   file=sys.stderr)
             return None
@@ -208,6 +208,14 @@ class Trial:
                 (self.dir / name).parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(WS / name, self.dir / name)
         self.trust = self.dir / "allowed_signers"
+        # What the trial started from. commit() folds in only what this run added on
+        # top of it, never the copy as a whole: the copy is a snapshot, and the
+        # workspace may have changed since (another registration, an unregister).
+        self.start_trust = self._trust_lines()
+        self.start_state = fpa_roots.read_trust_state(self.dir)
+
+    def _trust_lines(self):
+        return self.trust.read_text().splitlines() if self.trust.exists() else []
 
     def discard(self):
         shutil.rmtree(self.dir, ignore_errors=True)
@@ -222,23 +230,47 @@ class Trial:
         with fpa_roots.state_lock(WS):
             floors, signers, addresses = fpa_roots.read_trust_state(WS)
             t_floors, t_signers, t_addresses = fpa_roots.read_trust_state(self.dir)
-            for mine, theirs, what in ((signers, t_signers, "signer"), (addresses, t_addresses, "catalog")):
-                for k, v in theirs.items():
-                    if mine.get(k, v) != v:
-                        raise Refused(f"this workspace binds {k} to the {what} {mine[k]}, not {v}")
+            s_floors, s_signers, s_addresses = self.start_state
+            # Only what this run changed: floors it raised, bindings it made.
+            run_floors = {k: v for k, v in t_floors.items() if s_floors.get(k) != v}
+            run_signers = {k: v for k, v in t_signers.items() if k not in s_signers}
+            run_addresses = {k: v for k, v in t_addresses.items() if k not in s_addresses}
+            for k, v in run_signers.items():
+                clash = fpa_roots.binding_conflict(signers, k, v)
+                if clash:
+                    raise Refused(f"this workspace binds {clash[0]} to the signer {clash[1]}, not {v}")
+            for k, v in run_addresses.items():
+                if addresses.get(k, v) != v:
+                    raise Refused(f"this workspace binds {k} to the catalog {addresses[k]}, not {v}")
             entries = parse()
             was = entries.get(base)
             if was and was["fingerprint"] != record["fingerprint"]:
                 raise Refused(f"{base} was registered against key {was['fingerprint']} meanwhile")
-            for k, v in t_floors.items():
-                floors[k] = max(v, floors.get(k, v))
-            for mine, theirs in ((signers, t_signers), (addresses, t_addresses)):
-                for k, v in theirs.items():
-                    mine.setdefault(k, v)
+            # The trust root as it stands now, and the lines this run added to its copy.
+            # A principal names one key: a line whose principal, compared without regard
+            # to case, already names a different key here is refused, as extend_trust()
+            # refused it against the snapshot.
             local = WS / "allowed_signers"
             have = local.read_text().splitlines() if local.exists() else []
-            new = [l for l in (self.trust.read_text().splitlines() if self.trust.exists() else [])
-                   if l not in have]
+            named = {}
+            for line in have:
+                k = key_of(line)
+                if k:
+                    named.setdefault(k[0].lower(), set()).add(k[1])
+            new = []
+            for line in self._trust_lines():
+                if line in self.start_trust or line in have:
+                    continue
+                k = key_of(line)
+                if k and named.get(k[0].lower(), {k[1]}) != {k[1]}:
+                    raise Refused(f"the principal {k[0]!r} names a different key in the trust root "
+                                  "now -- another registration took it meanwhile")
+                new.append(line)
+            for k, v in run_floors.items():
+                floors[k] = max(v, floors.get(k, v))
+            for mine, theirs in ((signers, run_signers), (addresses, run_addresses)):
+                for k, v in theirs.items():
+                    mine.setdefault(k, v)
             entries[base] = record
             fpa_roots.write_state(WS, "floors", floors)
             fpa_roots.write_state(WS, "signers", signers)
@@ -301,18 +333,22 @@ def main(argv):
         return 2
 
     if invoked_as == "fp-unregister" or "--remove" in argv:
-        if base not in entries:
-            print(f"fp-unregister: {base} is not registered", file=sys.stderr)
-            return 1
-        gone = entries.pop(base)
-        fpa_roots.write_text_atomic(FILE, render(entries))
-        print(f"unregistered {base}\n  Nothing else revoked it, because nothing else agreed to it.")
-        # The key came in with the registration, so it leaves with it -- unless
-        # another registration still names it. A publisher that rotates its key is
-        # then unregistered and registered again, under the same principal.
-        if not any(e["fingerprint"] == gone["fingerprint"] for e in entries.values()):
-            if drop_key(gone["fingerprint"]):
-                print(f"  its key {gone['fingerprint']} is removed from the trust root")
+        # Under the state lock, read again: a registration committing meanwhile
+        # writes the same two files.
+        with fpa_roots.state_lock(WS):
+            entries = parse()
+            if base not in entries:
+                print(f"fp-unregister: {base} is not registered", file=sys.stderr)
+                return 1
+            gone = entries.pop(base)
+            fpa_roots.write_text_atomic(FILE, render(entries))
+            print(f"unregistered {base}\n  Nothing else revoked it, because nothing else agreed to it.")
+            # The key came in with the registration, so it leaves with it -- unless
+            # another registration still names it. A publisher that rotates its key is
+            # then unregistered and registered again, under the same principal.
+            if not any(e["fingerprint"] == gone["fingerprint"] for e in entries.values()):
+                if drop_key(gone["fingerprint"]):
+                    print(f"  its key {gone['fingerprint']} is removed from the trust root")
         if not entries:
             print("  fpa.registered is now empty. It still opts this workspace into the model, so\n"
                   "  every catalog is refused until one is registered. Delete the file to opt out.")
@@ -398,9 +434,19 @@ def register(argv, entries, base, pin, who, trial):
     # Verified in the trial workspace, which has no fpa.registered: the catalog is
     # checked on its own merits, and the real workspace's register still applies to
     # everyone else.
-    proc = subprocess.run([str(verify), "--from", base],
-                          env=dict(os.environ, FPA_WORKSPACE=str(trial.dir)),
-                          capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    # Stopped meanwhile, this run asks fp-verify to stop too (SIGTERM, not the
+    # SIGKILL subprocess.run would send), so that it removes its scratch directory.
+    child = subprocess.Popen([str(verify), "--from", base],
+                             env=dict(os.environ, FPA_WORKSPACE=str(trial.dir)),
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                             stdin=subprocess.DEVNULL)
+    try:
+        out, err = child.communicate()
+    except BaseException:
+        child.terminate()
+        child.wait()
+        raise
+    proc = subprocess.CompletedProcess(child.args, child.returncode, out, err)
     if proc.returncode != 0:
         print(f"fp-register: cannot verify {base} -- refusing to record consent to a catalog "
               f"this workspace cannot check.\n  {proc.stderr.strip().splitlines()[0] if proc.stderr.strip() else ''}",

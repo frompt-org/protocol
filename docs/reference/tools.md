@@ -60,6 +60,11 @@ signed under a certificate counts as its authority and principal together, never
 does not pass for a catalog bound to a key. `fp-register` refuses a catalog signed under a
 certificate, since a registration pins one key.
 
+A catalog is the address it is served from: `fp-verify --from <dir>` checks a catalog only when its
+`base` is that directory, and `--from https://…` only when its `base` is that URL. A publisher
+checks a checkout of an https catalog with `fp-index --check` and `ssh-keygen -Y verify` against
+its own published key ([tutorial 3](../tutorials/03-publish-a-catalog.md)).
+
 A tool that reads a catalog reads one somebody chose: `FPA_CATALOG`, a registration (`--from`), or
 the tool checkout. Standing in a directory is not choosing it.
 

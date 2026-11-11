@@ -17,6 +17,12 @@ lint="$here/bin/fp-lint"
 new="$here/bin/fp-new"
 tmpl="$here/TEMPLATE.frompt.md"
 fails=0
+# Every scratch directory a tool makes during this run goes in one directory of the
+# run's own, removed when it ends -- killed runs included.
+suite_tmp=${TMPDIR:-/tmp}; suite_tmp=$(mktemp -d "${suite_tmp%/}/fp-selftest.XXXXXXXX") || exit 2
+export TMPDIR="$suite_tmp"
+trap 'rm -rf "$suite_tmp"' EXIT
+trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
 
 check() { # check <name> <expected> <actual>
   if [ "$2" = "$3" ]; then printf 'ok   %s\n' "$1"
@@ -290,13 +296,26 @@ check "a signature does not authorize an interactive-only prompt" 1 $?
 check "fp-verify exits 2 when it cannot check, not 1" 2 $?
 
 # --- late binding: the manifest comes from the publisher ---------------------
-# openws: a workspace that trusts what this checkout trusts and keeps no register,
-# so a catalog is checked on its own merits.
+# A catalog's base is the address it is served from, so a copy of this checkout's
+# catalog read from a directory is a catalog of its own. mirror <dir> publishes one
+# there -- base <dir>/prompts -- signed by a key this run makes, as frompt-mirror.
+# openws: a workspace that trusts what this checkout trusts and that key, and
+# keeps no register, so a catalog is checked on its own merits.
+mk=$(mktemp -d 2>/dev/null || echo "/tmp/fp-mk-$$"); mkdir -p "$mk"
+ssh-keygen -q -t ed25519 -N "" -C frompt-mirror -f "$mk/key" >/dev/null 2>&1
+mresign() { rm -f "$1/index.json.sig"; ssh-keygen -Y sign -f "${2:-$mk/key}" -n foreign-prompts "$1/index.json" >/dev/null 2>&1; }
+mset() { # mset <dir> <python statement on m>: edit a mirror's manifest, then re-sign it
+  python3 -c 'import json, sys
+m = json.load(open(sys.argv[1])); exec(sys.argv[2])
+open(sys.argv[1], "w").write(json.dumps(m, indent=2, sort_keys=True) + "\n")' "$1/index.json" "$2"
+  mresign "$1"; }
+mirror() { mkdir -p "$1/prompts"; cp -R "$here"/prompts/. "$1/prompts/"
+  cp "$here/index.json" "$1/index.json"; mset "$1" "m['base'] = '$1/prompts'"; }
 openws() { local d; d=$(mktemp -d 2>/dev/null || echo "/tmp/fp-ows-$$-$RANDOM"); mkdir -p "$d"
-  cp "$here/allowed_signers" "$d/"; printf '%s' "$d"; }
-pub=$(mktemp -d 2>/dev/null || echo "/tmp/fp-pub-$$"); mkdir -p "$pub/prompts"
-cp "$here"/index.json "$here"/index.json.sig "$pub/"
-cp -R "$here"/prompts/. "$pub/prompts/"
+  cp "$here/allowed_signers" "$d/"
+  printf 'frompt-mirror namespaces="foreign-prompts" %s\n' "$(cut -d' ' -f1,2 "$mk/key.pub")" >> "$d/allowed_signers"
+  printf '%s' "$d"; }
+pub=$(mktemp -d 2>/dev/null || echo "/tmp/fp-pub-$$"); mirror "$pub"
 ows=$(openws)
 FPA_WORKSPACE="$ows" "$here/bin/fp-verify" repo-recon --from "$pub" >/dev/null 2>&1 </dev/null
 check "fp-verify --from fetches a publisher manifest and authorizes against it" 0 $?
@@ -306,31 +325,16 @@ check "fp-verify --from refuses a document the fetched manifest did not vouch fo
 rm -rf "$pub" "$ows"
 
 # --- freshness: a validly signed but older manifest is a replay --------------
-if [ -f "$here/.fpa/signing_key" ]; then
-  old=$(mktemp -d 2>/dev/null || echo "/tmp/fp-old-$$"); mkdir -p "$old/prompts"
-  cp "$here"/index.json "$old/index.json"; cp "$here"/index.json.sig "$old/index.json.sig"
-  cp "$here"/prompts/*/*.frompt.md "$old/prompts/"
-  ows=$(openws)
-  FPA_WORKSPACE="$ows" "$here/bin/fp-verify" repo-recon --from "$old" >/dev/null 2>&1 </dev/null
-  # Advance the serial with a scratch prompt of our own, never by editing a
-  # tracked one. An earlier version bumped a real prompt and restored it with
-  # git checkout, which discarded uncommitted work -- the same footgun fp-demo
-  # had, in a new place. A check that damages the tree is not a check.
-  mkdir -p "$here/prompts/zz-selftest-scratch"
-  scratch="$here/prompts/zz-selftest-scratch/1.0.0.frompt.md"
-  "$new" zz-selftest-scratch -c i-exist-only-to-advance-the-manifest-serial --author selftest \
-    > "$scratch" 2>/dev/null
-  (cd "$here" && bin/fp-index >/dev/null && bin/fp-sign </dev/null >/dev/null && \
-     FPA_WORKSPACE="$ows" bin/fp-verify repo-recon --base ./prompts >/dev/null 2>&1 </dev/null)
-  FPA_WORKSPACE="$ows" "$here/bin/fp-verify" repo-recon --from "$old" >/dev/null 2>&1 </dev/null
-  check "a validly signed but older manifest is refused as a rollback" 1 $?
-  rm -rf "$ows"
-  rm -rf "$here/prompts/zz-selftest-scratch"
-  (cd "$here" && bin/fp-index >/dev/null && bin/fp-lock >/dev/null && bin/fp-sign </dev/null >/dev/null)
-  rm -rf "$old"
-else
-  echo "skip -- no signing key; rollback check needs one"
-fi
+old=$(mktemp -d 2>/dev/null || echo "/tmp/fp-old-$$"); mirror "$old"
+kept=$(mktemp -d 2>/dev/null || echo "/tmp/fp-kept-$$"); cp "$old/index.json" "$old/index.json.sig" "$kept/"
+ows=$(openws)
+FPA_WORKSPACE="$ows" "$here/bin/fp-verify" repo-recon --from "$old" >/dev/null 2>&1 </dev/null
+mset "$old" 'm["serial"] += 1'
+FPA_WORKSPACE="$ows" "$here/bin/fp-verify" repo-recon --from "$old" >/dev/null 2>&1 </dev/null; r1=$?
+cp "$kept/index.json" "$kept/index.json.sig" "$old/"
+FPA_WORKSPACE="$ows" "$here/bin/fp-verify" repo-recon --from "$old" >/dev/null 2>&1 </dev/null
+check "a validly signed but older manifest is refused as a rollback" "0 1" "$r1 $?"
+rm -rf "$old" "$kept" "$ows"
 
 # --- the lock pins only what declares the registered context -----------------
 python3 - "$here" <<'PY' >/dev/null 2>&1
@@ -359,18 +363,8 @@ fi
 # --- freshness is per catalog, not per client --------------------------------
 # Two catalogs, two serial lines. One global floor meant a brand new catalog
 # starting at 1 read as a rollback of an unrelated one already at 45.
-two=$(mktemp -d 2>/dev/null || echo "/tmp/fp-two-$$"); mkdir -p "$two/a" "$two/b/prompts"
-cp "$here"/index.json "$here"/index.json.sig "$two/a/"
-cp -R "$here"/prompts "$two/a/"
-python3 - "$two" <<'PY'
-import json, pathlib, sys
-d = pathlib.Path(sys.argv[1])
-m = json.loads((d / "a" / "index.json").read_text())
-m["base"] = "https://example.invalid/other-catalog/prompts"
-m["serial"] = 1
-(d / "b" / "index.json").write_text(json.dumps(m, indent=2, sort_keys=True) + "\n")
-PY
-cp -R "$here"/prompts/. "$two/b/prompts/"
+two=$(mktemp -d 2>/dev/null || echo "/tmp/fp-two-$$"); mirror "$two/a"; mirror "$two/b"
+mset "$two/b" 'm["serial"] = 1'
 ows=$(openws)
 FPA_WORKSPACE="$ows" "$here/bin/fp-verify" repo-recon --from "$two/a" >/dev/null 2>&1 </dev/null
 check "a catalog at a high serial is accepted" 0 $?
@@ -381,29 +375,28 @@ data = json.loads(floors.read_text()) if floors.exists() else {}
 assert any(v > 1 for v in data.values()), "expected a high floor recorded for some catalog"
 PY
 check "the floor it recorded is keyed by that catalog" 0 $?
+FPA_WORKSPACE="$ows" "$here/bin/fp-verify" repo-recon --from "$two/b" >/dev/null 2>&1 </dev/null
+check "  and another catalog starting at serial 1 is not a rollback of it" 0 $?
 rm -rf "$two" "$ows"
 
 # --- expiry: the half of freshness that needs no memory ----------------------
-if [ -f "$here/.fpa/signing_key" ]; then
-  (cd "$here" && FPA_VALIDITY_DAYS=-1 bin/fp-index --renew >/dev/null && bin/fp-sign </dev/null >/dev/null)
-  "$here/bin/fp-verify" repo-recon --base "$here/prompts" >/dev/null 2>&1 </dev/null
-  check "a validly signed but expired manifest is refused" 1 $?
-  (cd "$here" && bin/fp-index --renew >/dev/null && bin/fp-sign </dev/null >/dev/null)
-  "$here/bin/fp-verify" repo-recon --base "$here/prompts" >/dev/null 2>&1 </dev/null
-  check "a manifest inside its validity window is accepted" 0 $?
-else
-  echo "skip -- no signing key; expiry checks need one"
-fi
+exp=$(mktemp -d 2>/dev/null || echo "/tmp/fp-exp-$$"); mirror "$exp"
+ows=$(openws)
+mset "$exp" 'm["not_after"] = "2001-01-01T00:00:00Z"'
+FPA_WORKSPACE="$ows" "$here/bin/fp-verify" repo-recon --from "$exp" >/dev/null 2>&1 </dev/null
+check "a validly signed but expired manifest is refused" 1 $?
+mset "$exp" 'import datetime as d; m["not_after"] = (d.datetime.utcnow() + d.timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")'
+FPA_WORKSPACE="$ows" "$here/bin/fp-verify" repo-recon --from "$exp" >/dev/null 2>&1 </dev/null
+check "a manifest inside its validity window is accepted" 0 $?
+rm -rf "$exp" "$ows"
 
 # --- registration: the record that someone agreed once -----------------------
-reg=$(mktemp -d 2>/dev/null || echo "/tmp/fp-reg-$$"); mkdir -p "$reg/prompts"
-cp "$here"/index.json "$here"/index.json.sig "$reg/"
-cp -R "$here"/prompts/. "$reg/prompts/"
+reg=$(mktemp -d 2>/dev/null || echo "/tmp/fp-reg-$$"); mirror "$reg"
 if [ -f "$here/fpa.registered" ]; then
   "$here/bin/fp-verify" repo-recon --from "$reg" >/dev/null 2>&1 </dev/null
   check "an unregistered catalog is refused once the workspace keeps a register" 1 $?
   "$here/bin/fp-verify" repo-recon --from "$reg" --registering >/dev/null 2>&1 </dev/null
-  check "no flag skips the register: an unregistered catalog is refused whatever is passed" 1 $?
+  check "no flag skips the register: an option fp-verify does not have is a usage error" 2 $?
 else
   echo "skip -- no fpa.registered in this workspace"
 fi
@@ -419,8 +412,8 @@ if [ -f "$here/.fpa/signing_key" ] && [ -f "$here/fpa.registered" ]; then
   sp=$(mktemp -d 2>/dev/null || echo "/tmp/fp-sp-$$"); mkdir -p "$sp/prompts"
   cp -R "$here"/prompts/. "$sp/prompts/"
   python3 -c 'import json, sys
-m = json.load(open(sys.argv[1])); m["base"] = "https://example.invalid/second-publisher/prompts"
-open(sys.argv[2], "w").write(json.dumps(m, indent=2, sort_keys=True) + "\n")' "$here/index.json" "$sp/index.json"
+m = json.load(open(sys.argv[1])); m["base"] = sys.argv[3]
+open(sys.argv[2], "w").write(json.dumps(m, indent=2, sort_keys=True) + "\n")' "$here/index.json" "$sp/index.json" "$sp/prompts"
   ssh-keygen -q -t ed25519 -N "" -C second-publisher -f "$sp/key2" >/dev/null 2>&1
   ssh-keygen -Y sign -f "$sp/key2" -n foreign-prompts "$sp/index.json" >/dev/null 2>&1
   ows=$(openws)
@@ -463,64 +456,61 @@ fi
 # the checkout's own index; then it read the publisher's JSON without checking
 # the signature, the registered key, expiry or context fitness. Two reviewers
 # found each in turn.
-if [ -f "$here/fpa.registered" ] && [ -f "$here/fpa.lock" ] && [ -f "$here/.fpa/signing_key" ]; then
-  cp "$here/fpa.registered" "$here/fpa.registered.selftest-bak"
-  cp "$here/allowed_signers" "$here/allowed_signers.selftest-bak"
-  rf=$(mktemp -d 2>/dev/null || echo "/tmp/fp-rf-$$"); mkdir -p "$rf/prompts"
-  cp "$here/index.json" "$here/index.json.sig" "$rf/"; cp -R "$here"/prompts/. "$rf/prompts/"
-  fp=$(ssh-keygen -lf "$here/.fpa/signing_key.pub" | awk '{print $2}')
-  resign() { rm -f "$rf/index.json.sig"; ssh-keygen -Y sign -f "${1:-$here/.fpa/signing_key}" -n foreign-prompts "$rf/index.json" >/dev/null 2>&1; }
+rf=$(mktemp -d 2>/dev/null || echo "/tmp/fp-rf-$$"); mirror "$rf"
+rw=$(openws); printf '# fpa.registered\n' > "$rw/fpa.registered"
+fp=$(ssh-keygen -lf "$mk/key.pub" | awk '{print $2}')
 
-  "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
-  check "--from an unregistered catalog is refused once the workspace keeps a register" 1 $?
-  printf '%s %s latest 2026-01-01 selftest\n' "$rf" "$fp" >> "$here/fpa.registered"
+FPA_WORKSPACE="$rw" "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
+check "--from an unregistered catalog is refused once the workspace keeps a register" 1 $?
+printf '%s %s latest 2026-01-01 selftest\n' "$rf" "$fp" >> "$rw/fpa.registered"
 
-  out=$("$here/bin/fp-resolve" pr-review --from "$rf" --record 2>/dev/null); rc=$?
-  [ $rc -eq 0 ] && printf '%s' "$out" | grep -q "source=$rf/prompts/" && printf '%s' "$out" | grep -q 'verified=registered'
-  check "--from resolves against the registered catalog's own verified manifest" 0 $?
+out=$(FPA_WORKSPACE="$rw" "$here/bin/fp-resolve" pr-review --from "$rf" --record 2>/dev/null); rc=$?
+[ $rc -eq 0 ] && printf '%s' "$out" | grep -q "source=$rf/prompts/" && printf '%s' "$out" | grep -q 'verified=registered'
+check "--from resolves against the registered catalog's own verified manifest" 0 $?
 
-  "$here/bin/fp-resolve" --list --from "$rf" 2>/dev/null | grep -q '^pr-review '
-  check "--list --from lists the registered catalog, not the catalog address as an id" 0 $?
+FPA_WORKSPACE="$rw" "$here/bin/fp-resolve" --list --from "$rf" 2>/dev/null | grep -q '^pr-review '
+check "--list --from lists the registered catalog, not the catalog address as an id" 0 $?
 
-  "$here/bin/fp-resolve" ghost-in-the-gist --from "$rf" --record >/dev/null 2>&1
-  check "a floating registration does not authorize a frompt that never offered 'registered' (AC4b)" 1 $?
+FPA_WORKSPACE="$rw" "$here/bin/fp-resolve" ghost-in-the-gist --from "$rf" --record >/dev/null 2>&1
+check "a floating registration does not authorize a frompt that never offered 'registered' (AC4b)" 1 $?
 
-  cp "$rf/index.json" "$rf/index.json.orig"
-  python3 -c "import json,sys; p=sys.argv[1]; m=json.load(open(p)); m['prompts'][0]['versions'][0]['digest']='0'*64; open(p,'w').write(json.dumps(m,indent=2,sort_keys=True)+'\n')" "$rf/index.json"
-  "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
-  check "a manifest edited after signing is refused before anything resolves from it" 1 $?
-  mv "$rf/index.json.orig" "$rf/index.json"
+cp "$rf/index.json" "$rf/index.json.orig"
+python3 -c "import json,sys; p=sys.argv[1]; m=json.load(open(p)); m['prompts'][0]['versions'][0]['digest']='0'*64; open(p,'w').write(json.dumps(m,indent=2,sort_keys=True)+'\n')" "$rf/index.json"
+FPA_WORKSPACE="$rw" "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
+check "a manifest edited after signing is refused before anything resolves from it" 1 $?
+mv "$rf/index.json.orig" "$rf/index.json"
 
-  ssh-keygen -q -t ed25519 -N "" -C intruder -f "$rf/key2" >/dev/null 2>&1
-  printf 'intruder %s\n' "$(cat "$rf/key2.pub")" >> "$here/allowed_signers"
-  resign "$rf/key2"
-  "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
-  check "a catalog re-signed by another trusted key is refused: the registered key wins (AC2b)" 1 $?
-  resign
+ssh-keygen -q -t ed25519 -N "" -C intruder -f "$mk/intruder" >/dev/null 2>&1
+printf 'intruder %s\n' "$(cat "$mk/intruder.pub")" >> "$rw/allowed_signers"
+mresign "$rf" "$mk/intruder"
+FPA_WORKSPACE="$rw" "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
+check "a catalog re-signed by another trusted key is refused: the registered key wins (AC2b)" 1 $?
+mresign "$rf"
 
-  rm -f "$rf/index.json.sig"
-  "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
-  check "an unsigned catalog cannot be resolved from: cannot check is exit 2, not a fallback" 2 $?
-  resign
+rm -f "$rf/index.json.sig"
+FPA_WORKSPACE="$rw" "$here/bin/fp-resolve" pr-review --from "$rf" --record >/dev/null 2>&1
+check "an unsigned catalog cannot be resolved from: cannot check is exit 2, not a fallback" 2 $?
+mresign "$rf"
 
-  sed -i.bak "s#^$rf .* latest 2026-01-01 selftest\$#$rf $fp version 2026-01-01 selftest#" "$here/fpa.registered" && rm -f "$here/fpa.registered.bak"
-  "$here/bin/fp-resolve" pr-review@1.2.0 --from "$rf" --record >/dev/null 2>&1
-  check "pin mode 'version' refuses a version that is not the pinned one (M5)" 1 $?
-  pinned=$(awk '$1=="pr-review" {print $2; exit}' "$here/fpa.lock")
-  "$here/bin/fp-resolve" "pr-review@$pinned" --from "$rf" --record >/dev/null 2>&1
-  check "pin mode 'version' accepts the pinned version" 0 $?
+sed -i.bak "s#^$rf .* latest 2026-01-01 selftest\$#$rf $fp version 2026-01-01 selftest#" "$rw/fpa.registered" && rm -f "$rw/fpa.registered.bak"
+FPA_WORKSPACE="$rw" "$here/bin/fp-lock" --update pr-review --from "$rf" >/dev/null 2>&1
+pinned=$(awk '$1=="pr-review" {print $2; exit}' "$rw/fpa.lock" 2>/dev/null)
+other=$(python3 -c 'import json, sys
+e = [p for p in json.load(open(sys.argv[1]))["prompts"] if p["id"] == "pr-review"][0]
+print(next(v["version"] for v in e["versions"] if v["version"] != sys.argv[2]))' "$rf/index.json" "$pinned")
+FPA_WORKSPACE="$rw" "$here/bin/fp-resolve" "pr-review@$other" --from "$rf" --record >/dev/null 2>&1
+check "pin mode 'version' refuses a version that is not the pinned one (M5)" 1 $?
+FPA_WORKSPACE="$rw" "$here/bin/fp-resolve" "pr-review@$pinned" --from "$rf" --record >/dev/null 2>&1
+check "pin mode 'version' accepts the pinned version" 0 $?
 
-  python3 -c "import json,sys; p=sys.argv[1]; m=json.load(open(p)); m['base']='https://other-publisher.invalid/prompts'; open(p,'w').write(json.dumps(m,indent=2,sort_keys=True)+'\n')" "$rf/index.json"
-  resign
-  "$here/bin/fp-resolve" "pr-review@$pinned" --from "$rf" --record >/dev/null 2>&1
-  check "a pin from one publisher does not authorize the same bytes from another (M5 origin)" 1 $?
-
-  mv "$here/fpa.registered.selftest-bak" "$here/fpa.registered"
-  mv "$here/allowed_signers.selftest-bak" "$here/allowed_signers"
-  rm -rf "$rf"
-else
-  echo "skip -- --from checks need fpa.registered, fpa.lock and a signing key"
-fi
+# The same signed bytes, served by another registered catalog: the pin names
+# where it was taken from, and that is not here.
+rf2=$(mktemp -d 2>/dev/null || echo "/tmp/fp-rf2-$$"); mirror "$rf2"
+printf '%s %s version 2026-01-01 selftest\n' "$rf2" "$fp" >> "$rw/fpa.registered"
+out=$(FPA_WORKSPACE="$rw" "$here/bin/fp-resolve" "pr-review@$pinned" --from "$rf2" --record 2>&1); rc=$?
+[ $rc -eq 1 ] && printf '%s' "$out" | grep -q 'pinned from a different publisher'
+check "a pin from one publisher does not authorize the same bytes from another (M5 origin)" 0 $?
+rm -rf "$rf" "$rf2" "$rw"
 
 # --- versions: choosing is exact or latest, and nothing else -----------------
 "$here/bin/fp-resolve" pr-review@1.2.0 --base "$here/prompts" --record >/dev/null 2>&1
@@ -598,8 +588,13 @@ rm -rf "$onlycat"
 # this checkout's signing key, and none of them writes to this checkout.
 sh=$(mktemp -d 2>/dev/null || echo "/tmp/fp-sh-$$"); mkdir -p "$sh"
 reg_before=$(cat "$here/fpa.registered" "$here/allowed_signers" 2>/dev/null | shasum | cut -c1-12)
-mkcat() { # mkcat <dir> <url> [identity] -- an initialized catalog with one registered-fit frompt
-  "$here/bin/fp-init-catalog" "$1" --url "$2" ${3:+--identity "$3"} >/dev/null 2>&1 || return 1
+# mkcat <dir> <name> [identity] -- an initialized catalog with one registered-fit
+# frompt. A catalog's base is the address it is served from, and these are read
+# from their directories, so each is published at its own directory; it signs as
+# the host <name> gives, or as [identity].
+mkcat() {
+  local host=${2#*://}; host=${host%%/*}
+  "$here/bin/fp-init-catalog" "$1" --url "$1" --identity "${3:-$host}" >/dev/null 2>&1 || return 1
   "$new" hello -c i-have-read-this-prompt-and-want-my-agent-to-say-hello-once -o "$1/prompts" \
     --author selftest >/dev/null 2>&1 || return 1
   sed -i.bak 's/^flow:/contexts: interactive, registered, managed\
@@ -610,11 +605,12 @@ keyof() { ssh-keygen -lf "$1/.fpa/signing_key.pub" | awk '{print $2}'; }
 
 mkcat "$sh/acme" https://catalog.acme.example
 check "fp-init-catalog makes a catalog that indexes and signs with no edits to any tool" 0 $?
-python3 -c "import json,sys; assert json.load(open(sys.argv[1]))['base']=='https://catalog.acme.example/prompts'" "$sh/acme/index.json" 2>/dev/null
+"$here/bin/fp-init-catalog" "$sh/web" --url https://catalog.acme.example >/dev/null 2>&1
+python3 -c "import json,sys; assert json.load(open(sys.argv[1]))['base']=='https://catalog.acme.example/prompts'" "$sh/web/index.json" 2>/dev/null
 check "fp-index takes the catalog's base from frompt-catalog.json, not from its own source" 0 $?
 "$here/bin/fp-init-catalog" "$sh/acme" --url https://catalog.acme.example >/dev/null 2>&1
 check "fp-init-catalog refuses to overwrite a catalog -- a new key would orphan its clients" 1 $?
-[ -f "$sh/acme/.nojekyll" ] && grep -qx 'catalog.acme.example' "$sh/acme/CNAME" && grep -q '^.fpa/$' "$sh/acme/.gitignore"
+[ -f "$sh/web/.nojekyll" ] && grep -qx 'catalog.acme.example' "$sh/web/CNAME" && grep -q '^.fpa/$' "$sh/web/.gitignore"
 check "fp-init-catalog leaves .nojekyll, CNAME and a .gitignore that keeps the key out" 0 $?
 (cd "$sh/acme" && "$here/bin/fp-index" --check >/dev/null 2>&1)
 check "standing in a catalog, the tools that build it find it" 0 $?
@@ -704,7 +700,7 @@ mv "$sh/acme/index.json.keep" "$sh/acme/index.json"; mv "$sh/acme/index.json.sig
 # Floors written before they were keyed by signer: they still refuse, they say so,
 # and they count once.
 lw="$sh/legacy"; mkdir -p "$lw/.fpa"; cp "$sh/client/allowed_signers" "$lw/"
-acme_base=https://catalog.acme.example/prompts
+acme_base="$sh/acme/prompts"
 acme_serial=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['serial'])" "$sh/acme/index.json")
 printf '{"%s": %s}\n' "$acme_base" $((acme_serial + 1)) > "$lw/.fpa/manifest-serials.json"
 FPA_WORKSPACE="$lw" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>"$sh/legacy.err" </dev/null
@@ -827,7 +823,7 @@ FPA_WORKSPACE="$st" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </de
 r=""
 for bad in '' '{"https://catalog.acme.example/prompts": ' '[]' '{"x": 5}'; do
   printf '%s' "$bad" > "$st/.fpa/catalog-signers.json"
-  FPA_WORKSPACE="$st" "$here/bin/fp-verify" --from "$sh/globex" >/dev/null 2>"$sh/st.err" </dev/null
+  FPA_WORKSPACE="$st" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>"$sh/st.err" </dev/null
   rc=$?; grep -q 'catalog-signers.json' "$sh/st.err" && r="$r$rc " || r="${r}unnamed-$rc "
 done
 check "a bindings file that exists but cannot be read is a refusal that names it" "2 2 2 2 " "$r"
@@ -870,23 +866,70 @@ out=$("$here/bin/fp-resolve" hello --from "$sh/acme" --record 2>&1 </dev/null); 
 printf '%s' "$out" | grep -q 'twice'
 check "fp-resolve refuses a lock that pins one id twice" "1 0" "$rc $?"
 cp "$sh/lock.keep" "$sh/client/fpa.lock"
+printf 'zz 1.0.x sha256:%s https://x.example/zz/1.0.x.frompt.md\n' "$(printf '%064d' 0)" >> "$sh/client/fpa.lock"
+out=$("$here/bin/fp-resolve" hello --from "$sh/acme" --record 2>&1 </dev/null); rc=$?
+printf '%s' "$out" | grep -q "is not '<id> <version> sha256:<digest> <url>'"
+check "fp-resolve refuses a lock with a malformed line" "1 0" "$rc $?"
+cp "$sh/lock.keep" "$sh/client/fpa.lock"
 
-# One spelling per address, and one catalog per address.
+# One spelling per catalog. A base is accepted written one plain way; the few
+# variations allowed fold to one spelling, and a catalog bound under https is not
+# free under http.
+python3 - "$here/bin" <<'PY' >/dev/null 2>&1
+import sys; sys.path.insert(0, sys.argv[1]); import fpa_roots as f
+bad = ["https://a.example/./prompts", "https://a.example/x/../prompts", "https://a.example//prompts",
+       "https://a.example/%70rompts", "https://a.example./prompts", "https://a.example/prompts;x",
+       "https://a.example/prompts?", "https://a.example/prompts#", "https://u@a.example/prompts",
+       "/srv//catalog/prompts", "/srv/./catalog/prompts", "/srv/x/../catalog/prompts", "//host/prompts",
+       "file:///srv/prompts", "srv/prompts", "https://a.example/pro mpts"]
+assert not [b for b in bad if f.valid_base(b)], [b for b in bad if f.valid_base(b)]
+good = ["https://a.example/prompts", "https://a.example/prompts/", "HTTPS://A.Example:443/prompts",
+        "http://a.example:8080/x/prompts", "/srv/catalog/prompts", "/srv/catalog/prompts/"]
+assert all(f.valid_base(b) for b in good), [b for b in good if not f.valid_base(b)]
+PY
+check "a base is accepted in one plain spelling only: no dot or empty segment, escape, ';' or trailing dot" 0 $?
+python3 - "$here/bin" <<'PY' >/dev/null 2>&1
+import sys; sys.path.insert(0, sys.argv[1]); import fpa_roots as f
+assert f.normalize_base("HTTPS://A.Example:443/prompts/") == "https://a.example/prompts"
+assert f.normalize_base("http://a.example:80/prompts") == "http://a.example/prompts"
+assert f.normalize_base("https://a.example:8443/prompts") == "https://a.example:8443/prompts"
+assert f.normalize_base("/srv/catalog/prompts//") == "/srv/catalog/prompts"
+PY
+check "trailing slashes, the case of scheme and host, and a default port fold to one spelling" 0 $?
+python3 - "$here/bin" <<'PY' >/dev/null 2>&1
+import sys; sys.path.insert(0, sys.argv[1]); import fpa_roots as f
+bound = {"https://a.example/prompts": "acme"}
+assert f.binding_conflict(bound, "http://a.example/prompts", "globex") == ("https://a.example/prompts", "acme")
+assert f.binding_conflict(bound, "http://a.example/prompts", "acme") is None
+assert f.binding_conflict({"http://a.example/prompts": "acme"}, "https://a.example/prompts", "globex")
+PY
+check "a catalog bound under https is not free under http, nor the reverse" 0 $?
 vw="$sh/vw"; freshws "$vw"
 FPA_WORKSPACE="$vw" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </dev/null
+cp "$sh/acme/index.json" "$sh/acme/index.json.keep"; cp "$sh/acme/index.json.sig" "$sh/acme/index.json.sig.keep"
 r=""
-for spelling in 'm["base"] + "/"' '"https://Catalog.Acme.Example/prompts"'; do
-  rm -rf "$sh/variant"; cp -R "$sh/acme" "$sh/variant"
-  resign "$sh/variant" "m[\"serial\"] = 999999; m[\"base\"] = $spelling" "$sh/globex/.fpa/signing_key"
-  FPA_WORKSPACE="$vw" "$here/bin/fp-verify" --from "$sh/variant" >/dev/null 2>&1 </dev/null; r="$r$? "
+for spelling in 'm["base"] + "/"' 'm["base"].replace("/prompts", "/./prompts")'; do
+  resign "$sh/acme" "m[\"serial\"] = 999999; m[\"base\"] = $spelling" "$sh/globex/.fpa/signing_key"
+  FPA_WORKSPACE="$vw" "$here/bin/fp-verify" --from "$sh/acme" >/dev/null 2>&1 </dev/null; r="$r$? "
+  cp "$sh/acme/index.json.keep" "$sh/acme/index.json"; cp "$sh/acme/index.json.sig.keep" "$sh/acme/index.json.sig"
 done
-check "another spelling of a bound catalog's base is the same catalog" "1 1 " "$r"
+rm -f "$sh/acme/index.json.keep" "$sh/acme/index.json.sig.keep"
+check "another spelling of a bound catalog's base, signed by another, is refused at its address" "1 1 " "$r"
 aw="$sh/aw"; mkdir -p "$aw"; cat "$sh/p1/allowed_signers" "$sh/p2/allowed_signers" > "$aw/allowed_signers"
-cp -R "$sh/p1" "$sh/p1-at"
+cp -R "$sh/p1" "$sh/p1-at"; resign "$sh/p1-at" "m[\"base\"] = \"$sh/p1-at/prompts\"" "$sh/p1/.fpa/signing_key"
 FPA_WORKSPACE="$aw" "$here/bin/fp-verify" --from "$sh/p1-at" >/dev/null 2>&1 </dev/null
 r1=$?; cp "$sh/p2/index.json" "$sh/p2/index.json.sig" "$sh/p1-at/"; rm -rf "$sh/p1-at/prompts"; cp -R "$sh/p2/prompts" "$sh/p1-at/"
-FPA_WORKSPACE="$aw" "$here/bin/fp-verify" hello --from "$sh/p1-at" >/dev/null 2>&1 </dev/null
-check "an address that served one catalog does not serve another" "0 1" "$r1 $?"
+out=$(FPA_WORKSPACE="$aw" "$here/bin/fp-verify" hello --from "$sh/p1-at" 2>&1 </dev/null); r2=$?
+printf '%s' "$out" | grep -q 'A catalog.s base is the address it is served from'
+check "an address serves the catalog whose base it is, and no other" "0 1 0" "$r1 $r2 $?"
+# A directory has more than one path. The address is its real path, and it serves the
+# one catalog first accepted there, under whichever spelling of that path.
+# ($sh/p1-at was first accepted here as the catalog $sh/p1-at/prompts.)
+ln -s "$sh/p1-at" "$sh/p1-alias"
+resign "$sh/p1-at" "m[\"base\"] = \"$sh/p1-alias/prompts\"" "$sh/p2/.fpa/signing_key"
+out=$(FPA_WORKSPACE="$aw" "$here/bin/fp-verify" --from "$sh/p1-at" 2>&1 </dev/null); rc=$?
+printf '%s' "$out" | grep -q 'served the catalog'
+check "a directory serves one catalog under every spelling of its path" "1 0" "$rc $?"
 
 # A certificate naming a catalog's principal does not stand in for that catalog's key.
 cwk="$sh/certws"; freshws "$cwk"
@@ -895,17 +938,76 @@ ssh-keygen -q -t ed25519 -N "" -C auth -f "$sh/auth" >/dev/null 2>&1
 ssh-keygen -q -t ed25519 -N "" -C holder -f "$sh/holder" >/dev/null 2>&1
 ssh-keygen -q -s "$sh/auth" -I holder -n catalog.acme.example -V -5m:+1d "$sh/holder.pub" >/dev/null 2>&1
 printf '* cert-authority,namespaces="foreign-prompts" %s\n' "$(cut -d' ' -f1,2 "$sh/auth.pub")" >> "$cwk/allowed_signers"
-rm -rf "$sh/certcat"; cp -R "$sh/acme" "$sh/certcat"; resign "$sh/certcat" 'm["serial"] = 999999' "$sh/holder-cert.pub"
-out=$(FPA_WORKSPACE="$cwk" "$here/bin/fp-verify" --from "$sh/certcat" 2>&1 </dev/null); r=$?
+cp "$sh/acme/index.json" "$sh/acme/index.json.keep"; cp "$sh/acme/index.json.sig" "$sh/acme/index.json.sig.keep"
+resign "$sh/acme" 'm["serial"] = 999999' "$sh/holder-cert.pub"
+out=$(FPA_WORKSPACE="$cwk" "$here/bin/fp-verify" --from "$sh/acme" 2>&1 </dev/null); r=$?
+mv "$sh/acme/index.json.keep" "$sh/acme/index.json"; mv "$sh/acme/index.json.sig.keep" "$sh/acme/index.json.sig"
 check "a manifest signed under a certificate does not pass for a catalog bound to a key" 1 $r
-case "$out" in *"accepts that catalog from"*) r=0 ;; *) r=1 ;; esac
+case "$out" in *"but this workspace accepts"*) r=0 ;; *) r=1 ;; esac
 check "  and the refusal is the catalog's binding to its signer, not an unrelated failure" 0 $r
 
 # Renewal: a window has a ceiling, and the workflow will not sign unprotected.
 FPA_CATALOG="$sh/acme-renew" FPA_VALIDITY_DAYS=99999 "$here/bin/fp-index" --renew >/dev/null 2>&1
 check "fp-index refuses a validity window longer than its ceiling" 2 $?
-grep -q 'required_reviewers' "$wf" && grep -q '^  actions: read$' "$wf"
-check "the renew workflow checks its environment for required reviewers before signing" 0 $?
+r=""
+for d in 0 -3 x 1.5 91 90; do
+  rm -rf "$sh/acme-w"; cp -R "$sh/acme" "$sh/acme-w"
+  FPA_CATALOG="$sh/acme-w" FPA_VALIDITY_DAYS="$d" "$here/bin/fp-index" --renew >/dev/null 2>&1; r="$r$? "
+done
+check "a window is 1 to 90 whole days: 0, negative, not a number and 91 are refused, 90 is not" "2 2 2 2 2 0 " "$r"
+rm -rf "$sh/acme-w"; cp -R "$sh/acme" "$sh/acme-w"
+python3 -c 'import json, sys
+p = sys.argv[1]; m = json.load(open(p)); m["not_after"] = "2300-01-01T00:00:00Z"
+open(p, "w").write(json.dumps(m, indent=2, sort_keys=True) + "\n")' "$sh/acme-w/index.json"
+FPA_CATALOG="$sh/acme-w" "$here/bin/fp-index" >/dev/null 2>&1
+python3 -c 'import datetime as d, json, sys
+t = d.datetime.strptime(json.load(open(sys.argv[1]))["not_after"], "%Y-%m-%dT%H:%M:%SZ")
+assert t < d.datetime.utcnow() + d.timedelta(days=91)' "$sh/acme-w/index.json" 2>/dev/null
+check "a plain fp-index run does not keep a window longer than the ceiling" 0 $?
+grep -q '^  actions: read$' "$wf"
+check "the renew workflow may read its environment's protection rules" 0 $?
+# The job itself, run with stand-ins for gh and git: it signs only when the
+# environment's rules include required reviewers, and refuses when the API says
+# anything else or nothing at all.
+mkcat "$sh/jobcat" https://job.example
+FPA_CATALOG="$sh/jobcat" FPA_VALIDITY_DAYS=5 "$here/bin/fp-index" --renew >/dev/null 2>&1
+FPA_CATALOG="$sh/jobcat" "$here/bin/fp-sign" </dev/null >/dev/null 2>&1
+python3 - "$here/bin/fp-init-catalog" "$sh/renew-job.sh" <<'PY'
+import importlib.machinery, importlib.util, sys
+loader = importlib.machinery.SourceFileLoader("fp_init_catalog", sys.argv[1])
+m = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+loader.exec_module(m)
+lines = m.WORKFLOW.format(ref="0" * 40).splitlines()
+at = next(i for i, l in enumerate(lines) if l.strip() == "run: |")
+indent = len(lines[at + 1]) - len(lines[at + 1].lstrip())
+body = []
+for l in lines[at + 1:]:
+    if l.strip() and len(l) - len(l.lstrip()) < indent:
+        break
+    body.append(l[indent:])
+open(sys.argv[2], "w").write("\n".join(body) + "\n")
+PY
+mkdir -p "$sh/jobbin"
+printf '#!/bin/sh
+[ "$JOB_RULES" = fail ] && exit 1
+printf "%%s\\n" "$JOB_RULES"
+' > "$sh/jobbin/gh"
+printf '#!/bin/sh
+exit 0
+' > "$sh/jobbin/git"
+chmod +x "$sh/jobbin/gh" "$sh/jobbin/git"
+r=""
+for rules in "" fail branch_policy wait_timer,branch_policy required_reviewers_x required_reviewers; do
+  rm -rf "$sh/job"; cp -R "$sh/jobcat" "$sh/job"; rm -rf "$sh/job/.fpa"; ln -s "$here" "$sh/job/.frompt-tools"
+  before=$(cat "$sh/job/index.json.sig")
+  (cd "$sh/job" && env -u FPA_CATALOG -u FPA_WORKSPACE JOB_RULES="$rules" PATH="$sh/jobbin:$PATH" \
+     GITHUB_REPOSITORY=owner/catalog FPA_SIGNING_KEY_MATERIAL="$(cat "$sh/jobcat/.fpa/signing_key")" \
+     bash -eo pipefail "$sh/renew-job.sh" >/dev/null 2>&1); rc=$?
+  [ "$(cat "$sh/job/index.json.sig")" = "$before" ] && r="$r$rc-unsigned " || r="$r$rc-signed "
+  [ -e "$sh/job/.fpa/signing_key" ] && r="${r}KEY-LEFT "
+done
+check "the renew job signs only when its environment requires reviewers, and never leaves the key" \
+  "1-unsigned 1-unsigned 1-unsigned 1-unsigned 1-unsigned 0-signed " "$r"
 
 # What a run is asked, and where it reads from.
 iw="$sh/iw"; freshws "$iw"; rm -rf "$sh/acme-t"; cp -R "$sh/acme" "$sh/acme-t"
@@ -915,23 +1017,33 @@ check "fp-verify checks the prompt id wherever it stands among the arguments" 1 
 mkdir -p "$sh/cwd/https:/nowhere.example"; cp "$sh/acme/index.json" "$sh/acme/index.json.sig" "$sh/cwd/https:/nowhere.example/"
 (cd "$sh/cwd" && FPA_WORKSPACE="$iw" "$here/bin/fp-verify" --from https://nowhere.example >/dev/null 2>&1 </dev/null)
 check "a URL is fetched, never read from a directory that happens to share its name" 2 $?
-rm -rf "$sh/stamp"; cp -R "$sh/acme" "$sh/stamp"
-resign "$sh/stamp" 'm["not_after"] = "2099-01-01T00:00:00Z\nmanifest verified: x SHA256:x"'
-FPA_WORKSPACE="$iw" "$here/bin/fp-verify" --from "$sh/stamp" >/dev/null 2>&1 </dev/null
-check "a not_after that is not a plain timestamp is refused" 1 $?
+r=""
+cp "$sh/acme/index.json" "$sh/acme/index.json.keep"; cp "$sh/acme/index.json.sig" "$sh/acme/index.json.sig.keep"
+for stamp in '"2099-01-01T00:00:00Z\nmanifest verified: x SHA256:x"' '"\u0662\u0660\u0669\u0669-01-01T00:00:00Z"' \
+             '"9999-99-99T99:99:99Z"'; do
+  resign "$sh/acme" "m[\"not_after\"] = $stamp"
+  for id in "" hello; do
+    out=$(FPA_WORKSPACE="$iw" "$here/bin/fp-verify" $id --from "$sh/acme" 2>&1 </dev/null); rc=$?
+    case "$out" in *Traceback*) rc=traceback;; esac; r="$r$rc "
+  done
+  cp "$sh/acme/index.json.keep" "$sh/acme/index.json"; cp "$sh/acme/index.json.sig.keep" "$sh/acme/index.json.sig"
+done
+rm -f "$sh/acme/index.json.keep" "$sh/acme/index.json.sig.keep"
+check "a not_after that is not a real time in ASCII digits is refused, with or without an id" "1 1 1 1 1 1 " "$r"
 
 # Registering: into a readable workspace only; nothing left behind when stopped.
 mkdir -p "$sh/badws/.fpa"; printf '{ "x": 1,' > "$sh/badws/.fpa/manifest-serials.json"
-FPA_WORKSPACE="$sh/badws" "$here/bin/fp-register" "$sh/p3" --key "$(keyof "$sh/p3")" >/dev/null 2>&1 </dev/null
-rc=$?; [ -e "$sh/badws/allowed_signers" ] || [ -e "$sh/badws/fpa.registered" ]
-check "fp-register refuses a workspace whose state cannot be read, and writes nothing" "1 1" "$rc $?"
+out=$(FPA_WORKSPACE="$sh/badws" "$here/bin/fp-register" "$sh/p3" --key "$(keyof "$sh/p3")" 2>&1 </dev/null)
+rc=$?; [ -e "$sh/badws/allowed_signers" ] || [ -e "$sh/badws/fpa.registered" ]; r2=$?
+printf '%s' "$out" | grep -q 'Refusing to register into a workspace whose state cannot be read'
+check "fp-register refuses a workspace whose state cannot be read, before trying, and writes nothing" "1 1 0" "$rc $r2 $?"
 fb="$sh/fakebin"; mkdir -p "$fb" "$sh/tmpdir"
 printf '#!/bin/sh\ncase "$*" in *find-principals*) sleep 4;; esac\nexec %s "$@"\n' "$(command -v ssh-keygen)" > "$fb/ssh-keygen"
 chmod +x "$fb/ssh-keygen"
 TMPDIR="$sh/tmpdir" PATH="$fb:$PATH" FPA_WORKSPACE="$sh/sigws" "$here/bin/fp-register" "$sh/p4" --key "$(keyof "$sh/p4")" >/dev/null 2>&1 </dev/null &
 pid=$!; sleep 1.5; kill -TERM "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; sleep 5
-ls "$sh/tmpdir" | grep -q '^fp-register-'
-check "a registration stopped part way leaves no trial copy behind" 1 $?
+ls "$sh/tmpdir" | grep -Eq '^(fp-register-|fp-verify\.)'
+check "a registration stopped part way leaves no trial copy or scratch directory behind" 1 $?
 mkcat "$sh/case" https://case.example
 printf 'Catalog.Acme.Example %s\n' "$(cut -d' ' -f1,2 "$sh/case/.fpa/signing_key.pub")" > "$sh/case/allowed_signers"
 "$here/bin/fp-register" "$sh/case" --key "$(keyof "$sh/case")" >/dev/null 2>&1 </dev/null
@@ -954,6 +1066,119 @@ r2=$?; grep -qF "$old_key" "$sh/client/allowed_signers"
 r3=$?; "$here/bin/fp-register" "$sh/rot" --key "$(keyof "$sh/rot")" >/dev/null 2>&1
 check "a rotated key: refused, then unregister drops the old key and the new one registers" "1 0 1 0" "$r1 $r2 $r3 $?"
 
+# --- one writer's view: what a registration adds, and what a floor implies -------
+# Two registrations at once. The later one's trial was taken before the earlier one
+# committed, so it is checked again under the lock: a principal names one key.
+slow="$sh/slowbin"; mkdir -p "$slow"
+printf '#!/bin/sh\ncase "$*" in *find-principals*) sleep 4;; esac\nexec %s "$@"\n' "$(command -v ssh-keygen)" > "$slow/ssh-keygen"
+chmod +x "$slow/ssh-keygen"
+mkcat "$sh/ra" https://ra.example; mkcat "$sh/rq" https://rq.example ra.example
+cw2="$sh/cw2"; mkdir -p "$cw2"
+PATH="$slow:$PATH" FPA_WORKSPACE="$cw2" "$here/bin/fp-register" "$sh/rq" --key "$(keyof "$sh/rq")" >/dev/null 2>&1 </dev/null &
+pid=$!; sleep 1.5
+FPA_WORKSPACE="$cw2" "$here/bin/fp-register" "$sh/ra" --key "$(keyof "$sh/ra")" >/dev/null 2>&1 </dev/null; r1=$?
+wait "$pid"; r2=$?
+check "two registrations at once: the one that commits second cannot give a principal a second key" \
+  "0 1 1" "$r1 $r2 $(grep -ci '^ra\.example ' "$cw2/allowed_signers")"
+# An unregister that happens during another registration stays done.
+mkcat "$sh/uc" https://uc.example; mkcat "$sh/ud" https://ud.example
+cw3="$sh/cw3"; mkdir -p "$cw3"
+FPA_WORKSPACE="$cw3" "$here/bin/fp-register" "$sh/uc" --key "$(keyof "$sh/uc")" >/dev/null 2>&1 </dev/null
+PATH="$slow:$PATH" FPA_WORKSPACE="$cw3" "$here/bin/fp-register" "$sh/ud" --key "$(keyof "$sh/ud")" >/dev/null 2>&1 </dev/null &
+pid=$!; sleep 1.5
+FPA_WORKSPACE="$cw3" "$here/bin/fp-unregister" "$sh/uc" >/dev/null 2>&1 </dev/null; r1=$?
+wait "$pid"; r2=$?
+grep -qF "$(cut -d' ' -f2 "$sh/uc/.fpa/signing_key.pub")" "$cw3/allowed_signers"
+check "an unregister during another registration stays done: its key does not come back" "0 0 1" "$r1 $r2 $?"
+# Two registrations at once binding one catalog -- reached by two names for one
+# directory -- to two signers: the one that commits second is refused.
+mkcat "$sh/kk" https://kk.example; ln -s "$sh/kk" "$sh/kk-link"
+ssh-keygen -q -t ed25519 -N "" -C kk-b -f "$sh/kk-b" >/dev/null 2>&1
+printf 'kk-b.example %s\n' "$(cut -d' ' -f1,2 "$sh/kk-b.pub")" >> "$sh/kk/allowed_signers"
+cp "$sh/kk/index.json.sig" "$sh/kk/sig.a"
+rm -f "$sh/kk/index.json.sig"; ssh-keygen -Y sign -f "$sh/kk-b" -n foreign-prompts "$sh/kk/index.json" >/dev/null 2>&1
+cw4="$sh/cw4"; mkdir -p "$cw4"
+PATH="$slow:$PATH" FPA_WORKSPACE="$cw4" "$here/bin/fp-register" "$sh/kk-link" --key "$(ssh-keygen -lf "$sh/kk-b.pub" | awk '{print $2}')" >/dev/null 2>&1 </dev/null &
+pid=$!; sleep 1.5; cp "$sh/kk/sig.a" "$sh/kk/index.json.sig"
+FPA_WORKSPACE="$cw4" "$here/bin/fp-register" "$sh/kk" --key "$(keyof "$sh/kk")" >/dev/null 2>&1 </dev/null; r1=$?
+wait "$pid"; r2=$?
+check "two registrations at once binding one catalog to two signers: the second is refused" "0 1" "$r1 $r2"
+
+# A floor counts as a binding even where the bindings file does not name the
+# catalog -- as after a run stopped between writing the two.
+mkcat "$sh/fa" https://fa.example; mkcat "$sh/fz" https://fz.example
+fw="$sh/fw"; mkdir -p "$fw"; cat "$sh/fa/allowed_signers" "$sh/fz/allowed_signers" > "$fw/allowed_signers"
+FPA_WORKSPACE="$fw" "$here/bin/fp-verify" --from "$sh/fz" >/dev/null 2>&1 </dev/null
+FPA_WORKSPACE="$fw" "$here/bin/fp-verify" --from "$sh/fa" >/dev/null 2>&1 </dev/null
+python3 -c 'import json, sys
+p = sys.argv[1]; m = json.load(open(p)); del m[sys.argv[2]]
+open(p, "w").write(json.dumps(m))' "$fw/.fpa/catalog-signers.json" "$sh/fa/prompts"
+cp "$sh/fa/index.json" "$sh/fa/index.json.keep"; cp "$sh/fa/index.json.sig" "$sh/fa/index.json.sig.keep"
+resign "$sh/fa" 'm["serial"] = 999999' "$sh/fz/.fpa/signing_key"
+FPA_WORKSPACE="$fw" "$here/bin/fp-verify" --from "$sh/fa" >/dev/null 2>&1 </dev/null
+check "a floor is a binding even when the bindings file does not name its catalog" 1 $?
+mv "$sh/fa/index.json.keep" "$sh/fa/index.json"; mv "$sh/fa/index.json.sig.keep" "$sh/fa/index.json.sig"
+
+# State that cannot be reached is not empty state.
+r=""
+for shape in dangling-file fpa-is-a-file fpa-dangling deep-json; do
+  sw="$sh/sw-$shape"; mkdir -p "$sw"; cp "$sh/fa/allowed_signers" "$sw/"
+  case "$shape" in
+    dangling-file) mkdir -p "$sw/.fpa"; ln -s "$sh/nothing-here" "$sw/.fpa/catalog-signers.json" ;;
+    fpa-is-a-file) printf 'x' > "$sw/.fpa" ;;
+    fpa-dangling) ln -s "$sh/nothing-here" "$sw/.fpa" ;;
+    deep-json) mkdir -p "$sw/.fpa"; python3 -c 'print("[" * 100000 + "]" * 100000)' > "$sw/.fpa/manifest-serials.json" ;;
+  esac
+  out=$(FPA_WORKSPACE="$sw" "$here/bin/fp-verify" --from "$sh/fa" 2>&1 </dev/null); rc=$?
+  case "$out" in *Traceback*) rc=traceback;; esac; r="$r$rc "
+done
+check "a dangling state file, an .fpa that is a file or a dangling link, and deep JSON are the exit-2 refusal" \
+  "2 2 2 2 " "$r"
+if [ "$(id -u)" -ne 0 ]; then
+  sw="$sh/sw-closed"; mkdir -p "$sw/.fpa"; cp "$sh/fa/allowed_signers" "$sw/"; chmod 000 "$sw/.fpa"
+  FPA_WORKSPACE="$sw" "$here/bin/fp-verify" --from "$sh/fa" >/dev/null 2>&1 </dev/null; rc=$?
+  chmod 700 "$sw/.fpa"
+  check "an .fpa this tool may not enter is the exit-2 refusal" 2 $rc
+else
+  echo "skip -- running as root, so a closed .fpa is open; that check needs another user"
+fi
+
+# Values: what a signed manifest says is checked before anything is written from it.
+r=""
+for v in '"1.0.0 x"' '"1.0.1٠"'; do
+  rm -rf "$sh/vv"; cp -R "$sh/fa" "$sh/vv"; resign "$sh/vv" "m[\"base\"] = \"$sh/vv/prompts\"; p = m[\"prompts\"][0]; p[\"latest\"] = p[\"versions\"][0][\"version\"] = $v" "$sh/fa/.fpa/signing_key"
+  vw2="$sh/vw2"; rm -rf "$vw2"; mkdir -p "$vw2"; cp "$sh/fa/allowed_signers" "$vw2/"
+  FPA_WORKSPACE="$vw2" "$here/bin/fp-verify" hello --from "$sh/vv" >/dev/null 2>&1 </dev/null; r="$r$? "
+done
+check "fp-verify refuses a signed version that is not a plain semantic version in ASCII digits" "1 1 " "$r"
+rm -rf "$sh/lk" "$sh/lkws"; cp -R "$sh/fa" "$sh/lk"; mkdir -p "$sh/lkws"
+sed -i.bak 's/^version: 1.0.0$/version: 1.0.0 x/' "$sh/lk/prompts/hello/1.0.0.frompt.md" && rm -f "$sh/lk/prompts/hello/1.0.0.frompt.md.bak"
+FPA_CATALOG="$sh/lk" FPA_WORKSPACE="$sh/lkws" "$here/bin/fp-lock" >/dev/null 2>&1 </dev/null
+rc=$?; [ -e "$sh/lkws/fpa.lock" ]
+check "fp-lock refuses to write a value a lock line cannot hold, and writes nothing" "1 1" "$rc $?"
+
+# A replaced file keeps its mode; a new one gets what the umask gives it.
+mw="$sh/mw"; mkdir -p "$mw"
+(umask 022; FPA_WORKSPACE="$mw" "$here/bin/fp-register" "$sh/fa" --key "$(keyof "$sh/fa")" >/dev/null 2>&1 </dev/null)
+modes() { python3 -c 'import os, stat, sys; print(" ".join(oct(stat.S_IMODE(os.stat(p).st_mode))[2:] for p in sys.argv[1:]))' "$@"; }
+m1=$(modes "$mw/allowed_signers" "$mw/fpa.registered" "$mw/.fpa/manifest-serials.json")
+chmod 640 "$mw/allowed_signers"
+(umask 077; FPA_WORKSPACE="$mw" "$here/bin/fp-register" "$sh/fz" --key "$(keyof "$sh/fz")" >/dev/null 2>&1 </dev/null)
+check "a replaced file keeps its mode, and a new one gets the umask's" "644 644 644 640" "$m1 $(modes "$mw/allowed_signers")"
+
+# The order a registration writes in: everything else first, the trust root last,
+# so a run that cannot finish leaves a key that is not trusted.
+if command -v chflags >/dev/null 2>&1; then
+  ow="$sh/ow"; mkdir -p "$ow"; printf '# fpa.registered\n' > "$ow/fpa.registered"
+  chflags uchg "$ow/fpa.registered"
+  FPA_WORKSPACE="$ow" "$here/bin/fp-register" "$sh/fa" --key "$(keyof "$sh/fa")" >/dev/null 2>&1 </dev/null; rc=$?
+  chflags nouchg "$ow/fpa.registered"
+  [ "$rc" -ne 0 ] && ! grep -q '^fa\.example ' "$ow/allowed_signers" 2>/dev/null
+  check "a registration that cannot be recorded leaves its key out of the trust root" 0 $?
+else
+  echo "skip -- no chflags here; the commit-order check needs a file that refuses to be replaced"
+fi
+
 # Usage errors are usage errors: exit 2 with a message, never a traceback.
 r=""
 for cmd in "fp-register $sh/acme --key" "fp-lock --update hello --from" "fp-resolve hello --from" \
@@ -962,6 +1187,8 @@ for cmd in "fp-register $sh/acme --key" "fp-lock --update hello --from" "fp-reso
   case "$out" in *Traceback*) rc=traceback;; esac; r="$r$rc "
 done
 check "a flag given without its value is a usage error in every tool" "2 2 2 2 2 " "$r"
+"$here/bin/fp-verify" "--from=$sh/acme" hello >/dev/null 2>&1 </dev/null
+check "fp-verify refuses an option it does not know, rather than ignoring it" 2 $?
 "$here/bin/fp-verify" --from gh:frompt-org/catalog >/dev/null 2>&1 </dev/null
 check "a gh: catalog without @branch is a usage error" 2 $?
 "$here/bin/fp-verify" hello --from "$sh/acme//" --context registered >/dev/null 2>&1 </dev/null
@@ -989,9 +1216,9 @@ ssh-keygen -q -s "$ca/authority" -I stale -n team-a@docs.example.org -V 20200101
 ssh-keygen -q -s "$ca/authority" -I outsider -n team-x@infra.example.org -V -5m:+1d "$ca/outsider.pub" >/dev/null 2>&1
 casign() { # casign <serial> <key-or-cert>: the docs catalog's manifest at that serial, signed
   python3 -c 'import json, sys
-m = {"base": "https://docs.example.org/prompts", "not_after": "2099-01-01T00:00:00Z",
+m = {"base": sys.argv[3], "not_after": "2099-01-01T00:00:00Z",
      "prompts": [], "serial": int(sys.argv[2])}
-open(sys.argv[1], "w").write(json.dumps(m, indent=2, sort_keys=True) + "\n")' "$ca/cat/index.json" "$1"
+open(sys.argv[1], "w").write(json.dumps(m, indent=2, sort_keys=True) + "\n")' "$ca/cat/index.json" "$1" "$ca/cat/prompts"
   rm -f "$ca/cat/index.json.sig"
   ssh-keygen -Y sign -f "$2" -n foreign-prompts "$ca/cat/index.json" >/dev/null 2>&1
 }
