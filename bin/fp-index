@@ -7,8 +7,15 @@ index gives you part 3, the document gives you part 1, and you need both. An
 index that handed over a whole phrase would be a copy-paste machine for the
 ceremony this protocol exists to create.
 
-    fp-index            # rewrite INDEX.md
-    fp-index --check    # exit 1 if INDEX.md is stale (used by fp-selftest)
+    fp-index            # rewrite INDEX.md and index.json
+    fp-index --check    # exit 1 if either is stale (used by fp-selftest)
+    fp-index --renew    # move not_after forward; refused if any document changed
+
+It indexes the catalog it finds (bin/fpa_roots.py): FPA_CATALOG, else the nearest
+directory upward holding frompt-catalog.json. That file says where the catalog is
+served from (`url`), and the summaries INDEX.md shows. Where a catalog is served
+is the publisher's fact, so it lives in the catalog, not in this tool's source --
+an earlier version hardcoded one URL, and every other publisher had to edit code.
 """
 import datetime
 import hashlib
@@ -17,21 +24,18 @@ import os
 import pathlib
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-RAW = "https://raw.githubusercontent.com/frompt-org/protocol/main/prompts"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import fpa_roots  # noqa: E402
 
-SUMMARY = {
-    "help-me": "Stuck? It interviews your agent about this session, then proposes a route through other prompts. Start here.",
-    "repo-recon": "Maps an unfamiliar codebase from entry points, seams and git churn. Twelve reads, five sections, read-only.",
-    "pr-review": "Judges a diff by tiers — correctness, blast radius, failure mode, reversibility, design fit. No praise, no nits.",
-    "bug-repro": "Reproduces before fixing, then stops. Falsifiable claim, shortest repro, failing/passing boundary.",
-    "grill-me": "Attacks your idea instead of encouraging it. Finds the weakest load-bearing assumption and asks what would falsify it.",
-    "ticket-intake": "Takes a support intake like a good first-line engineer, then drafts one ticket a stranger could act on.",
-    "welcome-tour": "A host prompt: a company guiding a visiting agent through its services. Reads nothing of yours.",
-    "ghost-in-the-gist": "A three-move ASCII terminal game. No engine — the document is the interpreter spec.",
-    "handoff-note": "Writes the note that lets a cold reader resume your work: state, next action, decisions with reasons.",
-    "fpa-bootstrap": "Teaches the protocol itself to an agent that has never heard of it, refusals included.",
-}
+ROOT = fpa_roots.catalog()
+CONFIG = fpa_roots.config(ROOT)
+if not CONFIG.get("url"):
+    print(f"fp-index: no frompt-catalog.json with a url in {ROOT}.\n"
+          "  Start a catalog with fp-init-catalog, or point FPA_CATALOG at one.", file=sys.stderr)
+    sys.exit(2)
+RAW = CONFIG["url"].rstrip("/") + "/prompts"
+
+SUMMARY = CONFIG.get("summaries", {})
 ORDER = list(SUMMARY)
 
 
@@ -115,7 +119,20 @@ def manifest():
     # container starting clean. All of them accept an arbitrarily old signed bundle.
     # `not_after` needs no memory: a replayed manifest dies on its own. apt calls it
     # Valid-Until and WebPKI shortened certificate lifetimes for the same reason.
-    days = int(os.environ.get("FPA_VALIDITY_DAYS", "30"))
+    raw = os.environ.get("FPA_VALIDITY_DAYS", CONFIG.get("validity_days", 30))
+    # A whole number of days, written in ASCII digits.
+    days = raw if isinstance(raw, int) and not isinstance(raw, bool) else (
+        int(raw) if isinstance(raw, str) and raw.isascii() and raw.isdigit() else None)
+    if days is None or days < 1:
+        print(f"fp-index: a validity of {raw!r} is not a whole number of days, at least 1",
+              file=sys.stderr)
+        sys.exit(2)
+    # A manifest that stays valid for years is one a replay can use for years
+    # (M6a), so the window has a ceiling: renewing is cheap, and that is the point.
+    if days > MAX_VALIDITY_DAYS:
+        print(f"fp-index: a validity of {days} days is longer than {MAX_VALIDITY_DAYS}; "
+              "set validity_days lower in frompt-catalog.json", file=sys.stderr)
+        sys.exit(2)
     previous, serial = None, 1
     js = ROOT / "index.json"
     if js.exists():
@@ -131,17 +148,26 @@ def manifest():
 
     # Keep the existing window unless the content changed or it has run out, so
     # `--check` stays deterministic and a re-run is not a re-publication.
+    # A window already on disk is kept only while it is a real time, not yet past,
+    # and within the ceiling: a plain run never keeps a longer one, and never
+    # shortens one a deliberate run signed.
     keep = None
+    now = datetime.datetime.now(datetime.timezone.utc)
     if previous:
         keep = previous.get("not_after")
+        until = fpa_roots.parse_stamp(keep)
         stale = {k: v for k, v in previous.items() if k not in ("serial", "not_after")}
-        expired = keep and keep < datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        if stale != {k: v for k, v in body.items() if k != "serial"} or expired or "--renew" in sys.argv:
+        usable = (until is not None
+                  and now <= until <= now + datetime.timedelta(days=MAX_VALIDITY_DAYS))
+        if stale != {k: v for k, v in body.items() if k != "serial"} or not usable or "--renew" in sys.argv:
             keep = None
     body["not_after"] = keep or (
         datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=days)
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
     return json.dumps(body, indent=2, sort_keys=True) + "\n"
+
+
+MAX_VALIDITY_DAYS = 90
 
 
 def build():
@@ -186,6 +212,20 @@ def build():
 if __name__ == "__main__":
     text, mtext = build(), manifest()
     md, js = ROOT / "INDEX.md", ROOT / "index.json"
+    # --renew extends the life of what was already published; publishing something
+    # new is a separate, deliberate run without it. So a renewal refuses as soon as
+    # the documents differ from the manifest on disk.
+    if "--renew" in sys.argv:
+        drop = ("serial", "not_after")
+        try:
+            was = {k: v for k, v in json.loads(js.read_text()).items() if k not in drop}
+        except (OSError, json.JSONDecodeError):
+            was = None
+        if was != {k: v for k, v in json.loads(mtext).items() if k not in drop}:
+            print("fp-index --renew: the documents differ from the manifest in index.json, so this\n"
+                  "  would publish new content, not renew the old. Run fp-index without --renew,\n"
+                  "  review the change, then sign it.", file=sys.stderr)
+            sys.exit(1)
     if "--check" in sys.argv:
         stale = [p.name for p, want in ((md, text), (js, mtext))
                  if (p.read_text() if p.exists() else "") != want]

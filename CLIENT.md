@@ -67,13 +67,18 @@ to a publisher once.
   (§M3). Re-pinning is a change a person reviews.
 - **MUST** keep a registration record — catalog, signing key fingerprint, pin mode, when, who
   (§AC2a) — and **MUST** refuse a catalog absent from it, or whose key has changed (§AC2b).
+- **MUST** obtain a publisher's key out of band (§M7): as a key, or as a fingerprint that the key
+  the catalog serves must match before it is trusted (§M7a).
 - **MUST** refuse to resolve bytes that appear in no manifest, with a non-zero exit. Printing a
   document and returning success is how unindexed text becomes an adoption.
 - **MUST NOT** apply a pin or a registration to a prompt whose `contexts` excludes
   `registered` (§AC4b).
 
-Reference: `bin/fp-resolve`, `bin/fp-lock`, `bin/fp-register`. The registration record is
-`fpa.registered`, one line per catalog, the shape `sources.list` has had for thirty years.
+Reference: `bin/fp-resolve`, `bin/fp-lock`, `bin/fp-register --key`. The registration record is
+`fpa.registered`, one line per catalog, the shape `sources.list` has had for thirty years. It
+lives in the client's **workspace** — the reference tools read `FPA_WORKSPACE`, else their own
+checkout — never in a catalog: a catalog directory is usually a clone of the publisher's
+repository, and a trust root read out of it would be the publisher vouching for themselves.
 
 ### Level 2 — verifier
 
@@ -82,7 +87,16 @@ Adds the `managed` context: no human at use time, so a signature authorizes.
 - **MUST** verify the manifest's signature against a trust root held locally and never fetched
   from the host being checked (§M7).
 - **MUST** refuse a manifest past `not_after` (§M6a) and one whose `serial` is below the highest
-  already accepted **from that catalog**, keyed by the manifest's `base` (§M6).
+  already accepted **from that catalog and signer**, keyed by the manifest's `base` and the
+  principal it verified as (§M6) — so no other trusted publisher can raise it.
+- **MUST** refuse a manifest fetched from an http(s) address or a directory whose `base` is not
+  that address followed by `/prompts`, and a `base` not written in its one plain spelling;
+  accept each catalog from one signer, the first it accepted for that `base` under either
+  scheme, and each address for one catalog, the first it accepted from there; refuse a conflict
+  (§M6b); and refuse to check anything when the state holding floors and bindings exists but
+  cannot be read. The reference tools keep them in `.fpa/manifest-serials.json`,
+  `.fpa/catalog-signers.json` and `.fpa/catalog-addresses.json`; a floor binds its catalog
+  too, so the pilot rebinds by deleting the binding and the old signer's floor.
 - **MUST** compute digests over exact bytes (§M8); a client that reads text first has a
   line-ending bug that hashes a CRLF copy identical to its LF original.
 - **MUST** fail closed — exit non-zero, adopt nothing — when it cannot fetch or verify the

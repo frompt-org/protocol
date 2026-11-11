@@ -24,7 +24,7 @@ elif [ -f index.json.sig ]; then
   signed="SIGNATURE PRESENT BUT NOT VERIFIED -- treat as unsigned"
 fi
 
-pinned=$(grep -cv '^#\|^$' fpa.lock 2>/dev/null || echo 0)
+pinned=$(grep -cv '^#\|^$' "${FPA_WORKSPACE:-$here}/fpa.lock" 2>/dev/null || echo 0)
 
 printf 'agent %s · %s · %s pinned in fpa.lock\n' "$id" "$signed" "$pinned"
 printf 'Foreign prompts available here (adopt with /f:prompt, browse with /f:find):\n'

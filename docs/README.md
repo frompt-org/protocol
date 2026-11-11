@@ -9,7 +9,7 @@ page when you want to know why. Use the reference for every detail.
 |---|---|---|
 | 1 | [Adopt your first frompt](tutorials/01-adopt-your-first-frompt.md) | an agent that adopted a frompt, said so, and let it go on command |
 | 2 | [Write a frompt](tutorials/02-write-a-frompt.md) | a frompt that lints, in the layout every tool reads |
-| 3 | [Publish a catalog](tutorials/03-publish-a-catalog.md) | a signed catalog anyone can verify against your key |
+| 3 | [Host a catalog on your own domain](tutorials/03-publish-a-catalog.md) | your frompts, signed with your key, served from your domain, trusted by its fingerprint |
 | 4 | [Run unattended](tutorials/04-run-unattended.md) | agents resolving by id from a catalog registered once, refusing what does not verify |
 
 ## Guides — one job each
@@ -46,4 +46,5 @@ page when you want to know why. Use the reference for every detail.
 ## Examples
 
 [`../examples/`](../examples/README.md), smallest to full: one adoption, two and a disown, refusals, a
-recorded game, a recorded ghost interview, and a catalog end to end that `make test` runs.
+recorded game, recorded ghost sessions, a catalog end to end, and a catalog hosted on your own
+domain — the last two run by `make test`.

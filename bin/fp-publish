@@ -7,7 +7,7 @@ command rather than a copy-paste, so the protocol repo and the catalog cannot
 drift into disagreeing about what was published.
 
     fp-publish ~/frompt/catalog                # sync, reindex, report
-    fp-publish ~/frompt/catalog --base URL     # set where the catalog is served from
+    fp-publish ~/frompt/catalog --base URL     # also record where the catalog is served from
     fp-publish ~/frompt/catalog --check        # would anything change?
     fp-publish ~/frompt/catalog --only pr-review,repo-recon   # publish these ids, nothing else
 
@@ -22,11 +22,16 @@ that quietly pushed signed bytes would be the wrong kind of convenient.
 Exit: 0 done (or nothing to do) · 1 drift found under --check · 2 unusable target.
 """
 import filecmp
+import json
 import pathlib
 import shutil
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import fpa_roots  # noqa: E402
+
+ROOT = fpa_roots.catalog()
+TOOLS = fpa_roots.TOOLS
 
 
 def main(argv):
@@ -80,13 +85,20 @@ def main(argv):
         shutil.copy2(src, dst)
 
     for extra in ("TEMPLATE.frompt.md",):
-        if (ROOT / extra).exists():
-            shutil.copy2(ROOT / extra, target / extra)
+        if (TOOLS / extra).exists():
+            shutil.copy2(TOOLS / extra, target / extra)
+
+    # Where a catalog is served is the catalog's own fact (frompt-catalog.json).
+    if base:
+        cfg_path = target / fpa_roots.CONFIG
+        cfg = json.loads(cfg_path.read_text()) if cfg_path.exists() else {}
+        cfg["url"] = base.rstrip("/")
+        cfg_path.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")
 
     print(f"staged {len(added)} new prompt file(s) into {target}")
     print("\nNow, in the catalog:")
     print(f"  cd {target}")
-    print("  fp-index" + (f"   # after setting base to {base}" if base else ""))
+    print("  fp-index" + (f"         # serves from {base.rstrip('/')}" if base else ""))
     print("  fp-sign          # with the publisher key, which lives outside the repo")
     print("  git add -A && git commit && git push")
     print("\nThe signature covers index.json. Commit it, its .sig, and the prompts together,")

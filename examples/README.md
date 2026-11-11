@@ -12,6 +12,7 @@ run it, and what passing looks like.
 | 05 | [ghost interview](05-ghost-interview/README.md) | addressing, relays, E7, disown | **recorded** session |
 | 07 | [a machine that may have a ghost](07-ghost-in-the-machine/README.md) | a character with hidden state, verdict endings, character versus agent | **recorded** session |
 | 06 | [catalog end to end](06-catalog-end-to-end/README.md) | publish, sign, register, resolve, verify | runnable script, run by `make test` |
+| 08 | [host your own catalog](08-host-your-own-catalog/README.md) | your own domain, trust by fingerprint, pins, a second publisher, a swapped key | runnable script, run by `make test` |
 
 *Annotated* transcripts are written to illustrate. *Recorded* ones are real agent output, copied
 verbatim. Everything under [`../conformance/results/`](../conformance/results/) is real output too,

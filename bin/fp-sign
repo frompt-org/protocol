@@ -8,7 +8,16 @@
 #
 #   fp-sign                        # sign index.json with .fpa/signing_key
 #   fp-sign --keygen               # create that key if it does not exist
-#   FPA_SIGNING_KEY=~/.ssh/id_ed25519 fp-sign
+#   fp-sign --catalog DIR          # name the catalog instead of standing in it
+#   FPA_SIGNING_KEY=~/.ssh/id_ed25519 fp-sign --catalog DIR
+#
+# It signs the catalog named by --catalog or FPA_CATALOG, else the one
+# bin/fpa_roots.py finds: the nearest directory upward holding
+# frompt-catalog.json, else this checkout. A key from outside the catalog
+# (FPA_SIGNING_KEY) signs only a catalog named explicitly: finding one by where
+# you stand is a convenience for the catalog's own key. The identity
+# is FPA_SIGNING_IDENTITY, else the catalog's `identity`, else
+# foreign-prompts-publisher.
 #
 # Uses ssh-keygen -Y, which is present wherever OpenSSH is, needs no GPG
 # keyring, and verifies with a plain allowed_signers file.
@@ -17,13 +26,36 @@
 # is index.json, index.json.sig and allowed_signers -- enough to verify, not
 # enough to forge.
 set -euo pipefail
-here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+tools=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+keygen=""; named="${FPA_CATALOG:-}"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --keygen) keygen=1 ;;
+    --catalog) [ $# -ge 2 ] || { echo "fp-sign: --catalog needs a value" >&2; exit 2; }
+               named="$2"; shift ;;
+    *) echo "fp-sign: unknown argument $1" >&2; exit 2 ;;
+  esac
+  shift
+done
+if [ -n "${FPA_SIGNING_KEY:-}" ] && [ -z "$named" ]; then
+  echo "fp-sign: FPA_SIGNING_KEY is set, so name the catalog to sign with --catalog DIR (or FPA_CATALOG)." >&2
+  echo "  A key from outside a catalog signs only a catalog somebody named, never the one you stand in." >&2
+  exit 2
+fi
+if [ -n "$named" ]; then
+  here=$(cd "$named" 2>/dev/null && pwd) || { echo "fp-sign: no catalog directory at $named" >&2; exit 2; }
+else
+  here=$(python3 "$tools/bin/fpa_roots.py" catalog)
+fi
 cd "$here"
 
 key="${FPA_SIGNING_KEY:-$here/.fpa/signing_key}"
-identity="${FPA_SIGNING_IDENTITY:-foreign-prompts-publisher}"
+configured=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("identity",""))' \
+  frompt-catalog.json 2>/dev/null || true)
+identity="${FPA_SIGNING_IDENTITY:-${configured:-foreign-prompts-publisher}}"
+case "$identity" in *[[:space:],]*|"") echo "fp-sign: identity '$identity' cannot contain spaces or commas -- it is an allowed_signers principal" >&2; exit 2;; esac
 
-if [ "${1:-}" = "--keygen" ]; then
+if [ -n "$keygen" ]; then
   mkdir -p "$(dirname "$key")"
   if [ -f "$key" ]; then
     echo "fp-sign: $key already exists; refusing to overwrite a signing key" >&2
@@ -48,9 +80,19 @@ fi
 # Merge, do not overwrite: allowed_signers is also this workspace's trust root
 # for OTHER publishers' catalogs, and an earlier version replaced the whole file
 # with one line every time it signed -- silently dropping every registered key.
-tmp_signers=$(mktemp 2>/dev/null || echo "/tmp/fp-signers-$$")
-{ [ -f allowed_signers ] && awk -v id="$identity" '$1 != id' allowed_signers; printf '%s %s\n' "$identity" "$(cat "$key.pub")"; } > "$tmp_signers"
-mv "$tmp_signers" allowed_signers
+# Written under the state lock and replaced whole, since where catalog and
+# workspace are one directory a registration may be writing it too.
+python3 - "$tools/bin" "$here" "$identity" "$key.pub" <<'PY' || { echo "fp-sign: cannot write allowed_signers" >&2; exit 1; }
+import pathlib, sys
+sys.path.insert(0, sys.argv[1])
+import fpa_roots
+here, identity, pub = pathlib.Path(sys.argv[2]), sys.argv[3], pathlib.Path(sys.argv[4])
+with fpa_roots.state_lock(here):
+    path = here / "allowed_signers"
+    keep = [l for l in (path.read_text().splitlines() if path.exists() else [])
+            if (l.split() or [""])[0] != identity]
+    fpa_roots.write_text_atomic(path, "\n".join(keep + [f"{identity} {pub.read_text().strip()}"]) + "\n")
+PY
 
 # Never claim a signature without checking it. This is the cheap half of the
 # whole mechanism, and skipping it is how the stale .sig went unnoticed.
@@ -59,8 +101,12 @@ if ! ssh-keygen -Y verify -f allowed_signers -I "$identity" -n foreign-prompts \
   echo "fp-sign: wrote a signature that does not verify -- refusing to claim success" >&2
   exit 1
 fi
+fingerprint=$(ssh-keygen -lf "$key.pub" | awk '{print $2}')
 echo "signed index.json -> index.json.sig (verified)"
 echo "published allowed_signers for identity '$identity'"
+echo "key fingerprint $fingerprint"
 echo
 echo "The private key stays in $key and is gitignored. Commit index.json,"
 echo "index.json.sig and allowed_signers; a managed agent needs exactly those three."
+echo "Publish the fingerprint somewhere other than the catalog -- a client registers with"
+echo "  fp-register <url> --key $fingerprint"

@@ -6,9 +6,22 @@ represented that moment: fpa.lock said what was pinned, never that anyone had
 agreed to it. This is the missing artifact — one line per catalog, the shape apt
 has used for thirty years.
 
-    fp-register <base> [--pin latest|version|digest] [--as who]
+    fp-register <base> --key SHA256:...  [--pin latest|version|digest] [--as who]
+    fp-register <base> --trust <allowed_signers-file> [...]
+    fp-register <base>              (the key is already in the workspace trust root)
     fp-register --list
     fp-unregister <base>            (same tool, invoked by that name)
+
+--key is how a client trusts a catalog on someone's own domain. The publisher
+gives you a fingerprint by some route that is not the catalog -- their website,
+a colleague, a README you already trust -- and the key itself is then read from
+<base>/allowed_signers and accepted only if it has exactly that fingerprint. The
+fingerprint is the trust root; the fetched key is merely checked against it,
+which is what keeps this inside FPA.md M7.
+
+Everything is recorded in the workspace (bin/fpa_roots.py): FPA_WORKSPACE, else
+this tool checkout. Point FPA_WORKSPACE at ~/.config/frompt for one record per
+user, or at a directory your fleet tooling provisions for one per machine.
 
 Registering verifies the catalog first: a catalog you cannot verify is not one you
 can meaningfully accept. It records the signer's fingerprint, so a later key
@@ -24,11 +37,19 @@ import datetime
 import json
 import os
 import pathlib
+import re
+import shutil
+import signal
 import subprocess
 import sys
+import tempfile
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
-FILE = ROOT / "fpa.registered"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import fpa_roots  # noqa: E402
+
+ROOT = fpa_roots.TOOLS
+WS = fpa_roots.workspace()
+FILE = WS / "fpa.registered"
 HEADER = [
     "# fpa.registered -- catalogs this workspace has accepted, and on what terms.",
     "#",
@@ -60,9 +81,221 @@ def render(entries):
     return "\n".join(lines) + "\n"
 
 
+def key_of(line):
+    """(principal, "type base64") of an allowed_signers line, or None."""
+    entry = fpa_roots.signers_entry(line)
+    return (entry[0], f"{entry[2]} {entry[3]}") if entry else None
+
+
+# What a registration may add to the trust root: one named principal, one key, and
+# at most the namespace this protocol signs in. The line is written here from those
+# parts, never copied from the catalog, so nothing else a served line says reaches
+# the trust root.
+PRINCIPAL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@+-]*")
+
+
+def publisher_line(line, src):
+    """The trust-root line for one served line, or raise ValueError saying why not."""
+    entry = fpa_roots.signers_entry(line)
+    if entry is None:
+        raise ValueError(f"cannot read a line in {src}")
+    principals, options, keytype, key = entry
+    if not PRINCIPAL.fullmatch(principals):
+        raise ValueError(f"{src} names the key for {principals!r}; a registration takes one plain "
+                         "principal -- no list, pattern or quotes")
+    extra = [n for n, v in options if not (n == "namespaces" and v == "foreign-prompts")]
+    if extra:
+        raise ValueError(f"{src} gives the key for {principals} the option(s) {', '.join(extra)}; "
+                         "a registration takes a key and nothing else")
+    return f'{principals} namespaces="foreign-prompts" {keytype} {key}'
+
+
+def fingerprint(key):
+    proc = subprocess.run(["ssh-keygen", "-lf", "-"], input=key + "\n", capture_output=True, text=True)
+    return proc.stdout.split()[1] if proc.returncode == 0 and proc.stdout.split() else None
+
+
+def fetch_signers(base):
+    """<base>/allowed_signers, through the same transports a catalog is read by."""
+    if base.startswith("gh:"):
+        lint = load_lint()
+        spec = base[len("gh:"):]
+        return lint.fetch_gh(f"gh:{spec}/allowed_signers")
+    if base.startswith(("http://", "https://")):
+        return load_lint().fetch(f"{base}/allowed_signers")
+    return pathlib.Path(base, "allowed_signers").read_text()
+
+
+def load_lint():
+    import importlib.machinery
+    import importlib.util
+    loader = importlib.machinery.SourceFileLoader("fp_lint", str(ROOT / "bin" / "fp-lint"))
+    spec = importlib.util.spec_from_loader("fp_lint", loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
+
+
+def extend_trust(lines, source, local):
+    """Add publisher keys to a trust root. A principal is a name a verification
+    reports ("signed by X"), so two different keys may not share one: the second
+    is refused rather than silently skipped or silently added."""
+    have = {}
+    if local.exists():
+        for l in local.read_text().splitlines():
+            k = key_of(l)
+            if k:
+                have.setdefault(k[0].lower(), set()).add(k[1])
+    added = []
+    for line in lines:
+        k = key_of(line)
+        if not k:
+            continue
+        principal, key = k
+        if key in have.get(principal.lower(), set()):
+            continue
+        if principal.lower() in have:
+            print(f"fp-register: the principal {principal!r} already names a different key in "
+                  f"the trust root.\n  Two publishers under one name would make 'signed by {principal}' "
+                  "mean either of them. Ask the publisher, or edit the trust root deliberately.",
+                  file=sys.stderr)
+            return None
+        local.parent.mkdir(parents=True, exist_ok=True)
+        with local.open("a") as f:
+            f.write(line.rstrip("\n") + "\n")
+        have.setdefault(principal.lower(), set()).add(key)
+        added.append(f"{principal} {fingerprint(key)}")
+    return added
+
+
+# A registration is one line of whitespace-separated fields, so every field it
+# records is one printable word.
+ONE_WORD = re.compile(r"[^\s\x00-\x1f\x7f-\x9f]+")
+
+
+class Trial:
+    """A registration is tried in a copy of the workspace's trust state, and kept
+    only if every check passes. The copy holds the trust root, the freshness floors
+    and the catalog bindings, and no fpa.registered: the trial checks the catalog
+    itself, not whether it is registered yet. Nothing in the real workspace changes
+    until commit(), so a refusal needs no undoing."""
+
+    FILES = ("allowed_signers",) + tuple(f".fpa/{name}" for name in fpa_roots.STATE.values())
+
+    def __init__(self):
+        # A workspace whose state cannot be read is not one to register into.
+        fpa_roots.read_trust_state(WS)
+        self.dir = pathlib.Path(tempfile.mkdtemp(prefix="fp-register-"))
+        for name in self.FILES:
+            if (WS / name).exists():
+                (self.dir / name).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(WS / name, self.dir / name)
+        self.trust = self.dir / "allowed_signers"
+        # What the trial started from. commit() folds in only what this run added on
+        # top of it, never the copy as a whole: the copy is a snapshot, and the
+        # workspace may have changed since (another registration, an unregister).
+        self.start_trust = self._trust_lines()
+        self.start_state = fpa_roots.read_trust_state(self.dir)
+
+    def _trust_lines(self):
+        return self.trust.read_text().splitlines() if self.trust.exists() else []
+
+    def discard(self):
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def commit(self, base, record):
+        """Fold the trial into the workspace and record the registration. Under the
+        state lock everything is read again and checked first -- the workspace's
+        state, any binding it already holds, the registration it may already have --
+        and only then written, each file whole: floors and bindings first, then the
+        registration, and the trust root last, so that a run stopped part way leaves
+        a key that is not trusted rather than one trusted without a registration."""
+        with fpa_roots.state_lock(WS):
+            floors, signers, addresses = fpa_roots.read_trust_state(WS)
+            t_floors, t_signers, t_addresses = fpa_roots.read_trust_state(self.dir)
+            s_floors, s_signers, s_addresses = self.start_state
+            # Only what this run changed: floors it raised, bindings it made.
+            run_floors = {k: v for k, v in t_floors.items() if s_floors.get(k) != v}
+            run_signers = {k: v for k, v in t_signers.items() if k not in s_signers}
+            run_addresses = {k: v for k, v in t_addresses.items() if k not in s_addresses}
+            for k, v in run_signers.items():
+                clash = fpa_roots.binding_conflict(signers, k, v)
+                if clash:
+                    raise Refused(f"this workspace binds {clash[0]} to the signer {clash[1]}, not {v}")
+            for k, v in run_addresses.items():
+                if addresses.get(k, v) != v:
+                    raise Refused(f"this workspace binds {k} to the catalog {addresses[k]}, not {v}")
+            entries = parse()
+            was = entries.get(base)
+            if was and was["fingerprint"] != record["fingerprint"]:
+                raise Refused(f"{base} was registered against key {was['fingerprint']} meanwhile")
+            # The trust root as it stands now, and the lines this run added to its copy.
+            # A principal names one key: a line whose principal, compared without regard
+            # to case, already names a different key here is refused, as extend_trust()
+            # refused it against the snapshot.
+            local = WS / "allowed_signers"
+            have = local.read_text().splitlines() if local.exists() else []
+            named = {}
+            for line in have:
+                k = key_of(line)
+                if k:
+                    named.setdefault(k[0].lower(), set()).add(k[1])
+            new = []
+            for line in self._trust_lines():
+                if line in self.start_trust or line in have:
+                    continue
+                k = key_of(line)
+                if k and named.get(k[0].lower(), {k[1]}) != {k[1]}:
+                    raise Refused(f"the principal {k[0]!r} names a different key in the trust root "
+                                  "now -- another registration took it meanwhile")
+                new.append(line)
+            for k, v in run_floors.items():
+                floors[k] = max(v, floors.get(k, v))
+            for mine, theirs in ((signers, run_signers), (addresses, run_addresses)):
+                for k, v in theirs.items():
+                    mine.setdefault(k, v)
+            # The key this registration trusts must be in the trust root it leaves
+            # behind: one already there may have been removed meanwhile.
+            kept = {fingerprint(k[1]) for k in map(key_of, have + new) if k}
+            if record["fingerprint"] not in kept:
+                raise Refused(f"the key {record['fingerprint']} left the trust root meanwhile")
+            entries[base] = record
+            fpa_roots.write_state(WS, "floors", floors)
+            fpa_roots.write_state(WS, "signers", signers)
+            fpa_roots.write_state(WS, "addresses", addresses)
+            fpa_roots.write_text_atomic(FILE, render(entries))
+            if new:
+                fpa_roots.write_text_atomic(local, "\n".join(have + new) + "\n")
+        self.discard()
+        return new
+
+
+class Refused(Exception):
+    """A registration this run will not record."""
+
+
+def drop_key(fp):
+    """Remove the trust-root lines for the key with this fingerprint."""
+    local = WS / "allowed_signers"
+    if not local.exists():
+        return 0
+    keep, dropped = [], 0
+    for line in local.read_text().splitlines():
+        k = key_of(line)
+        if k and fingerprint(k[1]) == fp:
+            dropped += 1
+            continue
+        keep.append(line)
+    if dropped:
+        fpa_roots.write_text_atomic(local, "\n".join(keep) + ("\n" if keep else ""))
+    return dropped
+
+
 def main(argv):
     invoked_as = pathlib.Path(argv[0]).name
-    args = [a for a in argv[1:] if not a.startswith("-")]
+    valued = {"--key", "--trust", "--pin", "--as"}
+    args = [a for i, a in enumerate(argv[1:], 1)
+            if not a.startswith("-") and argv[i - 1] not in valued]
     if "-h" in argv or "--help" in argv:
         print(__doc__)
         return 0
@@ -82,40 +315,126 @@ def main(argv):
         print(__doc__)
         return 2
     base = args[0].rstrip("/")
+    if not ONE_WORD.fullmatch(base):
+        print(f"fp-register: {base!r} cannot be a catalog address here -- it must be one word "
+              "with no spaces or control characters", file=sys.stderr)
+        return 2
 
     if invoked_as == "fp-unregister" or "--remove" in argv:
-        if base not in entries:
-            print(f"fp-unregister: {base} is not registered", file=sys.stderr)
-            return 1
-        del entries[base]
-        FILE.write_text(render(entries))
-        print(f"unregistered {base}\n  Nothing else revoked it, because nothing else agreed to it.")
-        if not entries:
-            print("  fpa.registered is now empty. It still opts this workspace into the model, so\n"
-                  "  every catalog is refused until one is registered. Delete the file to opt out.")
-        return 0
+        # Under the state lock, read again: a registration committing meanwhile
+        # writes the same two files.
+        try:
+            with fpa_roots.state_lock(WS):
+                entries = parse()
+                if base not in entries:
+                    print(f"fp-unregister: {base} is not registered", file=sys.stderr)
+                    return 1
+                gone = entries.pop(base)
+                fpa_roots.write_text_atomic(FILE, render(entries))
+                print(f"unregistered {base}\n  Nothing else revoked it, because nothing else agreed to it.")
+                # The key came in with the registration, so it leaves with it -- unless
+                # another registration still names it. A publisher that rotates its key is
+                # then unregistered and registered again, under the same principal.
+                if not any(e["fingerprint"] == gone["fingerprint"] for e in entries.values()):
+                    if drop_key(gone["fingerprint"]):
+                        print(f"  its key {gone['fingerprint']} is removed from the trust root")
+            if not entries:
+                print("  fpa.registered is now empty. It still opts this workspace into the model, so\n"
+                      "  every catalog is refused until one is registered. Delete the file to opt out.")
+            return 0
+        except fpa_roots.StateError as exc:
+            print(f"fp-unregister: {exc}. Refusing to change a workspace whose state cannot be "
+                  "used.", file=sys.stderr)
+            return 2
 
-    # --trust <allowed_signers>: extend the local trust root with this publisher's
-    # key, obtained out of band. The trust root is never fetched from the catalog
-    # it validates (M7); registering is where the pilot brings the key themselves.
-    if "--trust" in argv:
-        src = pathlib.Path(argv[argv.index("--trust") + 1])
-        local = ROOT / "allowed_signers"
-        have = {l.split()[0] for l in local.read_text().splitlines() if l.strip()} if local.exists() else set()
-        added = []
-        for line in src.read_text().splitlines():
-            if line.strip() and line.split()[0] not in have:
-                with local.open("a") as f:
-                    f.write(line.rstrip("\n") + "\n")
-                added.append(line.split()[0])
-        if added:
-            print(f"trust root extended with {', '.join(added)} from {src} -- confirm that fingerprint out of band")
+    # The trust root is never fetched from the catalog it validates (M7). The pilot
+    # brings it: as a file obtained out of band (--trust), or as a fingerprint
+    # obtained out of band (--key), against which the catalog's published key is
+    # then checked. Either way the decision was made somewhere else.
+    pin = fpa_roots.flag_value(argv, "--pin", "fp-register") or "latest"
+    if pin not in ("latest", "version", "digest"):
+        print(f"fp-register: --pin must be latest, version or digest", file=sys.stderr)
+        return 2
+    who = fpa_roots.flag_value(argv, "--as", "fp-register") or os.environ.get("USER") or "unknown"
+    if not ONE_WORD.fullmatch(who):
+        print(f"fp-register: {who!r} cannot be recorded as who registered -- it must be one word "
+              "with no spaces or control characters (set --as)", file=sys.stderr)
+        return 2
+
+    try:
+        trial = Trial()
+    except fpa_roots.StateError as exc:
+        print(f"fp-register: {exc}. Refusing to register into a workspace whose state cannot be read.",
+              file=sys.stderr)
+        return 1
+    try:
+        return register(argv, entries, base, pin, who, trial)
+    except fpa_roots.StateError as exc:
+        print(f"fp-register: {exc}. Nothing was registered.", file=sys.stderr)
+        return 1
+    except Refused as exc:
+        print(f"fp-register: {exc}. Nothing was registered.", file=sys.stderr)
+        return 1
+    finally:
+        trial.discard()
+
+
+def register(argv, entries, base, pin, who, trial):
+    want = fpa_roots.flag_value(argv, "--key", "fp-register")
+    if want is not None and not want.startswith("SHA256:"):
+        print("fp-register: --key takes a fingerprint, SHA256:..., as ssh-keygen -l prints it",
+              file=sys.stderr)
+        return 2
+    if "--trust" in argv or want:
+        if "--trust" in argv:
+            src = fpa_roots.flag_value(argv, "--trust", "fp-register")
+            text = pathlib.Path(src).read_text()
+        else:
+            src = f"{base}/allowed_signers"
+            try:
+                text = fetch_signers(base)
+            except Exception as exc:  # noqa: BLE001
+                print(f"fp-register: cannot read {src} -- {exc}", file=sys.stderr)
+                return 2
+        lines = [l for l in text.splitlines() if key_of(l)]
+        if want:
+            lines = [l for l in lines if fingerprint(key_of(l)[1]) == want]
+            if not lines:
+                print(f"fp-register: no key with fingerprint {want} in {src}.\n"
+                      "  Either the fingerprint you were given is not this catalog's, or the catalog "
+                      "is not serving the key its publisher gave you. Do not register it.",
+                      file=sys.stderr)
+                return 1
+            if len(lines) > 1:
+                print(f"fp-register: {src} serves the key {want} on {len(lines)} lines.\n"
+                      "  A registration trusts one key under one principal. Do not register it.",
+                      file=sys.stderr)
+                return 1
+        try:
+            lines = [publisher_line(l, src) for l in lines]
+        except ValueError as exc:
+            print(f"fp-register: {exc}. Do not register it.", file=sys.stderr)
+            return 1
+        if extend_trust(lines, src, trial.trust) is None:
+            return 1
 
     verify = ROOT / "bin" / "fp-verify"
-    # --registering: check the catalog itself, but not whether it is already
-    # registered. Otherwise the first check forbids the act it is checking for.
-    proc = subprocess.run([str(verify), "--from", base, "--registering"],
-                          capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    # Verified in the trial workspace, which has no fpa.registered: the catalog is
+    # checked on its own merits, and the real workspace's register still applies to
+    # everyone else.
+    # Stopped meanwhile, this run asks fp-verify to stop too (SIGTERM, not the
+    # SIGKILL subprocess.run would send), so that it removes its scratch directory.
+    child = subprocess.Popen([str(verify), "--from", base],
+                             env=dict(os.environ, FPA_WORKSPACE=str(trial.dir)),
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                             stdin=subprocess.DEVNULL)
+    try:
+        out, err = child.communicate()
+    except BaseException:
+        child.terminate()
+        child.wait()
+        raise
+    proc = subprocess.CompletedProcess(child.args, child.returncode, out, err)
     if proc.returncode != 0:
         print(f"fp-register: cannot verify {base} -- refusing to record consent to a catalog "
               f"this workspace cannot check.\n  {proc.stderr.strip().splitlines()[0] if proc.stderr.strip() else ''}",
@@ -126,19 +445,17 @@ def main(argv):
     # found it -- not the first key in the local file, which is some other publisher's.
     fp = None
     for line in proc.stdout.splitlines():
-        if line.startswith("manifest verified:") and line.split()[-1].startswith("SHA256:"):
-            fp = line.split()[-1]
+        if line.startswith("manifest verified:"):
+            fp = line.split()[-1] if line.split()[-1].startswith("SHA256:") else None
+            break
     if not fp:
         print("fp-register: fp-verify did not report the signing key's fingerprint", file=sys.stderr)
         return 1
 
-    pin = "latest"
-    if "--pin" in argv:
-        pin = argv[argv.index("--pin") + 1]
-    if pin not in ("latest", "version", "digest"):
-        print(f"fp-register: --pin must be latest, version or digest", file=sys.stderr)
-        return 2
-    who = argv[argv.index("--as") + 1] if "--as" in argv else os.environ.get("USER", "unknown")
+    if want and fp != want:
+        print(f"fp-register: {base} is signed by {fp}, not by the key you were given ({want}).\n"
+              "  Do not register it.", file=sys.stderr)
+        return 1
 
     was = entries.get(base)
     if was and was["fingerprint"] != fp:
@@ -147,12 +464,20 @@ def main(argv):
               "Unregister first, deliberately, if this is expected.", file=sys.stderr)
         return 1
 
-    entries[base] = {"fingerprint": fp, "pin": pin,
-                     "when": datetime.datetime.now().strftime("%Y-%m-%d"), "who": who}
-    FILE.write_text(render(entries))
+    added = trial.commit(base, {"fingerprint": fp, "pin": pin,
+                                "when": datetime.datetime.now().strftime("%Y-%m-%d"), "who": who})
+    if added:
+        print(f"trust root {WS / 'allowed_signers'} extended:\n  " + "\n  ".join(added))
     print(f"registered {base}\n  key {fp}\n  pin {pin}, by {who}")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    # A stop request ends the run through the same cleanup as a refusal, so the
+    # trial copy does not outlive it.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    signal.signal(signal.SIGHUP, lambda *_: sys.exit(129))
+    try:
+        sys.exit(main(sys.argv))
+    except KeyboardInterrupt:
+        sys.exit(130)

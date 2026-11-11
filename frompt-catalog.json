@@ -1,0 +1,17 @@
+{
+  "url": "https://raw.githubusercontent.com/frompt-org/protocol/main",
+  "identity": "foreign-prompts-publisher",
+  "validity_days": 30,
+  "summaries": {
+    "help-me": "Stuck? It interviews your agent about this session, then proposes a route through other prompts. Start here.",
+    "repo-recon": "Maps an unfamiliar codebase from entry points, seams and git churn. Twelve reads, five sections, read-only.",
+    "pr-review": "Judges a diff by tiers — correctness, blast radius, failure mode, reversibility, design fit. No praise, no nits.",
+    "bug-repro": "Reproduces before fixing, then stops. Falsifiable claim, shortest repro, failing/passing boundary.",
+    "grill-me": "Attacks your idea instead of encouraging it. Finds the weakest load-bearing assumption and asks what would falsify it.",
+    "ticket-intake": "Takes a support intake like a good first-line engineer, then drafts one ticket a stranger could act on.",
+    "welcome-tour": "A host prompt: a company guiding a visiting agent through its services. Reads nothing of yours.",
+    "ghost-in-the-gist": "A three-move ASCII terminal game. No engine — the document is the interpreter spec.",
+    "handoff-note": "Writes the note that lets a cold reader resume your work: state, next action, decisions with reasons.",
+    "fpa-bootstrap": "Teaches the protocol itself to an agent that has never heard of it, refusals included."
+  }
+}

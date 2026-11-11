@@ -3,35 +3,49 @@
 **You end with:** agents that resolve frompts by id from a catalog you registered once, with no digest
 typed — and that refuse anything that does not verify.
 
-## 1. Register the catalog, once
+## 1. Choose where this client keeps its trust
 
 ```
-bin/fp-register gh:frompt-org/catalog@main --pin latest --trust ./frompt-catalog.allowed_signers
+export FPA_WORKSPACE=~/.config/frompt
 ```
 
-`--trust` brings the publisher's key in from a file you obtained yourself. The registration line in
+The **workspace** holds what this client trusts: its `allowed_signers`, the registrations in
+`fpa.registered`, the pins in `fpa.lock`, and the freshness floors and adoption record in `.fpa/`.
+Without `FPA_WORKSPACE` it is the tool checkout itself. One workspace per set of agents that should
+share a consent record: per user, per machine (provisioned by your fleet tooling), or per project.
+
+## 2. Register the catalog, once
+
+```
+fp-register https://raw.githubusercontent.com/frompt-org/catalog/main \
+  --key SHA256:x4Z+wsX1wVrBt5SV/NWWgPfapXlpcmSk3rqZ36Y/rKY --pin version
+```
+
+`--key` is the publisher's fingerprint, obtained from somewhere other than the catalog. The
+publisher's key is read from the catalog and trusted only if it matches it (FPA.md M7a). If you
+received the key itself, `--trust <file>` takes it instead. The registration line in
 `fpa.registered` records the catalog, the key's fingerprint, the pin mode, when, and who. That line
 is the consent.
 
-## 2. Resolve by id
+## 3. Pin, then resolve by id
 
 ```
-bin/fp-resolve pr-review@latest --from gh:frompt-org/catalog@main
+fp-lock --update pr-review --from https://raw.githubusercontent.com/frompt-org/catalog/main
+fp-resolve pr-review --from https://raw.githubusercontent.com/frompt-org/catalog/main
 ```
 
 The manifest is verified first — signature against your key, the registered fingerprint, expiry,
 the freshness floor — and only then is the document fetched and checked against the digest it
 names.
 
-## 3. Choose how much drift you accept
-
 `--pin latest` floats to each new version. `version` and `digest` require a matching line in
-`fpa.lock` (`bin/fp-lock`), so a bump arrives only as a re-pin somebody reviews.
+`fpa.lock`, so a bump arrives only as a re-pin somebody reviews: `fp-lock --update <id> --from
+<catalog>`, which pins the latest version after verifying it.
 
 ## 4. The managed path
 
 ```
-bin/fp-verify pr-review --from gh:frompt-org/catalog@main
+fp-verify pr-review --from https://raw.githubusercontent.com/frompt-org/catalog/main
 ```
 
 No human at all: a signature authorizes, and anything that cannot be verified fails closed.
@@ -47,7 +61,7 @@ $ bin/fp-resolve pr-review --lock
 fp-resolve: pr-review has moved since it was pinned
   pinned  1.2.0 7f364c1f8cd4…
   fetched 6c0aaea5c2f3…
-Re-pin deliberately with 'bin/fp-lock --update' if that is what you want.
+Re-pin deliberately with 'fp-lock --update pr-review' if that is what you want.
 ```
 
 Pinning is not safer than floating by itself. It makes the choice **a line somebody reviews** instead of an event nobody sees.
@@ -73,7 +87,7 @@ Four things have to hold, and each one closes an attack that the others do not:
 - **The manifest expires.** A serial floor is a memory, and a client that has never seen a newer manifest has none — a fresh agent, a wiped store, a clean container. All of them would accept an arbitrarily old signed bundle, and every signature on it verifies. `not_after` needs no memory: a replay dies on its own. This is apt's `Valid-Until`, and the reason WebPKI shortened certificate lifetimes instead of trusting revocation.
 
 - **The trust root is local.** `allowed_signers` is never fetched from the host it is used to check — a signer list taken from the same place as the signature proves only that the two agree with each other.
-- **The serial is monotonic.** Every signature on last month's manifest is still perfectly valid, so replaying one is a rollback that needs no key. A client refuses a serial below the highest it has accepted.
+- **The serial is monotonic.** Every signature on last month's manifest is still perfectly valid, so replaying one is a rollback that needs no key. A client refuses a serial below the highest it has accepted from that catalog under that key — keyed by both, so another publisher the client trusts cannot sign its way into raising this catalog's floor.
 - **Digests cover bytes.** Reading a document as text first normalizes line endings, and a CRLF copy then hashes identical to its LF original while differing byte for byte.
 
 **A digest proves the bytes are the bytes you expected; only a signature proves who expected them.** That is why the manifest is signed and the documents are not — one signature covers the set, and revocation is dropping an entry rather than reaching every agent.
